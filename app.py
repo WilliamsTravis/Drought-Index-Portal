@@ -45,11 +45,13 @@ if platform == 'win32':
     data_path = 'd:/'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
     from flask_cache import Cache  # This one works on Windows but not Linux
+    startyear = 1948
 else:
     home_path = '/home/ubuntu'  # Not sure yet
     os.chdir(os.path.join(home_path, 'Ubuntu-Practie-Machine'))
     data = '/home/ubunutu'
     from flask_caching import Cache  # This works on Linux but not Windows :)
+    startyear = 1980
 
 # In[] Create the DASH App object
 app = dash.Dash(__name__)
@@ -118,34 +120,42 @@ maptypes = [{'label': 'Light', 'value': 'light'},
             {'label': 'Satellite', 'value': 'satellite'},
             {'label': 'Satellite Streets', 'value': 'satellite-streets'}]
 
+# Year Marks for Slider
+years = [int(y) for y in range(startyear, 2018)]
+yearmarks = dict(zip(years, years))
+for y in yearmarks:
+    if y % 5 != 0:
+        yearmarks[y] = ""
+
 # Set up initial signal and raster to scatterplot conversion
 # A source grid for scatterplot maps - will need more for optional resolution
 source = xr.open_dataarray(os.path.join(home_path, "data/source_array.nc"))
-
+sample = xr.open_dataarray(os.path.join(data_path,
+                                        "data/droughtindices/pdsi/"+
+                                        "pdsi_2018_12_PRISM.nc"))
 
 # Create Coordinate index positions from xarray
 def convertCoords(source):
     # Geometry
     x_length = source.shape[2]
     y_length = source.shape[1]
-    resolution = source.res[0]
+    
+    # Resolution is not always available
+    res = source.res[0]  
     lon_min = source.transform[0]
-    lat_max = source.transform[3] - resolution
+    lat_max = source.transform[3] - res
 
     # Make dictionaires with coordinates and array index positions
     xs = range(x_length)
     ys = range(y_length)
-    lons = [lon_min + resolution*x for x in xs]
-    lats = [lat_max - resolution*y for y in ys]
+    lons = [lon_min + xres*x for x in xs]
+    lats = [lat_max - yres*y for y in ys]
     londict = dict(zip(lons, xs))
     latdict = dict(zip(lats, ys))
     londict2 = {y: x for x, y in londict.items()}
     latdict2 = {y: x for x, y in latdict.items()}
 
     return [londict, latdict, londict2, latdict2]
-
-
-londict, latdict, londict2, latdict2 = convertCoords(source)
 
 # Map Layout:
 # Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
@@ -179,23 +189,178 @@ layout = dict(
 
 # In[]: Create App Layout
 app.layout = html.Div([
+        html.Div([html.Img(src=('https://github.com/WilliamsTravis/' +
+                                'Ubuntu-Practice-Machine/blob/master/images/' +
+                                'banner2.png?raw=true'),
+                  style={'width': '100%',
+                         'box-shadow': '1px 1px 1px 1px black'})]),
+        html.Hr(),
+        html.Div([html.H1('Raster to Scatterplot Visualization')],
+                 className='twelve columns',
+                 style={'font-weight': 'bold',
+                        'text-align': 'center',
+                        'font-family': 'Bookman Old Style'}),
+        
+
+        # Year Slider
         html.Div([
-                html.Img(src='images/banner2.png'),
-                html.H1('Raster to Scatterplot Visualization',
-                        className='twelve columns',
-                        style={'font-weight': 'bold',
-                               'text-align': 'center'})
-                ]),
+                 html.Hr(),
+                 html.P('Study Period Year Range'),
+                 dcc.RangeSlider(
+                     id='year_slider',
+                     value=[startyear, 2017],
+                     min=startyear,
+                     max=2017,
+                     marks=yearmarks)],
+                 className="twelve columns",
+                 style={'margin-top': '0',
+                        'margin-bottom': '40'}),
+
+        # Four by Four Map Layout
+        # Row 1
+        html.Div([
+                 html.Div([
+                          html.Div([
+                                   dcc.Dropdown(id='choice_1',
+                                                options=indices,
+                                                value='pdsi')],
+                                   style={'width': '35%'}),
+                          dcc.Graph(id='map_1')],
+                          className='six columns',
+                          style={'float': 'left',
+                                 'margin-top': '40'}),
+                 html.Div([
+                          html.Div([
+                                   dcc.Dropdown(id='choice_2',
+                                                options=indices,
+                                                value='noaa')],
+                                   style={'width': '35%'}),
+                          dcc.Graph(id='map_2')],
+                          className='six columns',
+                          style={'float': 'right',
+                                 'margin-top': '40'})],
+                 className='row'),
+
+        # Row 2
+        html.Div([
+                 html.Div([
+                          html.Div([
+                                   dcc.Dropdown(id='choice_3',
+                                                options=indices,
+                                                value='noaa')],
+                                   style={'width': '35%'}),
+                          dcc.Graph(id='map_3')],
+                          className='six columns',
+                          style={'float': 'left',
+                                 'margin-top': '40'}),
+                 html.Div([
+                          html.Div([
+                                   dcc.Dropdown(id='choice_4',
+                                                options=indices,
+                                                value='noaa')],
+                                   style={'width': '35%'}),
+                          dcc.Graph(id='map_4')],
+                          className='six columns',
+                          style={'float': 'right',
+                                 'margin-top': '40'})],
+                 className='row'),
+    # The end!
         ],
-    className='ten columns offset-by-one'
-    )
+    className='ten columns offset-by-one')
 
 # In[]:
+@app.callback(Output('map_1', 'figure'),
+              [Input('choice_1', 'value')])
+def makeMap1(choice):
+    # Clear memory space...what's the best way to do this?
+    gc.collect()
+    
+    # get coordinate-array index dictionaries
+    # Geometry
+    x_length = sample.shape[2]
+    y_length = sample.shape[1]
+    
+    # Resolution is not always available
+    res = float(sample.latitude[0] - sample.latitude[1])
+    lon_min = float(sample.longitude[0])
+    lat_max = float(sample.latitude[len(sample.latitude)-1]) - res
+
+    # Make dictionaires with coordinates and array index positions
+    xs = range(x_length)
+    ys = range(y_length)
+    lons = [lon_min + res*x for x in xs]
+    lats = [lat_max - res*y for y in ys]
+    londict = dict(zip(lons, xs))
+    latdict = dict(zip(lats, ys))
+    londict2 = {y: x for x, y in londict.items()}
+    latdict2 = {y: x for x, y in latdict.items()}
+
+    # For now we will just use sample...which is upside down
+    # data = sample.data[0]
+    # data = np.array([data[::-1]], dtype="float32")
+    
+    # # Return the data!
+    # sample.data = data    
+    
+    # Now all this
+    dfs = xr.DataArray(sample, name = "data")
+    pdf = dfs.to_dataframe()
+    step = res
+    to_bin = lambda x: np.floor(x / step) * step
+    pdf["latbin"] = pdf.index.get_level_values('latitude').map(to_bin)
+    pdf["lonbin"] = pdf.index.get_level_values('longitude').map(to_bin)
+    pdf['gridx']= pdf['lonbin'].map(londict)
+    pdf['gridy']= pdf['latbin'].map(latdict)
+    # grid2 = np.copy(grid)
+    # grid2[np.isnan(grid2)] = 0
+    # pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
+    # pdf['grid'] = pdf['grid'].apply(int).apply(str)
+    # pdf['data'] = pdf['data'].astype(float).round(3)
+    # pdf['printdata'] = "GRID #: " + pdf['grid'] + "<br>Data: " + pdf['data'].apply(str)
+
+    df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
+    df = df_flat[np.isfinite(df_flat['data'])]
+
+    # Colors 
+    # Split the range into 6 numbers from min to max
+    dmin = np.nanmin(pdf.data)
+    dmax = np.nanmax(pdf.data)
+    tick = abs((dmin - dmax) / 6)
+    ticks = [dmin + tick*i for i in range(7)]
+    colorscale = [[ticks[0], 'rgb(68, 13, 84)'],
+                  [ticks[1], 'rgb(47, 107, 142)'],
+                  [ticks[2], 'rgb(32, 164, 134)'],
+                  [ticks[3], 'rgb(255, 239, 71)'],
+                  [ticks[4], 'rgb(229, 211, 13)'],
+                  [ticks[5], 'rgb(252, 63, 0)'],
+                  [ticks[6], 'rgb(140, 35, 0)']]
+    
+# Create the scattermapbox object
+    data = [
+        dict(
+        type='scattermapbox',
+        lon=df['lonbin'],
+        lat=df['latbin'],
+        text=df['data'],
+        mode='markers',
+        hoverinfo='text',
+        marker=dict(
+            colorscale=colorscale,
+            cmin=dmin,
+            color=df['data'],
+            cmax=dmax,
+            opacity=0.85,
+            size=5,
+            colorbar=dict(
+                textposition="auto",
+                orientation="h",
+                font=dict(size=15)
+                )
+            )
+        )]
+    figure = dict(data=data, layout=layout)
+    return figure
 
 # In[] Run Application through the server
 if __name__ == '__main__':
     app.run_server()
-
-
-
-
