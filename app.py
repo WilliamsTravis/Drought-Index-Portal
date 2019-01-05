@@ -59,8 +59,8 @@ from functions import npzIn
 app = dash.Dash(__name__)
 
 # Go to stylesheet, styled after a DASH example (how to serve locally?)
-app.css.append_css({'external_url': 'https://rawgit.com/WilliamsTravis/' +
-                    'PRF-USDM/master/dash-stylesheet.css'})
+app.css.append_css({'external_url': 'https://codepen.io/williamstravis/pen/' +
+                                    'maxwvK.css'})
 
 # Create Server Object
 server = app.server
@@ -72,6 +72,11 @@ cache.init_app(server)
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
+
+# which banner?
+time_modulo = round(time.time())%5
+banners = {0: 1, 1:2, 2:3, 3:4, 4:5}
+image_time = banners[time_modulo]
 
 # In[] Drought and Climate Indices (looking to include any raster time series)
 # Index Paths (for npz files)
@@ -158,7 +163,7 @@ layout = dict(
     autosize=True,
     height=500,
     font=dict(color='#CCCCCC'),
-    titlefont=dict(color='#FCF003', size='20'),
+    titlefont=dict(color='#DD7D24', size='20'),
     margin=dict(
         l=55,
         r=35,
@@ -186,7 +191,7 @@ layout = dict(
 app.layout = html.Div([
         html.Div([html.Img(src=('https://github.com/WilliamsTravis/' +
                                 'Ubuntu-Practice-Machine/blob/master/images/' +
-                                'banner2.png?raw=true'),
+                                'banner' + str(image_time) + '.png?raw=true'),
                   style={'width': '100%',
                          'box-shadow': '1px 1px 1px 1px black'})]),
         html.Hr(),
@@ -266,18 +271,23 @@ app.layout = html.Div([
 
 # In[]: App callbacks
 @app.callback(Output('map_1', 'figure'),
-              [Input('choice_1', 'value')])
-def makeMap1(choice):
+              [Input('choice_1', 'value'),
+               Input('year_slider', 'value')])
+def makeMap1(choice, years):
     # Clear memory space...what's the best way to do this?
     gc.collect()
 
     # Get numpy arrays
-    array_path = os.path.join(data_path, "data/droughtindices/npz", 
-                        choice + '_arrays.npz')
-    date_path =  os.path.join(data_path, "data/droughtindices/npz", 
-                        choice + '_dates.npz')
+    array_path = os.path.join(data_path, "data/droughtindices/npz",
+                              choice + '_arrays.npz')
+    date_path = os.path.join(data_path, "data/droughtindices/npz", 
+                              choice + '_dates.npz')
     indexlist = npzIn(array_path, date_path)
-    
+
+    # filter by year
+    indexlist = [a for a in indexlist if int(a[0][-6:-2]) >= years[0] and
+              int(a[0][-6:-2]) <= years[1]]
+
     # Apply chosen funtion
     arrays = [i[1] for i in indexlist]
     array = np.nanmean(arrays, axis=0)
