@@ -73,11 +73,6 @@ cache.init_app(server)
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
 
-# which banner?
-time_modulo = round(time.time())%5
-banners = {0: 1, 1:2, 2:3, 3:4, 4:5}
-image_time = banners[time_modulo]
-
 # In[] Drought and Climate Indices (looking to include any raster time series)
 # Index Paths (for npz files)
 indices = [{'label': 'Rainfall Index', 'value': 'noaa'},
@@ -189,9 +184,10 @@ layout = dict(
 
 # In[]: Create App Layout
 app.layout = html.Div([
-        html.Div([html.Img(src=('https://github.com/WilliamsTravis/' +
+        html.Div([html.Img(id='banner',
+                           src=('https://github.com/WilliamsTravis/' +
                                 'Ubuntu-Practice-Machine/blob/master/images/' +
-                                'banner' + str(image_time) + '.png?raw=true'),
+                                'banner1.png?raw=true'),
                   style={'width': '100%',
                          'box-shadow': '1px 1px 1px 1px black'})]),
         html.Hr(),
@@ -270,6 +266,7 @@ app.layout = html.Div([
 
 
 # In[]: App callbacks
+
 @app.callback(Output('map_1', 'figure'),
               [Input('choice_1', 'value'),
                Input('year_slider', 'value')])
@@ -353,6 +350,19 @@ def makeMap1(choice, years):
         )]
     figure = dict(data=data, layout=layout)
     return figure
+
+@app.callback(Output('banner', 'src'),
+              [Input('choice_1', 'value')])
+def whichBanner(value):
+    # which banner?
+    time_modulo = round(time.time()) % 5
+    print(str(time_modulo))
+    banners = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5}
+    image_time = banners[time_modulo]
+    image = ('https://github.com/WilliamsTravis/' +
+             'Ubuntu-Practice-Machine/blob/master/images/' +
+             'banner' + str(image_time) + '.png?raw=true')
+    return image
 
 # In[] Run Application through the server
 if __name__ == '__main__':
