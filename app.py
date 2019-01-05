@@ -113,6 +113,7 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'eddi2': 'Evaporative Demand Drought Index - 2 month',
               'eddi3': 'Evaporative Demand Drought Index - 3 month',
               'eddi6': 'Evaporative Demand Drought Index - 6 month'}
+
 # In[] The map
 # Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
