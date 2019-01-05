@@ -271,7 +271,7 @@ app.layout = html.Div([
 @app.callback(Output('map_1', 'figure'),
               [Input('choice_1', 'value'),
                Input('year_slider', 'value')])
-def makeMap1(choice, years):
+def makeMap1(choice, year_range):
     # Clear memory space...what's the best way to do this?
     gc.collect()
 
@@ -281,10 +281,14 @@ def makeMap1(choice, years):
     date_path = os.path.join(data_path, "data/droughtindices/npz", 
                               choice + '_dates.npz')
     indexlist = npzIn(array_path, date_path)
+    
+    # Get total Min and Max Values for colors
+    dmin = np.nanmin([i[1] for i in indexlist])
+    dmax = np.nanmax([i[1] for i in indexlist])
 
     # filter by year
-    indexlist = [a for a in indexlist if int(a[0][-6:-2]) >= years[0] and
-              int(a[0][-6:-2]) <= years[1]]
+    indexlist = [a for a in indexlist if int(a[0][-6:-2]) >= year_range[0] and
+              int(a[0][-6:-2]) <= year_range[1]]
 
     # Apply chosen funtion
     arrays = [i[1] for i in indexlist]
@@ -314,17 +318,14 @@ def makeMap1(choice, years):
 
     # Colors 
     # Split the range into 6 numbers from min to max
-    dmin = np.nanmin(pdf.data)
-    dmax = np.nanmax(pdf.data)
-    tick = abs((dmin - dmax) / 6)
-    ticks = [dmin + tick*i for i in range(7)]
-    colorscale = [[ticks[0], 'rgb(68, 13, 84)'],
-                  [ticks[1], 'rgb(47, 107, 142)'],
-                  [ticks[2], 'rgb(32, 164, 134)'],
-                  [ticks[3], 'rgb(255, 239, 71)'],
-                  [ticks[4], 'rgb(229, 211, 13)'],
-                  [ticks[5], 'rgb(252, 63, 0)'],
-                  [ticks[6], 'rgb(140, 35, 0)']]
+    tick = abs((dmin - dmax) / 4)
+    colorscale = [0, 'rgb(196, 86, 59)'],
+                 [.1, 'rgb(47, 107, 142)'],
+                 [.25 'rgb(32, 164, 134)'],
+                 [.5, 'rgb(255, 239, 71)'],
+                 [.75, 'rgb(229, 211, 13)'],
+                 [.9, 'rgb(252, 63, 0)'],
+                 [.1, 'rgb(140, 35, 0)']]
     
 # Create the scattermapbox object
     data = [
