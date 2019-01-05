@@ -36,6 +36,11 @@
     padding: 0; }
 }
 
+/* For the slider color */
+.rc-slider{
+  background-color: #C45639;
+}
+
 /* For devices larger than 550px */
 @media (min-width: 550px) {
   .container {
