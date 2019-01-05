@@ -53,6 +53,8 @@ else:
     from flask_caching import Cache  # This works on Linux but not Windows :)
     startyear = 1980
 
+from functions import npzIn
+
 # In[] Create the DASH App object
 app = dash.Dash(__name__)
 
@@ -129,33 +131,26 @@ for y in yearmarks:
 
 # Set up initial signal and raster to scatterplot conversion
 # A source grid for scatterplot maps - will need more for optional resolution
-source = xr.open_dataarray(os.path.join(home_path, "data/source_array.nc"))
-sample = xr.open_dataarray(os.path.join(data_path,
-                                        "data/droughtindices/pdsi/"+
-                                        "pdsi_2018_12_PRISM.nc"))
+source = xr.open_dataarray(os.path.join(data_path,
+                                        "data/droughtindices/source_array.nc"))
 
 # Create Coordinate index positions from xarray
-def convertCoords(source):
-    # Geometry
-    x_length = source.shape[2]
-    y_length = source.shape[1]
-    
-    # Resolution is not always available
-    res = source.res[0]  
-    lon_min = source.transform[0]
-    lat_max = source.transform[3] - res
+# Geometry
+x_length = source.shape[2]
+y_length = source.shape[1]
+res = source.res[0]  
+lon_min = source.transform[0]
+lat_max = source.transform[3] - res
 
-    # Make dictionaires with coordinates and array index positions
-    xs = range(x_length)
-    ys = range(y_length)
-    lons = [lon_min + xres*x for x in xs]
-    lats = [lat_max - yres*y for y in ys]
-    londict = dict(zip(lons, xs))
-    latdict = dict(zip(lats, ys))
-    londict2 = {y: x for x, y in londict.items()}
-    latdict2 = {y: x for x, y in latdict.items()}
-
-    return [londict, latdict, londict2, latdict2]
+# Make dictionaires with coordinates and array index positions
+xs = range(x_length)
+ys = range(y_length)
+lons = [lon_min + res*x for x in xs]
+lats = [lat_max - res*y for y in ys]
+londict = dict(zip(lons, xs))
+latdict = dict(zip(lats, ys))
+londict2 = {y: x for x, y in londict.items()}
+latdict2 = {y: x for x, y in latdict.items()}
 
 # Map Layout:
 # Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
@@ -163,7 +158,7 @@ layout = dict(
     autosize=True,
     height=500,
     font=dict(color='#CCCCCC'),
-    titlefont=dict(color='#CCCCCC', size='20'),
+    titlefont=dict(color='#FCF003', size='20'),
     margin=dict(
         l=55,
         r=35,
@@ -172,8 +167,8 @@ layout = dict(
         pad=4
     ),
     hovermode="closest",
-    plot_bgcolor="#eee",
-    paper_bgcolor="#083C04",
+    plot_bgcolor="#083C04",
+    paper_bgcolor="#0D347C",
     legend=dict(font=dict(size=10), orientation='h'),
     title='<b>Potential Payout Frequencies</b>',
     mapbox=dict(
@@ -268,47 +263,35 @@ app.layout = html.Div([
         ],
     className='ten columns offset-by-one')
 
-# In[]:
+
+# In[]: App callbacks
 @app.callback(Output('map_1', 'figure'),
               [Input('choice_1', 'value')])
 def makeMap1(choice):
     # Clear memory space...what's the best way to do this?
     gc.collect()
-    
-    # get coordinate-array index dictionaries
-    # Geometry
-    x_length = sample.shape[2]
-    y_length = sample.shape[1]
-    
-    # Resolution is not always available
-    res = float(sample.latitude[0] - sample.latitude[1])
-    lon_min = float(sample.longitude[0])
-    lat_max = float(sample.latitude[len(sample.latitude)-1]) - res
 
-    # Make dictionaires with coordinates and array index positions
-    xs = range(x_length)
-    ys = range(y_length)
-    lons = [lon_min + res*x for x in xs]
-    lats = [lat_max - res*y for y in ys]
-    londict = dict(zip(lons, xs))
-    latdict = dict(zip(lats, ys))
-    londict2 = {y: x for x, y in londict.items()}
-    latdict2 = {y: x for x, y in latdict.items()}
+    # Get numpy arrays
+    array_path = os.path.join(data_path, "data/droughtindices/npz", 
+                        choice + '_arrays.npz')
+    date_path =  os.path.join(data_path, "data/droughtindices/npz", 
+                        choice + '_dates.npz')
+    indexlist = npzIn(array_path, date_path)
+    
+    # Apply chosen funtion
+    arrays = [i[1] for i in indexlist]
+    array = np.nanmean(arrays, axis=0)
 
-    # For now we will just use sample...which is upside down
-    # data = sample.data[0]
-    # data = np.array([data[::-1]], dtype="float32")
-    
-    # # Return the data!
-    # sample.data = data    
-    
+    # get coordinate-array index dictionaries data!
+    source.data[0] = array
+
     # Now all this
-    dfs = xr.DataArray(sample, name = "data")
+    dfs = xr.DataArray(source, name = "data")
     pdf = dfs.to_dataframe()
     step = res
     to_bin = lambda x: np.floor(x / step) * step
-    pdf["latbin"] = pdf.index.get_level_values('latitude').map(to_bin)
-    pdf["lonbin"] = pdf.index.get_level_values('longitude').map(to_bin)
+    pdf["latbin"] = pdf.index.get_level_values('y').map(to_bin)
+    pdf["lonbin"] = pdf.index.get_level_values('x').map(to_bin)
     pdf['gridx']= pdf['lonbin'].map(londict)
     pdf['gridy']= pdf['latbin'].map(latdict)
     # grid2 = np.copy(grid)
