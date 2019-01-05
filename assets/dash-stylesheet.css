@@ -37,8 +37,23 @@
 }
 
 /* For the slider color */
-.rc-slider{
+.rc-slider-rail{
   background-color: #C45639;
+}
+.rc-slider-dot {
+    border-color: #C45639;
+}
+.rc-slider-dot-active {
+    border-color: #0D347C;
+}
+.rc-slider-track{
+  background-color: #0D347C;
+}
+.rc-slider-handle{
+  border-color: #0D347C;
+}
+.rc-slider {
+    background-color: rgba(0, 0, 0, 0);
 }
 
 /* For devices larger than 550px */
