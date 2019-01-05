@@ -9,6 +9,15 @@ Created on Sat Jan  5 11:01:14 2019
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors
+import os
+import scipy as spy
+
+homepath = "C:/users/user/github/"
+os.chdir(homepath + "PRF-ALTIND")
+from functions import npzIn
+from functions import indexHist
+
+os.chdir("D:/data/droughtindices/npz/")
 
 # In[]
 # I am looking to recreate the red, yellow, green, blue color ramp from ArcMap
@@ -21,3 +30,7 @@ plt.scatter(x, y, c=c, cmap=cmap, norm=norm)
 plt.colorbar()
 plt.show()
 
+# In[] How to create similar color-scales for different distributions?
+indexlist = npzIn('noaa_arrays.npz', 'noaa_dates.npz')
+arrays = [a[1] for a in indexlist]
+indexHist(arrays)

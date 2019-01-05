@@ -199,10 +199,10 @@ def covCellwise(arraylist):
     arraylist = standardize(arraylist)
     
     # First get standard deviation for each cell
-    sds = np.nanstd([a[1] for a in arraylist],axis = 0)
+    sds = np.nanstd([a[1] for a in arraylist], axis = 0)
     
     # Now get mean values for each cell
-    avs = np.nanmean([a[1] for a in arraylist],axis = 0)
+    avs = np.nanmean([a[1] for a in arraylist] ,axis = 0)
     
     # Third, simply divide
     covs = sds/avs
@@ -211,6 +211,35 @@ def covCellwise(arraylist):
     average = np.nanmean(covs)
     return(average)
 
+
+def calculateCV(indexlist):
+    '''
+     A single array showing the distribution of coefficients of variation
+         throughout the time period represented by the chosen rasters
+    '''
+    # is it a named list or not?
+    if type(indexlist[0]) is list:
+        # Get just the arrays from this
+        indexlist = [a[1] for a in indexlist]
+    else:
+        indexlist = indexlist
+
+    # Adjust for outliers
+    sd = np.nanstd(indexlist)
+    thresholds = [-3*sd, 3*sd]
+    for a in indexlist:
+        a[a <= thresholds[0]] = thresholds[0]
+        a[a >= thresholds[1]] = thresholds[1]
+
+    # Standardize Range
+    indexlist = standardize(indexlist)
+
+    # Simple Cellwise calculation of variance
+    sds = np.nanstd(indexlist, axis=0)
+    avs = np.nanmean(indexlist, axis=0)
+    covs = sds/avs
+
+    return covs
 
 
 ###########################################################################
@@ -2200,22 +2229,31 @@ def readArrays(path):
         dates = [str(d) for d in dates]
     arraylist = [[dates[i],arrays[i]] for i in range(len(arrays))]
     return(arraylist)
-    
+
+
 ###########################################################################
 ############## Little Standardization function for differenct scales ######
-###########################################################################  
-## Min Max Standardization 
+###########################################################################
+# Min Max Standardization 
 def standardize(indexlist):
-    if type(indexlist[0][0])==str:
-        arrays = [a[1] for a in indexlist]
-    else:
-        arrays = indexlist
-    mins = np.nanmin(arrays)
-    maxes = np.nanmax(arrays)
-    def single(array,mins,maxes):    
+    def single(array, mins, maxes):
         newarray = (array - mins)/(maxes - mins)
         return(newarray)
-    standardizedlist = [[indexlist[i][0],single(indexlist[i][1],mins,maxes)] for i in range(len(indexlist))]
+
+    if type(indexlist[0][0]) == str:
+        arrays = [a[1] for a in indexlist]
+        mins = np.nanmin(arrays)
+        maxes = np.nanmax(arrays)
+        standardizedlist = [[indexlist[i][0],
+                             single(indexlist[i][1],
+                                    mins,
+                                    maxes)] for i in range(len(indexlist))]
+
+    else:
+        mins = np.nanmin(indexlist)
+        maxes = np.nanmax(indexlist)
+        standardizedlist = [single(indexlist[i],
+                                   mins, maxes) for i in range(len(indexlist))]
     return(standardizedlist)
 
 # SD Standardization

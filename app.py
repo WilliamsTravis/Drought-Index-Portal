@@ -53,8 +53,9 @@ else:
     from flask_caching import Cache  # This works on Linux but not Windows :)
     startyear = 1980
 
+from functions import indexHist
 from functions import npzIn
-
+from functions import calculateCV
 # In[] Create the DASH App object
 app = dash.Dash(__name__)
 
@@ -114,6 +115,10 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'eddi3': 'Evaporative Demand Drought Index - 3 month',
               'eddi6': 'Evaporative Demand Drought Index - 6 month'}
 
+# Function options
+function_options = [{'label': 'Mean - Percentiles', 'value': 'mean_perc'},
+                    {'label': 'Coefficient of Variation - Original Values',
+                     'value': 'cv'}]
 # In[] The map
 # Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
@@ -158,8 +163,12 @@ latdict2 = {y: x for x, y in latdict.items()}
 layout = dict(
     autosize=True,
     height=500,
-    font=dict(color='#CCCCCC'),
-    titlefont=dict(color='#DD7D24', size='20'),
+    font=dict(color='#CCCCCC',
+              fontweight='bold'),
+    titlefont=dict(color='#CCCCCC',
+                   size='20',
+                   family='Time New Roman',
+                   fontweight='bold'),
     margin=dict(
         l=55,
         r=35,
@@ -170,7 +179,7 @@ layout = dict(
     hovermode="closest",
     plot_bgcolor="#083C04",
     paper_bgcolor="#0D347C",
-    legend=dict(font=dict(size=10), orientation='h'),
+    legend=dict(font=dict(size=10, fontweight='bold'), orientation='h'),
     title='<b>Potential Payout Frequencies</b>',
     mapbox=dict(
         accesstoken=mapbox_access_token,
@@ -196,8 +205,7 @@ app.layout = html.Div([
                  className='twelve columns',
                  style={'font-weight': 'bold',
                         'text-align': 'center',
-                        'font-family': 'Bookman Old Style'}),
-        
+                        'font-family': 'Times New Roman'}),
 
         # Year Slider
         html.Div([
@@ -205,7 +213,7 @@ app.layout = html.Div([
                  html.P('Study Period Year Range'),
                  dcc.RangeSlider(
                      id='year_slider',
-                     value=[startyear, 2017],
+                     value=[2017, 2017],
                      min=startyear,
                      max=2017,
                      marks=yearmarks)],
@@ -213,15 +221,31 @@ app.layout = html.Div([
                  style={'margin-top': '0',
                         'margin-bottom': '40'}),
 
+        # Maptype
+        html.Div([
+                html.P("Map Type"),
+                dcc.Dropdown(
+                        id="map_type",
+                        value="light",
+                        options=maptypes,
+                        multi=False)],
+                style={'width': '25%'}),
+
         # Four by Four Map Layout
         # Row 1
         html.Div([
                  html.Div([
                           html.Div([
-                                   dcc.Dropdown(id='choice_1',
+                                   html.Div([dcc.Dropdown(id='choice_1',
                                                 options=indices,
                                                 value='pdsi')],
-                                   style={'width': '35%'}),
+                                            className='three columns'),
+                                   html.Div([dcc.Dropdown(id='function_1',
+                                                options=function_options,
+                                                value='mean_perc')],
+                                             className='six columns')],
+                                   # style={'width': '30%'},
+                                   className='row'),
                           dcc.Graph(id='map_1')],
                           className='six columns',
                           style={'float': 'left',
@@ -270,42 +294,84 @@ app.layout = html.Div([
 
 @app.callback(Output('map_1', 'figure'),
               [Input('choice_1', 'value'),
-               Input('year_slider', 'value')])
-def makeMap1(choice, year_range):
+               Input('function_1', 'value'),
+               Input('year_slider', 'value'),
+               Input('map_type', 'value')])
+def makeMap1(choice, function, year_range, map_type):
     # Clear memory space...what's the best way to do this?
     gc.collect()
 
     # Get numpy arrays
-    array_path = os.path.join(data_path, "data/droughtindices/npz",
-                              choice + '_arrays.npz')
-    date_path = os.path.join(data_path, "data/droughtindices/npz", 
-                              choice + '_dates.npz')
-    indexlist = npzIn(array_path, date_path)
-    
-    # Get total Min and Max Values for colors
-    dmin = np.nanmin([i[1] for i in indexlist])
-    dmax = np.nanmax([i[1] for i in indexlist])
+    if function == 'mean_perc':
+        array_path = os.path.join(data_path,
+                                  "data/droughtindices/npz/percentiles",
+                                  choice + '_arrays.npz')
+        date_path = os.path.join(data_path,
+                                 "data/droughtindices/npz/percentiles",
+                                 choice + '_dates.npz')
+        indexlist = npzIn(array_path, date_path)
 
-    # filter by year
-    indexlist = [a for a in indexlist if int(a[0][-6:-2]) >= year_range[0] and
-              int(a[0][-6:-2]) <= year_range[1]]
+        # Get total Min and Max Values for colors
+        dmin = np.nanmin([i[1] for i in indexlist])
+        dmax = np.nanmax([i[1] for i in indexlist])
 
-    # Apply chosen funtion
-    arrays = [i[1] for i in indexlist]
-    array = np.nanmean(arrays, axis=0)
+        # filter by year
+        indexlist = [a for a in indexlist if
+                     int(a[0][-6:-2]) >= year_range[0] and
+                     int(a[0][-6:-2]) <= year_range[1]]
+        arrays = [i[1] for i in indexlist]
+        
+        # Apply chosen funtion
+        array = np.nanmean(arrays, axis=0)
+        
+        # Colors - RdYlGnBu
+        colorscale = [[0.00, 'rgb(197, 90, 58)'],
+                      [0.25, 'rgb(255, 255, 48)'],
+                      [0.50, 'rgb(39, 147, 57)'],
+                      # [0.75, 'rgb(6, 104, 70)'],
+                      [1.00, 'rgb(1, 62, 110)']]
+
+    else:
+        array_path = os.path.join(data_path,
+                                  "data/droughtindices/npz",
+                                  choice + '_arrays.npz')
+        date_path = os.path.join(data_path,
+                                 "data/droughtindices/npz",
+                                 choice + '_dates.npz')
+        indexlist = npzIn(array_path, date_path)
+
+        # Get total Min and Max Values for colors
+        dmin = 0
+        dmax = 1
+
+        # filter by year
+        indexlist = [a for a in indexlist if 
+                     int(a[0][-6:-2]) >= year_range[0] and
+                     int(a[0][-6:-2]) <= year_range[1]]
+        arrays = [i[1] for i in indexlist]
+        
+        # Apply chosen funtion
+        array = calculateCV(arrays)
+
+        # Colors - RdYlGnBu
+        colorscale = [[0.00, 'rgb(1, 62, 110)'],
+                      [0.35, 'rgb(6, 104, 70)'],
+                      [0.45, 'rgb(39, 147, 57)'],
+                      [0.55, 'rgb(255, 255, 48)'],
+                      [1.00, 'rgb(197, 90, 58)']]
 
     # get coordinate-array index dictionaries data!
     source.data[0] = array
 
     # Now all this
-    dfs = xr.DataArray(source, name = "data")
+    dfs = xr.DataArray(source, name="data")
     pdf = dfs.to_dataframe()
     step = res
     to_bin = lambda x: np.floor(x / step) * step
     pdf["latbin"] = pdf.index.get_level_values('y').map(to_bin)
     pdf["lonbin"] = pdf.index.get_level_values('x').map(to_bin)
-    pdf['gridx']= pdf['lonbin'].map(londict)
-    pdf['gridy']= pdf['latbin'].map(latdict)
+    pdf['gridx'] = pdf['lonbin'].map(londict)
+    pdf['gridy'] = pdf['latbin'].map(latdict)
     # grid2 = np.copy(grid)
     # grid2[np.isnan(grid2)] = 0
     # pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
@@ -316,40 +382,37 @@ def makeMap1(choice, year_range):
     df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
     df = df_flat[np.isfinite(df_flat['data'])]
 
-    # Colors 
-    # Split the range into 6 numbers from min to max
-    tick = abs((dmin - dmax) / 4)
-    colorscale = [0, 'rgb(196, 86, 59)'],
-                 [.1, 'rgb(47, 107, 142)'],
-                 [.25 'rgb(32, 164, 134)'],
-                 [.5, 'rgb(255, 239, 71)'],
-                 [.75, 'rgb(229, 211, 13)'],
-                 [.9, 'rgb(252, 63, 0)'],
-                 [.1, 'rgb(140, 35, 0)']]
-    
-# Create the scattermapbox object
+    # Create the scattermapbox object
     data = [
         dict(
-        type='scattermapbox',
-        lon=df['lonbin'],
-        lat=df['latbin'],
-        text=df['data'],
-        mode='markers',
-        hoverinfo='text',
-        marker=dict(
-            colorscale=colorscale,
-            cmin=dmin,
-            color=df['data'],
-            cmax=dmax,
-            opacity=0.85,
-            size=5,
-            colorbar=dict(
-                textposition="auto",
-                orientation="h",
-                font=dict(size=15)
+            type='scattermapbox',
+            lon=df['lonbin'],
+            lat=df['latbin'],
+            text=df['data'],
+            mode='markers',
+            hoverinfo='text',
+            marker=dict(
+                colorscale=colorscale,
+                cmin=dmin,
+                color=df['data'],
+                cmax=dmax,
+                opacity=0.85,
+                size=5,
+                colorbar=dict(
+                    textposition="auto",
+                    orientation="h",
+                    font=dict(size=15,
+                              fontweight='bold')
                 )
             )
         )]
+
+    layout['mapbox'] = dict(
+        accesstoken=mapbox_access_token,
+        style=map_type,
+        center=dict(lon=-95.7, lat=37.1),
+        zoom=2)
+
     figure = dict(data=data, layout=layout)
     return figure
 
