@@ -13,7 +13,7 @@ import dash
 from dash.dependencies import Input, Output, State, Event
 import dash_core_components as dcc
 import dash_html_components as html
-import dash_table_experiments as dt
+import datetime as dt
 import gc
 import gdal
 import glob
@@ -56,6 +56,7 @@ else:
 from functions import indexHist
 from functions import npzIn
 from functions import calculateCV
+
 # In[] Create the DASH App object
 app = dash.Dash(__name__)
 
@@ -73,7 +74,72 @@ cache.init_app(server)
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
+def makeMap(function, choice, year_range):
+    # Get numpy arrays
+    if function != 'cv':
+        array_path = os.path.join(data_path,
+                                  "data/droughtindices/npz/percentiles",
+                                  choice + '_arrays.npz')
+        date_path = os.path.join(data_path,
+                                 "data/droughtindices/npz/percentiles",
+                                 choice + '_dates.npz')
+        indexlist = npzIn(array_path, date_path)
 
+        # Get total Min and Max Values for colors
+        dmin = np.nanmin([i[1] for i in indexlist])
+        dmax = np.nanmax([i[1] for i in indexlist])
+
+        # filter by year
+        indexlist = [a for a in indexlist if
+                     int(a[0][-6:-2]) >= year_range[0] and
+                     int(a[0][-6:-2]) <= year_range[1]]
+        arrays = [i[1] for i in indexlist]
+
+        # Apply chosen funtion
+        if function == 'mean_perc':
+            array = np.nanmean(arrays, axis=0)
+        elif function == 'max':
+            array = np.nanmax(arrays, axis=0)
+        else:
+            array = np.nanmin(arrays, axis=0)
+
+        # Colors - RdYlGnBu
+        colorscale = [[0.00, 'rgb(197, 90, 58)'],
+                      [0.25, 'rgb(255, 255, 48)'],
+                      [0.50, 'rgb(39, 147, 57)'],
+                      # [0.75, 'rgb(6, 104, 70)'],
+                      [1.00, 'rgb(1, 62, 110)']]
+
+    else:
+        array_path = os.path.join(data_path,
+                                  "data/droughtindices/npz",
+                                  choice + '_arrays.npz')
+        date_path = os.path.join(data_path,
+                                 "data/droughtindices/npz",
+                                 choice + '_dates.npz')
+        indexlist = npzIn(array_path, date_path)
+
+        # Get total Min and Max Values for colors
+        dmin = 0
+        dmax = 1
+
+        # filter by year
+        indexlist = [a for a in indexlist if
+                     int(a[0][-6:-2]) >= year_range[0] and
+                     int(a[0][-6:-2]) <= year_range[1]]
+        arrays = [i[1] for i in indexlist]
+
+        # Apply chosen funtion
+        array = calculateCV(arrays)
+
+        # Colors - RdYlGnBu
+        colorscale = [[0.00, 'rgb(1, 62, 110)'],
+                      [0.35, 'rgb(6, 104, 70)'],
+                      [0.45, 'rgb(39, 147, 57)'],
+                      [0.55, 'rgb(255, 255, 48)'],
+                      [1.00, 'rgb(197, 90, 58)']]
+
+    return [[array, indexlist], colorscale, dmax, dmin]
 # In[] Drought and Climate Indices (looking to include any raster time series)
 # Index Paths (for npz files)
 indices = [{'label': 'Rainfall Index', 'value': 'noaa'},
@@ -118,7 +184,14 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
 # Function options
 function_options = [{'label': 'Mean - Percentiles', 'value': 'mean_perc'},
                     {'label': 'Coefficient of Variation - Original Values',
-                     'value': 'cv'}]
+                     'value': 'cv'},
+                    {'label': 'Maximum - Percentiles', 'value': 'max'},
+                    {'label': 'Minimum - Percentiles', 'value': 'min'}]
+function_names = {'mean_perc': 'Average Percentiles',
+                  'cv': 'Coefficient of Variation using Original Index Values',
+                  'min': 'Minimum Percentile',
+                  'max': 'Maxmium Percentile'}
+
 # In[] The map
 # Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
@@ -173,7 +246,7 @@ layout = dict(
         l=55,
         r=35,
         b=65,
-        t=95,
+        t=90,
         pad=4
     ),
     hovermode="closest",
@@ -192,14 +265,39 @@ layout = dict(
     )
 )
 
+
+# In[]: Create a Div maker
+def divMaker(id_num, index='noaa'):
+    div = html.Div([
+              html.Div([
+                       dcc.Dropdown(id='choice_{}'.format(id_num),
+                                    options=indices,
+                                    value=index)],
+                       style={'width': '30%',
+                              'margin-top': 20},
+                       className='row'),
+
+                dcc.Graph(id='map_{}'.format(id_num)),
+
+                html.Div([dcc.Graph(id='series_{}'.format(id_num),
+                                    style={'margin-top': 15,
+                                           'margin-bottom': 50,
+                                           'height': '150'})],
+                         className='six columns')],
+                className='six columns',
+                style={'float': 'left',
+                       'margin-top': '40'})
+    return div
+
+
 # In[]: Create App Layout
 app.layout = html.Div([
         html.Div([html.Img(id='banner',
                            src=('https://github.com/WilliamsTravis/' +
                                 'Ubuntu-Practice-Machine/blob/master/images/' +
                                 'banner1.png?raw=true'),
-                  style={'width': '100%',
-                         'box-shadow': '1px 1px 1px 1px black'})]),
+                 style={'width': '100%',
+                        'box-shadow': '1px 1px 1px 1px black'})]),
         html.Hr(),
         html.Div([html.H1('Raster to Scatterplot Visualization')],
                  className='twelve columns',
@@ -220,202 +318,309 @@ app.layout = html.Div([
                  className="twelve columns",
                  style={'margin-top': '0',
                         'margin-bottom': '40'}),
+        # Options
+        html.Div([        
+            # Maptype
+            html.Div([
+                    html.P("Map Type"),
+                    dcc.Dropdown(
+                            id="map_type",
+                            value="light",
+                            options=maptypes,
+                            multi=False)],
+                    className='two columns'),
 
-        # Maptype
-        html.Div([
-                html.P("Map Type"),
-                dcc.Dropdown(
-                        id="map_type",
-                        value="light",
-                        options=maptypes,
-                        multi=False)],
-                style={'width': '25%'}),
+           # Function 
+           html.Div([
+                   html.P("Function"),
+                   dcc.Dropdown(id='function_choice',
+                                options=function_options,
+                                value='mean_perc')],
+                    className='four columns')],
+                className='row'),
 
         # Four by Four Map Layout
         # Row 1
-        html.Div([
-                 html.Div([
-                          html.Div([
-                                   html.Div([dcc.Dropdown(id='choice_1',
-                                                options=indices,
-                                                value='pdsi')],
-                                            className='three columns'),
-                                   html.Div([dcc.Dropdown(id='function_1',
-                                                options=function_options,
-                                                value='mean_perc')],
-                                             className='six columns')],
-                                   # style={'width': '30%'},
-                                   className='row'),
-                          dcc.Graph(id='map_1')],
-                          className='six columns',
-                          style={'float': 'left',
-                                 'margin-top': '40'}),
-                 html.Div([
-                          html.Div([
-                                   dcc.Dropdown(id='choice_2',
-                                                options=indices,
-                                                value='noaa')],
-                                   style={'width': '35%'}),
-                          dcc.Graph(id='map_2')],
-                          className='six columns',
-                          style={'float': 'right',
-                                 'margin-top': '40'})],
+        html.Div([divMaker(1, 'noaa'),
+                  divMaker(2, 'pdsi')],
                  className='row'),
+        
+        # I need a gap!
+        html.Div([html.P("")],
+                  className='row'),
 
         # Row 2
-        html.Div([
-                 html.Div([
-                          html.Div([
-                                   dcc.Dropdown(id='choice_3',
-                                                options=indices,
-                                                value='noaa')],
-                                   style={'width': '35%'}),
-                          dcc.Graph(id='map_3')],
-                          className='six columns',
-                          style={'float': 'left',
-                                 'margin-top': '40'}),
-                 html.Div([
-                          html.Div([
-                                   dcc.Dropdown(id='choice_4',
-                                                options=indices,
-                                                value='noaa')],
-                                   style={'width': '35%'}),
-                          dcc.Graph(id='map_4')],
-                          className='six columns',
-                          style={'float': 'right',
-                                 'margin-top': '40'})],
+        html.Div([divMaker(3, 'spi1'),
+                  divMaker(4, 'spei1')],
                  className='row'),
-    # The end!
-        ],
-    className='ten columns offset-by-one')
+
+        # Signals
+        html.Div(id='signal_store',
+                 style={'display': 'none'}),
+        html.Div(id='click_store',
+                 style={'display': 'hidden'})
+
+        # The end!
+        ], className='ten columns offset-by-one')
 
 
 # In[]: App callbacks
+@cache.memoize()
+def global_store(signal):
+    # Dejsonify the signal
+    signal = json.loads(signal)
 
-@app.callback(Output('map_1', 'figure'),
-              [Input('choice_1', 'value'),
-               Input('function_1', 'value'),
-               Input('year_slider', 'value'),
-               Input('map_type', 'value')])
-def makeMap1(choice, function, year_range, map_type):
+    # get individual signals
+    choices = [signal[0], signal[1], signal[2], signal[3]]
+    fun = signal[4]
+    year_range = signal[5]
+
     # Clear memory space...what's the best way to do this?
     gc.collect()
 
-    # Get numpy arrays
-    if function == 'mean_perc':
-        array_path = os.path.join(data_path,
-                                  "data/droughtindices/npz/percentiles",
-                                  choice + '_arrays.npz')
-        date_path = os.path.join(data_path,
-                                 "data/droughtindices/npz/percentiles",
-                                 choice + '_dates.npz')
-        indexlist = npzIn(array_path, date_path)
+    # Make one map
+    def makeMap(function, choice, year_range):
+        # Get numpy arrays
+        if function != 'cv':
+            array_path = os.path.join(data_path,
+                                      "data/droughtindices/npz/percentiles",
+                                      choice + '_arrays.npz')
+            date_path = os.path.join(data_path,
+                                     "data/droughtindices/npz/percentiles",
+                                     choice + '_dates.npz')
+            indexlist = npzIn(array_path, date_path)
 
-        # Get total Min and Max Values for colors
-        dmin = np.nanmin([i[1] for i in indexlist])
-        dmax = np.nanmax([i[1] for i in indexlist])
+            # Get total Min and Max Values for colors
+            dmin = np.nanmin([i[1] for i in indexlist])
+            dmax = np.nanmax([i[1] for i in indexlist])
 
-        # filter by year
-        indexlist = [a for a in indexlist if
-                     int(a[0][-6:-2]) >= year_range[0] and
-                     int(a[0][-6:-2]) <= year_range[1]]
-        arrays = [i[1] for i in indexlist]
-        
-        # Apply chosen funtion
-        array = np.nanmean(arrays, axis=0)
-        
-        # Colors - RdYlGnBu
-        colorscale = [[0.00, 'rgb(197, 90, 58)'],
-                      [0.25, 'rgb(255, 255, 48)'],
-                      [0.50, 'rgb(39, 147, 57)'],
-                      # [0.75, 'rgb(6, 104, 70)'],
-                      [1.00, 'rgb(1, 62, 110)']]
+            # filter by year
+            indexlist = [a for a in indexlist if
+                         int(a[0][-6:-2]) >= year_range[0] and
+                         int(a[0][-6:-2]) <= year_range[1]]
+            arrays = [i[1] for i in indexlist]
 
-    else:
-        array_path = os.path.join(data_path,
-                                  "data/droughtindices/npz",
-                                  choice + '_arrays.npz')
-        date_path = os.path.join(data_path,
-                                 "data/droughtindices/npz",
-                                 choice + '_dates.npz')
-        indexlist = npzIn(array_path, date_path)
+            # Apply chosen funtion
+            if function == 'mean_perc':
+                array = np.nanmean(arrays, axis=0)
+            elif function == 'max':
+                array = np.nanmax(arrays, axis=0)
+            else:
+                array = np.nanmin(arrays, axis=0)
 
-        # Get total Min and Max Values for colors
-        dmin = 0
-        dmax = 1
+            # Colors - RdYlGnBu
+            colorscale = [[0.00, 'rgb(197, 90, 58)'],
+                          [0.25, 'rgb(255, 255, 48)'],
+                          [0.50, 'rgb(39, 147, 57)'],
+                          # [0.75, 'rgb(6, 104, 70)'],
+                          [1.00, 'rgb(1, 62, 110)']]
 
-        # filter by year
-        indexlist = [a for a in indexlist if 
-                     int(a[0][-6:-2]) >= year_range[0] and
-                     int(a[0][-6:-2]) <= year_range[1]]
-        arrays = [i[1] for i in indexlist]
-        
-        # Apply chosen funtion
-        array = calculateCV(arrays)
+        else:
+            array_path = os.path.join(data_path,
+                                      "data/droughtindices/npz",
+                                      choice + '_arrays.npz')
+            date_path = os.path.join(data_path,
+                                     "data/droughtindices/npz",
+                                     choice + '_dates.npz')
+            indexlist = npzIn(array_path, date_path)
 
-        # Colors - RdYlGnBu
-        colorscale = [[0.00, 'rgb(1, 62, 110)'],
-                      [0.35, 'rgb(6, 104, 70)'],
-                      [0.45, 'rgb(39, 147, 57)'],
-                      [0.55, 'rgb(255, 255, 48)'],
-                      [1.00, 'rgb(197, 90, 58)']]
+            # Get total Min and Max Values for colors
+            dmin = 0
+            dmax = 1
 
-    # get coordinate-array index dictionaries data!
-    source.data[0] = array
+            # filter by year
+            indexlist = [a for a in indexlist if
+                         int(a[0][-6:-2]) >= year_range[0] and
+                         int(a[0][-6:-2]) <= year_range[1]]
+            arrays = [i[1] for i in indexlist]
 
-    # Now all this
-    dfs = xr.DataArray(source, name="data")
-    pdf = dfs.to_dataframe()
-    step = res
-    to_bin = lambda x: np.floor(x / step) * step
-    pdf["latbin"] = pdf.index.get_level_values('y').map(to_bin)
-    pdf["lonbin"] = pdf.index.get_level_values('x').map(to_bin)
-    pdf['gridx'] = pdf['lonbin'].map(londict)
-    pdf['gridy'] = pdf['latbin'].map(latdict)
-    # grid2 = np.copy(grid)
-    # grid2[np.isnan(grid2)] = 0
-    # pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
-    # pdf['grid'] = pdf['grid'].apply(int).apply(str)
-    # pdf['data'] = pdf['data'].astype(float).round(3)
-    # pdf['printdata'] = "GRID #: " + pdf['grid'] + "<br>Data: " + pdf['data'].apply(str)
+            # Apply chosen funtion
+            array = calculateCV(arrays)
 
-    df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
-    df = df_flat[np.isfinite(df_flat['data'])]
+            # Colors - RdYlGnBu
+            colorscale = [[0.00, 'rgb(1, 62, 110)'],
+                          [0.35, 'rgb(6, 104, 70)'],
+                          [0.45, 'rgb(39, 147, 57)'],
+                          [0.55, 'rgb(255, 255, 48)'],
+                          [1.00, 'rgb(197, 90, 58)']]
 
-    # Create the scattermapbox object
-    data = [
-        dict(
-            type='scattermapbox',
-            lon=df['lonbin'],
-            lat=df['latbin'],
-            text=df['data'],
-            mode='markers',
-            hoverinfo='text',
-            marker=dict(
-                colorscale=colorscale,
-                cmin=dmin,
-                color=df['data'],
-                cmax=dmax,
-                opacity=0.85,
-                size=5,
-                colorbar=dict(
-                    textposition="auto",
-                    orientation="h",
-                    font=dict(size=15,
-                              fontweight='bold')
+        return [[array, indexlist], colorscale, dmax, dmin]
+
+    data = {choice: makeMap(fun, choice, year_range) for choice in choices}
+
+    return data
+
+
+def retrieve_data(signal):
+    data = global_store(signal)
+    return data
+
+@app.callback(Output('signal_store', 'children'),
+              [Input('choice_1', 'value'),
+               Input('choice_2', 'value'),
+               Input('choice_3', 'value'),
+               Input('choice_4', 'value'),
+               Input('function_choice', 'value'),
+               Input('year_slider', 'value')])
+def submitSignal(choice1, choice2, choice3, choice4, function, year_range):
+
+    return json.dumps([choice1, choice2, choice3, choice4,
+                       function, year_range])
+
+@app.callback(Output('click_store', 'children'),
+              [Input('map_1', 'clickData'),
+              Input('map_2', 'clickData'),
+              Input('map_3', 'clickData'),
+              Input('map_4', 'clickData')])
+def clickPicker(click1, click2, click3, click4):
+    clicks = [click1, click2, click3, click4]
+    # if not any(c is not None for c in  clicks):
+    #     coords = [50, 50]
+    return json.dumps(clicks)
+
+for i in range(1, 5):
+    @app.callback(Output("map_{}".format(i), 'figure'),
+                  [Input('signal_store', 'children'),
+                   Input('choice_{}'.format(i), 'value'),
+                   Input('function_choice', 'value'),
+                   Input('year_slider', 'value'),
+                   Input('map_type', 'value')])
+    def makeGraph(signal, choice, function, year_range, map_type):
+        # Clear memory space...what's the best way to do this?
+        gc.collect()
+
+        # Collect signal and choose appropriate choice
+        # data = retrieve_data(signal)
+            # Make one map
+
+
+        data = makeMap(function, choice, year_range)
+        # data = data[choice]
+        maps = data[0]
+        array = maps[0]
+        colorscale = data[1]
+        dmax = data[2]
+        dmin = data[3]
+
+        # get coordinate-array index dictionaries data!
+        source.data[0] = array
+
+        # Now all this
+        dfs = xr.DataArray(source, name="data")
+        pdf = dfs.to_dataframe()
+        step = res
+        to_bin = lambda x: np.floor(x / step) * step
+        pdf["latbin"] = pdf.index.get_level_values('y').map(to_bin)
+        pdf["lonbin"] = pdf.index.get_level_values('x').map(to_bin)
+        pdf['gridx'] = pdf['lonbin'].map(londict)
+        pdf['gridy'] = pdf['latbin'].map(latdict)
+        # grid2 = np.copy(grid)
+        # grid2[np.isnan(grid2)] = 0
+        # pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
+        # pdf['grid'] = pdf['grid'].apply(int).apply(str)
+        # pdf['data'] = pdf['data'].astype(float).round(3)
+        # pdf['printdata'] = "GRID #: " + pdf['grid'] + "<br>Data: " + pdf['data'].apply(str)
+
+        df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
+        df = df_flat[np.isfinite(df_flat['data'])]
+
+        # Create the scattermapbox object
+        data = [
+            dict(
+                type='scattermapbox',
+                lon=df['lonbin'],
+                lat=df['latbin'],
+                text=df['data'],
+                mode='markers',
+                hoverinfo='text',
+                marker=dict(
+                    colorscale=colorscale,
+                    cmin=dmin,
+                    color=df['data'],
+                    cmax=dmax,
+                    opacity=0.85,
+                    size=5,
+                    colorbar=dict(
+                        textposition="auto",
+                        orientation="h",
+                        font=dict(size=15,
+                                  fontweight='bold')
+                    )
                 )
-            )
-        )]
+            )]
 
-    layout['mapbox'] = dict(
-        accesstoken=mapbox_access_token,
-        style=map_type,
-        center=dict(lon=-95.7, lat=37.1),
-        zoom=2)
+        if year_range[0] != year_range[1]:
+            year_print = '{} - {}'.format(year_range[0], year_range[1])
+        else:
+            year_print = str(year_range[0])
+            
+        layout_copy = copy.deepcopy(layout)
+        layout_copy['mapbox'] = dict(
+            accesstoken=mapbox_access_token,
+            style=map_type,
+            center=dict(lon=-95.7, lat=37.1),
+            zoom=2)
 
-    figure = dict(data=data, layout=layout)
-    return figure
+        layout_copy['title'] = (indexnames[choice] + '<br>' +
+                               function_names[function] + ', ' +
+                               year_print)
 
+        figure = dict(data=data, layout=layout_copy)
+        return figure
+
+    @app.callback(Output('series_{}'.format(i), 'figure'),
+                  [Input("map_{}".format(i), 'clickData'),
+                   Input('choice_{}'.format(i), 'value'),
+                   Input('signal_store', 'children'),
+                   Input('year_slider', 'value'),
+                   Input('function_choice', 'value')])
+    def makeSeries(click, choice, signal, year_range, function):
+        # Get data
+        # data = retrieve_data(signal)
+        data = makeMap(function, choice, year_range)
+        # data = data[choice]
+        indexlist = data[0][1]
+        arrays = [i[1] for i in indexlist]
+
+        # find coordinates
+        if click is None:
+            x = londict[-100]
+            y = latdict[40]
+        else:
+            lon = click['points'][0]['lon']
+            lat = click['points'][0]['lat']
+            x = londict[lon]
+            y = latdict[lat]
+
+        # Get time series
+        timeseries = [a[y, x] for a in arrays]
+        dates = [i[0][-6:] for i in indexlist]
+
+        # Convert dates to datetime
+        dates2 = [dt.datetime(int(d[:4]), int(d[4:]), day=1) for d in dates]
+
+        data = [
+            dict(
+                type='bar',
+                # marker = dict(color='blue', line=dict(width=3.5,
+                #                                       color="#000000")),
+                # yaxis=dict(range = [0,100]),
+                x=dates2,
+                y=timeseries
+            )]
+
+        # Change Layout
+        layout_copy = copy.deepcopy(layout)
+        layout_copy['title'] = "Time Series"
+        layout_copy['plot_bgcolor'] ="white"
+        layout_copy['paper_bgcolor'] ="white"
+
+        figure = dict(data=data, layout=layout_copy)
+
+        return figure
+
+
+# In[]
 @app.callback(Output('banner', 'src'),
               [Input('choice_1', 'value')])
 def whichBanner(value):
@@ -428,6 +633,7 @@ def whichBanner(value):
              'Ubuntu-Practice-Machine/blob/master/images/' +
              'banner' + str(image_time) + '.png?raw=true')
     return image
+
 
 # In[] Run Application through the server
 if __name__ == '__main__':
