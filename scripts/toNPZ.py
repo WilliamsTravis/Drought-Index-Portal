@@ -14,7 +14,7 @@ Created on Fri Jun  8 20:48:33 2018
 @author: User
 """
 import os
-os.chdir(r"C:\Users\User\github\PRF-ALTIND")
+os.chdir(r"C:\Users\User\github\Ubuntu-Practice-Machine)
 from functions import *
 os.chdir("C:/users/user/github/")
 mask = readRaster("d:\\data\\masks\\nad83\\mask25.tif", 1, -9999)[0]
@@ -40,7 +40,7 @@ savenames = ['noaa','pdsi','pdsisc','pdsiz','spi1','spi2','spi3','spi6',
 
 for i in tqdm(range(len(indexnames)), position=0):
     print(savenames[i])
-    arraylist = readRasters2(indexnames[i], -9999)[0]
+    arraylist, geom, proj = readRasters2(indexnames[i], -9999)[0]
     arrays = [a[1]*mask for a in arraylist]
     dates = [a[0] for a in arraylist]
     np.savez_compressed("d:\\data\\droughtindices\\npz\\" + savenames[i] +

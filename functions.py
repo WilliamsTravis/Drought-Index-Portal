@@ -2288,7 +2288,7 @@ def toRaster(array, path, geometry, srs, navalue=-9999):
 ###############################################################################
 ##################### Write arrays to tiffs ###################################
 ###############################################################################
-def toRasters(arraylist,path,geometry,srs):
+def toRasters(arraylist, path, geometry, srs):
     """
     Arraylist format = [[name,array],[name,array],....]
     path = target path
@@ -2302,8 +2302,10 @@ def toRasters(arraylist,path,geometry,srs):
     sample = arraylist[0][1]
     ypixels = sample.shape[0]
     xpixels = sample.shape[1]
-    for ray in  tqdm(arraylist):
-        image = gdal.GetDriverByName("GTiff").Create(path+"\\"+ray[0]+".tif",xpixels, ypixels, 1,gdal.GDT_Float32)
+    for ray in tqdm(arraylist, position=0):
+        image = gdal.GetDriverByName("GTiff").Create(os.path.join(path, 
+                                                     ray[0] + ".tif"),
+                                    xpixels, ypixels, 1, gdal.GDT_Float32)
         image.SetGeoTransform(geometry)
         image.SetProjection(srs)
         image.GetRasterBand(1).WriteArray(ray[1])
