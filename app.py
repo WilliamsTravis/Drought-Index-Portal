@@ -85,11 +85,85 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
 
 
-# In[] Functions
+
+
+# In[] Drought and Climate Indices (looking to include any raster time series)
+# Index Paths (for npz files)
+indices = [{'label': 'Rainfall Index', 'value': 'noaa'},
+           {'label': 'PDSI', 'value': 'pdsi'},
+           {'label': 'PDSI-Self Calibrated', 'value': 'pdsisc'},
+           {'label': 'Palmer Z Index', 'value': 'pdsiz'},
+           {'label': 'SPI-1', 'value': 'spi1'},
+           {'label': 'SPI-2', 'value': 'spi2'},
+           {'label': 'SPI-3', 'value': 'spi3'},
+           {'label': 'SPI-6', 'value': 'spi6'},
+           {'label': 'SPEI-1', 'value': 'spei1'},
+           {'label': 'SPEI-2', 'value': 'spei2'},
+           {'label': 'SPEI-3', 'value': 'spei3'},
+           {'label': 'SPEI-6', 'value': 'spei6'},
+           {'label': 'EDDI-1', 'value': 'eddi1'},
+           {'label': 'EDDI-2', 'value': 'eddi2'},
+           {'label': 'EDDI-3', 'value': 'eddi3'},
+           {'label': 'EDDI-6', 'value': 'eddi6'}]
+
+# Index dropdown labels
+indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
+              'pdsi': 'Palmer Drought Severity Index',
+              'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
+              'pdsiz': 'Palmer Z Index',
+              'spi1': 'Standardized Precipitation Index - 1 month',
+              'spi2': 'Standardized Precipitation Index - 2 month',
+              'spi3': 'Standardized Precipitation Index - 3 month',
+              'spi6': 'Standardized Precipitation Index - 6 month',
+              'spei1': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 1 month',
+              'spei2': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 2 month',
+              'spei3': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 3 month',
+              'spei6': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 6 month',
+              'eddi1': 'Evaporative Demand Drought Index - 1 month',
+              'eddi2': 'Evaporative Demand Drought Index - 2 month',
+              'eddi3': 'Evaporative Demand Drought Index - 3 month',
+              'eddi6': 'Evaporative Demand Drought Index - 6 month'}
+
+# Function options
+function_options = [{'label': 'Mean - Percentiles', 'value': 'mean_perc'},
+                    {'label': 'Mean - Original Values',
+                     'value': 'mean_original'},
+                    {'label': 'Maximum - Percentiles', 'value': 'max'},
+                    {'label': 'Minimum - Percentiles', 'value': 'min'},
+                    {'label': 'Maximum - Original Values', 'value': 'omax'},
+                    {'label': 'Minimum - Original Values', 'value': 'omin'}]
+function_names = {'mean_perc': 'Average Percentiles',
+                  'mean_original': 'Average Original Index Values',
+                  'min': 'Minimum Percentile',
+                  'max': 'Maxmium Percentile',
+                  'omin': 'Minimum Original Value',
+                  'omax': 'Maximum Original Value'}
+
+# For the city list
+grid = readRaster(data_path + 'data/droughtindices/prfgrid.tif', 1, -9999)[0]
+mask = grid*0+1
+cities_df = pd.read_csv("cities.csv")
+
+cities = [{'label': cities_df['NAME'][i] + ", " + cities_df['STATE'][i],
+           'value': cities_df['grid'][i]} for i in range(len(cities_df))]
+# In[] The map
+# Map types
+maptypes = [{'label': 'Light', 'value': 'light'},
+            {'label': 'Dark', 'value': 'dark'},
+            {'label': 'Basic', 'value': 'basic'},
+            {'label': 'Outdoors', 'value': 'outdoors'},
+            {'label': 'Satellite', 'value': 'satellite'},
+            {'label': 'Satellite Streets', 'value': 'satellite-streets'}]
+
+
 def makeMap(function, choice, year_range):
 
     # Get numpy arrays
-    if function != 'mean_original':
+    if function not in ['mean_original', 'omin', 'omax']:
         array_path = os.path.join(
                 data_path, "data/droughtindices/netcdfs/percentiles",
                 choice + '.nc')
@@ -155,9 +229,20 @@ def makeMap(function, choice, year_range):
         arrays = indexlist.sel(time=slice(y1, y2))
 
         # Apply chosen funtion
-        data = arrays.mean('time')
-        array = data.value.data
-        array = array*mask
+        if function == 'mean_original':
+            data = arrays.mean('time')
+            array = data.value.data
+            array = array*mask
+        elif function == 'omax':
+            data = arrays.max('time')
+            array = data.value.data
+            array[array == 0] = np.nan
+            array = array*mask
+        else:
+            data = arrays.min('time')
+            array = data.value.data
+            array[array == 0] = np.nan
+            array = array*mask
 
         # Colors - RdYlGnBu
         colorscale = [[0.00, 'rgb(124, 36, 36)'],
@@ -167,75 +252,6 @@ def makeMap(function, choice, year_range):
                       [1.00, 'rgb(0, 46, 110)']]
 
     return [[array, arrays], colorscale, dmax, dmin]
-
-
-# In[] Drought and Climate Indices (looking to include any raster time series)
-# Index Paths (for npz files)
-indices = [{'label': 'Rainfall Index', 'value': 'noaa'},
-           {'label': 'PDSI', 'value': 'pdsi'},
-           {'label': 'PDSI-Self Calibrated', 'value': 'pdsisc'},
-           {'label': 'Palmer Z Index', 'value': 'pdsiz'},
-           {'label': 'SPI-1', 'value': 'spi1'},
-           {'label': 'SPI-2', 'value': 'spi2'},
-           {'label': 'SPI-3', 'value': 'spi3'},
-           {'label': 'SPI-6', 'value': 'spi6'},
-           {'label': 'SPEI-1', 'value': 'spei1'},
-           {'label': 'SPEI-2', 'value': 'spei2'},
-           {'label': 'SPEI-3', 'value': 'spei3'},
-           {'label': 'SPEI-6', 'value': 'spei6'},
-           {'label': 'EDDI-1', 'value': 'eddi1'},
-           {'label': 'EDDI-2', 'value': 'eddi2'},
-           {'label': 'EDDI-3', 'value': 'eddi3'},
-           {'label': 'EDDI-6', 'value': 'eddi6'}]
-
-# Index dropdown labels
-indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
-              'pdsi': 'Palmer Drought Severity Index',
-              'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
-              'pdsiz': 'Palmer Z Index',
-              'spi1': 'Standardized Precipitation Index - 1 month',
-              'spi2': 'Standardized Precipitation Index - 2 month',
-              'spi3': 'Standardized Precipitation Index - 3 month',
-              'spi6': 'Standardized Precipitation Index - 6 month',
-              'spei1': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 1 month',
-              'spei2': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 2 month',
-              'spei3': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 3 month',
-              'spei6': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 6 month',
-              'eddi1': 'Evaporative Demand Drought Index - 1 month',
-              'eddi2': 'Evaporative Demand Drought Index - 2 month',
-              'eddi3': 'Evaporative Demand Drought Index - 3 month',
-              'eddi6': 'Evaporative Demand Drought Index - 6 month'}
-
-# Function options
-function_options = [{'label': 'Mean - Percentiles', 'value': 'mean_perc'},
-                    {'label': 'Mean - Original Values',
-                     'value': 'mean_original'},
-                    {'label': 'Maximum - Percentiles', 'value': 'max'},
-                    {'label': 'Minimum - Percentiles', 'value': 'min'}]
-function_names = {'mean_perc': 'Average Percentiles',
-                  'mean_original': 'Average Original Index Values',
-                  'min': 'Minimum Percentile',
-                  'max': 'Maxmium Percentile'}
-
-# For the city list
-grid = readRaster(data_path + 'data/droughtindices/prfgrid.tif', 1, -9999)[0]
-mask = grid*0+1
-cities_df = pd.read_csv("cities.csv")
-
-cities = [{'label': cities_df['NAME'][i] + ", " + cities_df['STATE'][i],
-           'value': cities_df['grid'][i]} for i in range(len(cities_df))]
-# In[] The map
-# Map types
-maptypes = [{'label': 'Light', 'value': 'light'},
-            {'label': 'Dark', 'value': 'dark'},
-            {'label': 'Basic', 'value': 'basic'},
-            {'label': 'Outdoors', 'value': 'outdoors'},
-            {'label': 'Satellite', 'value': 'satellite'},
-            {'label': 'Satellite Streets', 'value': 'satellite-streets'}]
 
 # Year Marks for Slider
 years = [int(y) for y in range(startyear, 2018)]
