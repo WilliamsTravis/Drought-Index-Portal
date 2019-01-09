@@ -55,8 +55,8 @@ indexpaths = {'noaa': 'D:/data/droughtindices/noaa/nad83',
               'eddi2': 'D:/data/droughtindices/eddi/nad83/2month',
               'eddi3': 'D:/data/droughtindices/eddi/nad83/3month',
               'eddi6': 'D:/data/droughtindices/eddi/nad83/6month'}
-# indexpaths = {key: os.path.join(indexpaths[key], 'percentiles') for
-#               key in indexpaths.keys()}
+indexpaths = {key: os.path.join(indexpaths[key], 'percentiles') for
+              key in indexpaths.keys()}
 
 
 def toNetCDF(index, savepath):
@@ -96,9 +96,9 @@ def toNetCDF(index, savepath):
     nco.subtitle = "Monthly Index values since {}-{}-1".format(year1, month1)
 
     # create dimensions, variables and attributes:
-    lon_dim = nco.createDimension('lon', nlon)
-    lat_dim = nco.createDimension('lat', nlat)
-    time_dim = nco.createDimension('time', None)
+    nco.createDimension('lon', nlon)
+    nco.createDimension('lat', nlat)
+    nco.createDimension('time', None)
 
     timeo = nco.createVariable('time', np.float64, ('time',))
     timeo.units = 'days since {}-{:02d}-01'.format(year1, month1)
@@ -154,4 +154,4 @@ def toNetCDF(index, savepath):
 
 
 for index in tqdm(indexnames.keys(), position=0):
-    toNetCDF(index, 'D:/data/droughtindices/netcdfs')
+    toNetCDF(index, 'D:/data/droughtindices/netcdfs/percentiles')

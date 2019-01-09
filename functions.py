@@ -1764,12 +1764,12 @@ def probMatch(indexlist, noaalist, strike, binumber=100, limmax=0, plot=True):
     binumber = number of bins to put values in
     linmax = index value limit for noaa precip (it extends quite far)
 
-    This will take in a list of drought index values, generate a histogram for both that and the 
-        noaa index and then calculate the drought index value that corresponds with an equal 
-        probability of occurence in the noaa index for a chosen strike level. 
-        
+    This will take in a list of drought index values, generate a histogram for
+        both that and the noaa index and then calculate the drought index value
+        that corresponds with an equal probability of occurrence in the noaa
+        index for a chosen strike level.
     '''    
-   
+
     # Tinker
     name = indexlist[0][0][:-7] + ' Value Distribution'
     startyear = indexlist[0][0][-6:-2]
@@ -2082,6 +2082,227 @@ class RasterArrays:
             image.SetProjection(crs)
             image.GetRasterBand(1).WriteArray(array[1])
 #            image.GetRasterBand(1).SetNoDataValue(self.navalue)
+
+
+###############################################################################
+######################## Define Raster Manipulation Class #####################
+###############################################################################
+# class RasterArrays2:
+#     '''
+#     This class creates a series of Numpy arrays from a netcdf file containing a
+#     series of rasters using xarray. With this you can retrieve a named list of
+#     arrays, a list of only arrays, and a few general statistics or fields. It
+#     also includes several sample methods that might be useful when manipulating
+#     or analysing gridded data.
+
+#         Initializing arguments:
+
+#             rasterpath(string) = filename of netcdf.
+#             navalue(numeric) = value used for NaN in raster, or user specified
+
+#         Attributes:
+
+#             namedlist (list) = [[filename, array], [filename, array], ...]
+#             geometry (tuple) = (spatial geometry): (upper left coordinate,
+#                                                     x-dimension pixel size,
+#                                                     rotation,
+#                                                     lower right coordinate,
+#                                                     rotation,
+#                                                     y-dimension pixel size)
+#             crs (string) = Coordinate Reference System (Well-Knowm Text Format)
+#             arraylist (list) = [array, array, ...]
+#             minimumvalue (numeric)
+#             maximumvalue (numeric)
+#             averagevalues (Numpy array)
+
+#         Methods:
+
+#             standardizeArrays = Standardizes all values in arrays
+#             calculateCV = Calculates Coefficient of Variation
+#             generateHistogram = Generates histogram of all values in arrays
+#             toRaster = Writes a singular array to raster
+#             toRasters = Writes a list of arrays to rasters
+#     '''
+#     import salem
+#     import xarray
+#     # Reduce memory use of dictionary attribute storage
+#     __slots__ = ('data', 
+#                   'geometry', 'crs',
+#                  'exceptions', 'arraylist',
+#                  'minimumvalue', 'maximumvalue', 'averagevalues', 'navalue')
+
+#     # Create initial values
+#     def __init__(self, filepath, navalue=-9999):
+#         self.data = xr.open_dataset(filepath)
+#         self.geometry = self.data...
+#         self.crs = self.data...
+#         self.arraylist = [a[1] for a in self.namedlist]
+#         self.minimumvalue = np.nanmin(self.arraylist)
+#         self.maximumvalue = np.nanmax(self.arraylist)
+#         self.averagevalues = np.nanmean(self.arraylist, axis=0)
+#         self.navalue = navalue
+
+#     # Establish methods
+#     def standardizeArrays(self):
+#         '''
+#         Min/Max standardization of array list, returns a named list
+#         '''
+#         print("Standardizing arrays...")
+#         mins = np.nanmin(self.arraylist)
+#         maxes = np.nanmax(self.arraylist)
+
+#         def singleArray(array, mins, maxes):
+#             '''
+#             calculates the standardized values of a single array
+#             '''
+#             newarray = (array - mins)/(maxes - mins)
+#             return newarray
+
+#         standardizedarrays = []
+#         for i in range(len(self.arraylist)):
+#             standardizedarrays.append([self.namedlist[i][0],
+#                                        singleArray(self.namedlist[i][1],
+#                                                    mins, maxes)])
+#         return standardizedarrays
+
+#     def calculateCV(self, standardized=True):
+#         '''
+#          A single array showing the distribution of coefficients of variation
+#              throughout the time period represented by the chosen rasters
+#         '''
+#         # Get list of arrays
+#         if standardized is True:
+#             numpyarrays = self.standardizeArrays()
+#         else:
+#             numpyarrays = self.namedlist
+
+#         # Get just the arrays from this
+#         numpylist = [a[1] for a in numpyarrays]
+
+#         # Simple Cellwise calculation of variance
+#         sds = np.nanstd(numpylist, axis=0)
+#         avs = np.nanmean(numpylist, axis=0)
+#         covs = sds/avs
+
+#         return covs
+
+#     def generateHistogram(self,
+#                           bins=1000,
+#                           title="Value Distribution",
+#                           xlimit=0,
+#                           savepath=''):
+#         '''
+#         Creates a histogram of the entire dataset for a quick view.
+
+#           bins = number of value bins
+#           title = optional title
+#           xlimit = x-axis cutoff value
+#           savepath = image file path with extension (.jpg, .png, etc.)
+#         '''
+#         print("Generating histogram...")
+#         # Get the unnamed list
+#         arrays = self.arraylist
+
+#         # Mask the array for the histogram (Makes this easier)
+#         arrays = np.ma.masked_invalid(arrays)
+
+#         # Get min and maximum values
+#         amin = np.min(arrays)
+#         if xlimit > 0:
+#             amax = xlimit
+#         else:
+#             amax = np.max(arrays)
+
+#         # Get the bin width, and the frequency of values within
+#         hists, bins = np.histogram(arrays, range=[amin, amax],
+#                                    bins=bins, normed=False)
+#         width = .65 * (bins[1] - bins[0])
+#         center = (bins[:-1] + bins[1:]) / 2
+
+#         # Make plotting optional
+#         plt.ioff()
+
+#         # Create Pyplot figure
+#         plt.figure(figsize=(8, 8))
+#         plt.bar(center, hists, align='center', width=width)
+#         title = (title + ":\nMinimum: " + str(round(amin, 2)) +
+#                  "\nMaximum: " + str(round(amax, 2)))
+#         plt.title(title, loc='center')
+
+#         # Optional write to image
+#         if len(savepath) > 0:
+#             print("Writing histogram to image...")
+#             savepath = os.path.normpath(savepath)
+#             if not os.path.exists(os.path.dirname(savepath)):
+#                 os.mkdir(os.path.dirname(savepath))
+#             plt.savefig(savepath)
+#             plt.close()
+#         else:
+#             plt.show()
+    
+#     def toRaster(self, array, savepath):
+#         '''
+#         Uses the geometry and crs of the rasterArrays class object to write a
+#             singular array as a GeoTiff.
+#         '''
+#         print("Writing numpy array to GeoTiff...")
+#         # Check that the Save Path exists
+#         savepath = os.path.normpath(savepath)
+#         if not os.path.exists(os.path.dirname(savepath)):
+#             os.mkdir(os.path.dirname(savepath))
+
+#         # Retrieve needed raster elements
+#         geometry = self.geometry
+#         crs = self.crs
+#         xpixels = array.shape[1]
+#         ypixels = array.shape[0]
+
+#         # This helps sometimes
+#         savepath = savepath.encode('utf-8')
+
+#         # Create file
+#         image = gdal.GetDriverByName("GTiff").Create(savepath,
+#                                                      xpixels,
+#                                                      ypixels,
+#                                                      1,
+#                                                      gdal.GDT_Float32)
+#         # Save raster and attributes to file
+#         image.SetGeoTransform(geometry)
+#         image.SetProjection(crs)
+#         image.GetRasterBand(1).WriteArray(array)
+#         image.GetRasterBand(1).SetNoDataValue(self.navalue)
+
+#     def toRasters(self, namedlist, savefolder):
+#         """
+#         namedlist (list) = [[name, array], [name, array], ...]
+#         savefolder (string) = target directory
+#         """
+#         # Create directory if needed
+#         print("Writing numpy arrays to GeoTiffs...")
+#         savefolder = os.path.normpath(savefolder)
+#         savefolder = os.path.join(savefolder, '')
+#         if not os.path.exists(savefolder):
+#             os.mkdir(savefolder)
+
+#         # Get spatial reference information
+#         geometry = self.geometry
+#         crs = self.crs
+#         sample = namedlist[0][1]
+#         ypixels = sample.shape[0]
+#         xpixels = sample.shape[1]
+
+#         # Create file
+#         for array in tqdm(namedlist):
+#             image = gdal.GetDriverByName("GTiff").Create(savefolder+array[0] +
+#                                                          ".tif",
+#                                                          xpixels,
+#                                                          ypixels,
+#                                                          1,
+#                                                          gdal.GDT_Float32)
+#             image.SetGeoTransform(geometry)
+#             image.SetProjection(crs)
+#             image.GetRasterBand(1).WriteArray(array[1])
+#             image.GetRasterBand(1).SetNoDataValue(self.navalue)
 
 
 ###############################################################################

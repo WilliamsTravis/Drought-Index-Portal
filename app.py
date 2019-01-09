@@ -57,6 +57,7 @@ from functions import indexHist
 from functions import npzIn
 from functions import calculateCV
 from functions import readRaster
+from functions import RasterArrays
 
 # In[] for development
 # function =  'mean_perc'
@@ -83,8 +84,6 @@ cache.init_app(server)
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
-
-
 
 
 # In[] Drought and Climate Indices (looking to include any raster time series)
@@ -130,26 +129,29 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
 
 # Function options
 function_options = [{'label': 'Mean - Percentiles', 'value': 'mean_perc'},
-                    {'label': 'Mean - Original Values',
-                     'value': 'mean_original'},
                     {'label': 'Maximum - Percentiles', 'value': 'max'},
                     {'label': 'Minimum - Percentiles', 'value': 'min'},
+                    {'label': 'Mean - Original Values',
+                     'value': 'mean_original'},
                     {'label': 'Maximum - Original Values', 'value': 'omax'},
-                    {'label': 'Minimum - Original Values', 'value': 'omin'}]
+                    {'label': 'Minimum - Original Values', 'value': 'omin'},
+                    {'label': 'Coefficient of Variation - Original Value',
+                     'value': 'ocv'}]
 function_names = {'mean_perc': 'Average Percentiles',
-                  'mean_original': 'Average Original Index Values',
-                  'min': 'Minimum Percentile',
                   'max': 'Maxmium Percentile',
+                  'min': 'Minimum Percentile',
+                  'mean_original': 'Average Original Index Values',
+                  'omax': 'Maximum Original Value',
                   'omin': 'Minimum Original Value',
-                  'omax': 'Maximum Original Value'}
+                  'ocv': 'Coefficient of Variation for Original Values'}
 
 # For the city list
 grid = readRaster(data_path + 'data/droughtindices/prfgrid.tif', 1, -9999)[0]
 mask = grid*0+1
 cities_df = pd.read_csv("cities.csv")
-
 cities = [{'label': cities_df['NAME'][i] + ", " + cities_df['STATE'][i],
            'value': cities_df['grid'][i]} for i in range(len(cities_df))]
+
 # In[] The map
 # Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
@@ -159,25 +161,61 @@ maptypes = [{'label': 'Light', 'value': 'light'},
             {'label': 'Satellite', 'value': 'satellite'},
             {'label': 'Satellite Streets', 'value': 'satellite-streets'}]
 
+RdWhBu = [[0.00, 'rgb(115,0,0)'],
+          [0.10, 'rgb(230,0,0)'],
+          [0.20, 'rgb(255,170,0)'],
+          [0.30, 'rgb(252,211,127)'],
+          [0.40, 'rgb(255, 255, 0)'],
+          [0.45, 'rgb(255, 255, 255)'],
+          [0.55, 'rgb(255, 255, 255)'],
+          [0.60, 'rgb(143, 238, 252)'],
+          [0.70, 'rgb(12,164,235)'],
+          [0.80, 'rgb(0,125,255)'],
+          [0.90, 'rgb(10,55,166)'],
+          [1.00, 'rgb(5,16,110)']]
 
-def makeMap(function, choice, year_range):
+RdYlGnBu = [[0.00, 'rgb(124, 36, 36)'],
+            [0.25, 'rgb(255, 255, 48)'],
+            [0.5, 'rgb(76, 145, 33)'],
+            [0.85, 'rgb(0, 92, 221)'],
+            [1.00, 'rgb(0, 46, 110)']]
+
+colorscales = ['Blackbody', 'Bluered', 'Blues', 'Earth', 'Electric', 'Greens',
+               'Greys', 'Hot', 'Jet', 'Picnic', 'Portland', 'Rainbow', 'RdBu',
+               'Reds', 'Viridis', 'Default']
+color_options = [{'label': c, 'value': c} for c in colorscales]
+color_options.append({'label': 'RdWhBu', 'value': 'RdWhBu'})
+color_options.append({'label': 'RdYlGnBu', 'value': 'RdYlGnBu'})
+
+
+def makeMap(function, choice, time_range, colorscale):
+    # Split time range up
+    year_range = time_range[0]
+    month_range = time_range[1]
+    y1 = year_range[0]
+    y2 = year_range[1]
+    if y1 == y2:
+        m1 = month_range[0]
+        m2 = month_range[1]
+    else:
+        m1 = 1
+        m2 = 12
 
     # Get numpy arrays
-    if function not in ['mean_original', 'omin', 'omax']:
+    if function not in ['mean_original', 'omin', 'omax', 'ocv']:
         array_path = os.path.join(
                 data_path, "data/droughtindices/netcdfs/percentiles",
                 choice + '.nc')
-
         indexlist = xr.open_dataset(array_path)
 
         # Get total Min and Max Values for colors
         dmin = 0
         dmax = 1
 
-        # filter by year
-        y1 = dt.datetime(year_range[0], 1, 1)
-        y2 = dt.datetime(year_range[1], 12, 1)
-        arrays = indexlist.sel(time=slice(y1, y2))
+        # filter by date
+        d1 = dt.datetime(y1, m1, 1)
+        d2 = dt.datetime(y2, m2, 1)
+        arrays = indexlist.sel(time=slice(d1, d2))
 
         # Apply chosen funtion
         if function == 'mean_perc':
@@ -196,21 +234,13 @@ def makeMap(function, choice, year_range):
             array[array == 0] = np.nan
             array = array*mask
 
-        # Colors - USDM Scale
-        colorscale = [[0.00, 'rgb(115,0,0)'],
-                      [0.10, 'rgb(230,0,0)'],
-                      [0.20, 'rgb(255,170,0)'],
-                      [0.30, 'rgb(252,211,127)'],
-                      [0.40, 'rgb(255, 255, 0)'],
-                      [0.45, 'rgb(255, 255, 255)'],
-                      [0.55, 'rgb(255, 255, 255)'],
-                      [0.60, 'rgb(143, 238, 252)'],
-                      [0.70, 'rgb(12,164,235)'],
-                      [0.80, 'rgb(0,125,255)'],
-                      [0.90, 'rgb(10,55,166)'],
-                      [1.00, 'rgb(5,16,110)']]
+        # Colors - Default is USDM style, sort of
+        if colorscale == 'Default':
+            colorscale = RdWhBu
 
-    else:
+        reverse = False
+
+    else:  # Using original values
         array_path = os.path.join(
                 data_path, "data/droughtindices/netcdfs",
                 choice + '.nc')
@@ -220,42 +250,66 @@ def makeMap(function, choice, year_range):
         # Get total Min and Max Values for colors
         values = indexlist.value.data
         values[values == 0] = np.nan
-        dmin = np.nanmin(values)
-        dmax = np.nanmax(values)
+        limits = [abs(np.nanmin(values)), abs(np.nanmax(values))]
+        dmax = max(limits)
+        dmin = dmax*-1
 
-        # filter by year
-        y1 = dt.datetime(year_range[0], 1, 1)
-        y2 = dt.datetime(year_range[1], 12, 1)
-        arrays = indexlist.sel(time=slice(y1, y2))
+        # Filter by Date
+        d1 = dt.datetime(y1, m1, 1)
+        d2 = dt.datetime(y2, m2, 1)
+        arrays = indexlist.sel(time=slice(d1, d2))
 
         # Apply chosen funtion
         if function == 'mean_original':
             data = arrays.mean('time')
             array = data.value.data
             array = array*mask
+            if colorscale == 'Default':
+                colorscale = RdYlGnBu
+
         elif function == 'omax':
             data = arrays.max('time')
             array = data.value.data
             array[array == 0] = np.nan
             array = array*mask
-        else:
+            if colorscale == 'Default':
+                colorscale = RdYlGnBu
+
+        elif function == 'omin':
             data = arrays.min('time')
             array = data.value.data
             array[array == 0] = np.nan
             array = array*mask
+            if colorscale == 'Default':
+                colorscale = RdYlGnBu
 
-        # Colors - RdYlGnBu
-        colorscale = [[0.00, 'rgb(124, 36, 36)'],
-                      [0.25, 'rgb(255, 255, 48)'],
-                      [0.5, 'rgb(76, 145, 33)'],
-                       [0.85, 'rgb(0, 92, 221)'],
-                      [1.00, 'rgb(0, 46, 110)']]
+        else:
+            numpy_arrays = arrays.value.data
+            array = calculateCV(numpy_arrays)
+            array = array*mask
+            if colorscale == 'Default':
+                colorscale = 'Portland'
 
-    return [[array, arrays], colorscale, dmax, dmin]
+    # The scale is reverse for this
+    if 'eddi' in choice:
+        reverse = True
+    else:
+        reverse = False
+
+    # With an object as a value the label is left blank? Not sure why?
+    if colorscale == 'RdWhBu':
+        colorscale = RdWhBu
+    if colorscale == 'RdYlGnBu':
+        colorscale = RdYlGnBu
+
+    return [[array, arrays], colorscale, dmax, dmin, reverse]
+
 
 # Year Marks for Slider
 years = [int(y) for y in range(startyear, 2018)]
 yearmarks = dict(zip(years, years))
+monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+              7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
 for y in yearmarks:
     if y % 5 != 0:
         yearmarks[y] = ""
@@ -299,8 +353,7 @@ layout = dict(
         r=35,
         b=65,
         t=90,
-        pad=4
-    ),
+        pad=4),
     hovermode="closest",
     plot_bgcolor="#083C04",
     paper_bgcolor="#0D347C",
@@ -311,8 +364,7 @@ layout = dict(
         style="satellite-streets",
         center=dict(
             lon=-95.7,
-            lat=37.1
-        ),
+            lat=37.1),
         zoom=2,
     )
 )
@@ -342,68 +394,113 @@ app.layout = html.Div([
         #                  style={'width': '100%',
         #                         'box-shadow': '1px 1px 1px 1px black'})]),
         # html.Hr(),
-        html.Div([html.H1('Raster to Scatterplot Visualization')],
+        html.Div([html.H1('Raster to Scatterplot Visualization'),
+                  html.Hr()],
                  className='twelve columns',
-                 style={'font-weight': 'bold',
+                 style={'font-weight': 'bolder',
                         'text-align': 'center',
                         'font-size': '50px',
                         'font-family': 'Times New Roman'}),
 
         # Year Slider
-        html.Div([
-                 html.Hr(),
-                 html.H3('Study Period Year Range'),
-                 html.Div([dcc.RangeSlider(
-                             id='year_slider',
-                             value=[2000, 2017],
-                             min=startyear,
-                             max=2017,
-                             marks=yearmarks)],
-                 className="twelve columns",
-                 style={'margin-top': '0',
-                        'margin-bottom': '40'})]),
-        # Submit button
-        html.Div([
-                html.Hr(),
-                html.Button(id='submit',
-                            children='Submit Years',
-                            type='button',
-                            title='It updates automatically without this.')]),
-
-        # Options
-        html.Div([
-            # Maptype
-            html.Div([
-                    html.H3("Map Type"),
-                     dcc.RadioItems(
-                            id="map_type",
-                            value="light",
-                            options=maptypes)],
-                     className='two columns'),
-
-            # Function
-            html.Div([
-                     html.H3("Function"),
-                     dcc.RadioItems(id='function_choice',
-                                    options=function_options,
-                                    value='mean_original')],
-                     className='three columns'),
-            # Syncing locations on click
-            html.Div([
-                    html.H3("Sync Click Locations"),
-                    dcc.RadioItems(id='click_sync',
-                                   options=[{'label': 'Yes', 'value': 'yes'},
-                                            {'label': 'No', 'value': 'no'}],
-                                   value='yes')],
-                     className='three columns')
-            ],
-           className='row',
-           style={'margin-bottom': '50',
-                  'margin-top': '0'}),
-        
-        # Break    
-        html.Hr(),
+        html.Div(id='options',
+                 children=[
+                     html.Div([
+                     html.H3('Study Period Year Range'),
+                     html.Div([dcc.RangeSlider(
+                                 id='year_slider',
+                                 value=[1985, 1985],
+                                 min=startyear,
+                                 max=2017,
+                                 marks=yearmarks)],
+                              style={'margin-top': '0',
+                                     'margin-bottom': '40'}),
     
+                     # Month Slider
+                     html.Div(id='month_slider',
+                              children=[
+                                      html.H3('Month Range'),
+                                      html.Div([
+                                               dcc.RangeSlider(id='month',
+                                                               value=[1, 12],
+                                                               min=1, max=12,
+                                                               marks=monthmarks)],
+                                               style={'width': '35%'})],
+                              style={'display': 'none'},
+                              # className="six columns"
+                              )
+                     ],
+                     className="row",
+                     style={'margin-bottom': '55'}),
+    
+            # Submit button
+            html.Div([
+                    html.Button(id='submit',
+                                children='Submit Dates',
+                                type='button',
+                                title='It updates automatically without this.')]),
+                    # html.Hr(),
+    
+            # Options
+            html.Div([
+                # Maptype
+                html.Div([
+                        html.H3("Map Type"),
+                         dcc.RadioItems(
+                                id="map_type",
+                                value="light",
+                                options=maptypes)],
+                         className='two columns'),
+    
+                # Function
+                html.Div([
+                         html.H3("Function"),
+                         dcc.RadioItems(id='function_choice',
+                                        options=function_options,
+                                        value='mean_original')],
+                         className='three columns'),
+                # Syncing locations on click
+                html.Div([
+                        html.H3("Sync Click Locations"),
+                        dcc.RadioItems(id='click_sync',
+                                       options=[{'label': 'Yes', 'value': 'yes'},
+                                                {'label': 'No', 'value': 'no'}],
+                                       value='yes')],
+                         className='three columns'),
+    
+                # Customize Color Scales
+                html.Div([
+                        html.H3('Color Gradient'),
+                        dcc.Dropdown(id='colors',
+                                     options=color_options,
+                                     value='Default'),
+                        html.H4("Reverse"),
+                        dcc.RadioItems(id='reverse',
+                                       options=[{'label': 'Yes', 
+                                                 'value': 'yes'},
+                                                {'label': 'No',
+                                                 'value': 'no'}],
+                                       value='no')],
+                         className='two columns')
+                ],
+               className='row',
+               style={'margin-bottom': '50',
+                      'margin-top': '0'}),
+    
+            # Break
+            html.Hr(),
+        ]),
+
+        # Toggle Options
+        html.Div([
+                html.Button(id='toggle_options',
+                            children='Toggle Options On/Off',
+                            type='button',
+                            title='Click to collapse the options above')],
+                style={'margin-buttom': '50'}),
+        # Break
+        html.Br(style={'line-height': '150%'}),
+
         # Four by Four Map Layout
         # Row 1
         html.Div([divMaker(1, 'spei1'), divMaker(2, 'spei2')],
@@ -414,7 +511,7 @@ app.layout = html.Div([
                  className='row'),
 
         # Signals
-        html.Div(id='signal', style={'display': 'none'}),
+        html.Div(id='time_range', style={'display': 'none'}),
         html.Div(id='click_store', style={'display': 'none'}),
         html.Div(id='cache_1', children='1', style={'display': 'none'}),
         html.Div(id='cache_2', children='2', style={'display': 'none'}),
@@ -434,44 +531,82 @@ app.layout = html.Div([
 @cache.memoize()
 def global_store1(signal):
     gc.collect()
-    data = makeMap(signal[1], signal[0], signal[2])
+    data = makeMap(signal[1], signal[0], signal[2], signal[3])
     return data
+
+
 def retrieve_data1(signal):
     data = global_store1(signal)
     return data
 
+
 @cache.memoize()
 def global_store2(signal):
-    data = makeMap(signal[1], signal[0], signal[2])
+    data = makeMap(signal[1], signal[0], signal[2], signal[3])
     return data
+
+
 def retrieve_data2(signal):
     data = global_store2(signal)
     return data
 
+
 @cache.memoize()
 def global_store3(signal):
-    data = makeMap(signal[1], signal[0], signal[2])
+    data = makeMap(signal[1], signal[0], signal[2], signal[3])
     return data
+
+
 def retrieve_data3(signal):
     data = global_store3(signal)
     return data
 
+
 @cache.memoize()
 def global_store4(signal):
-    data = makeMap(signal[1], signal[0], signal[2])
+    data = makeMap(signal[1], signal[0], signal[2], signal[3])
     return data
+
+
 def retrieve_data4(signal):
     data = global_store4(signal)
     return data
 
 
 # Store data in the cache and hide the signal to activate it in the hidden div
-@app.callback(Output('signal', 'children'),
+@app.callback(Output('time_range', 'children'),
               [Input('submit', 'n_clicks')],
-              [State('year_slider', 'value')])
-def submitSignal(click, year_range):
+              [State('year_slider', 'value'),
+               State('month', 'value')])
+def submitSignal(click, year_range, month_range):
     print(year_range)
-    return json.dumps(year_range)
+    if not month_range:
+        month_range = [1, 1]
+    print("Month Range" + str(month_range))
+    return json.dumps([year_range, month_range])
+
+
+# Allow users to select a month range if the year slider is set to one year
+@app.callback(Output('month_slider', 'style'),
+              [Input('year_slider', 'value')])
+def monthSlider(year_range):
+    if year_range[0] == year_range[1]:
+        style = {}
+    else:
+        style = {'display': 'none'}
+    return style
+
+
+@app.callback(Output('options', 'style'),
+              [Input('toggle_options', 'n_clicks')])
+def toggleOptions(click):
+    if not click:
+        click = 0
+    if click % 2 == 1:
+        style = {'display': 'none'}
+    else:
+        style = {}
+    return style
 
 
 @app.callback(Output('click_store', 'children'),
@@ -514,33 +649,47 @@ for i in range(1, 5):
         return(clicktime)
 
     @app.callback(Output("map_{}".format(i), 'figure'),
-                  [Input('signal', 'children'),
+                  [Input('time_range', 'children'),
                    Input('cache_{}'.format(i), 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('function_choice', 'value'),
-                   Input('map_type', 'value')])
-    def makeGraph(year_range, cache, choice, function, map_type):
+                   Input('map_type', 'value'),
+                   Input('colors', 'value'),
+                   Input('reverse', 'value')])
+    def makeGraph(time_range, cache, choice, function, map_type,
+                  colorscale, reverse_override):
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
         # Create signal for the global_store
-        year_range = json.loads(year_range)
-        signal = [choice, function, year_range]
+        time_range = json.loads(time_range)
+        signal = [choice, function, time_range, colorscale]
+
+        # Split the time range up
+        year_range = time_range[0]
+        month_range = time_range[1]
+        y1 = year_range[0]
+        y2 = year_range[1]
+        m1 = month_range[0]
+        m2 = month_range[1]
 
         # Get data - check which cache first
         if cache == '1':
             [[array, arrays],
-             colorscale, dmax, dmin] = retrieve_data1(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_data1(signal)
         elif cache == '2':
             [[array, arrays],
-             colorscale, dmax, dmin] = retrieve_data2(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_data2(signal)
         elif cache == '3':
             [[array, arrays],
-             colorscale, dmax, dmin] = retrieve_data3(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_data3(signal)
         else:
             [[array, arrays],
-             colorscale, dmax, dmin] = retrieve_data4(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_data4(signal)
 
+        # There a lot of colorscale switching in the default settings
+        if reverse_override == 'yes':
+            reverse = not reverse
         # Individual array min/max
         amax = np.nanmax(array)
         amin = np.nanmin(array)
@@ -581,6 +730,7 @@ for i in range(1, 5):
                 hovermode='closest',
                 marker=dict(
                     colorscale=colorscale,
+                    reversescale=reverse,
                     color=df['data'],
                     cmax=amax,
                     cmin=amin,
@@ -589,16 +739,20 @@ for i in range(1, 5):
                     colorbar=dict(
                         textposition="auto",
                         orientation="h",
+
                         font=dict(size=15,
                                   fontweight='bold')
                     )
                 )
             )]
 
-        if year_range[0] != year_range[1]:
-            year_print = '{} - {}'.format(year_range[0], year_range[1])
+        if y1 != y2:
+            date_print = '{} - {}'.format(y1, y2)
+        elif y1 == y2 and m1 != m2:
+            date_print = "{} - {}, {}".format(monthmarks[m1],
+                                              monthmarks[m2], y1)
         else:
-            year_print = str(year_range[0])
+            date_print = "{}, {}".format(monthmarks[m1], y1)
 
         layout_copy = copy.deepcopy(layout)
         layout_copy['mapbox'] = dict(
@@ -608,8 +762,8 @@ for i in range(1, 5):
             zoom=2)
 
         layout_copy['title'] = (indexnames[choice] + '<br>' +
-                                function_names[function] + ', ' +
-                                year_print)
+                                function_names[function] + ': ' +
+                                date_print)
 
         figure = dict(data=data, layout=layout_copy)
         return figure
@@ -619,26 +773,34 @@ for i in range(1, 5):
                    Input("map_{}".format(i), 'clickData'),
                    Input('click_store', 'children'),
                    Input('choice_{}'.format(i), 'value'),
-                   Input('signal', 'children'),
-                   Input('function_choice', 'value')])
-    def makeSeries(click_sync, click, synced_click, choice, year_range,
-                   function):
-        year_range = json.loads(year_range)
-        signal = [choice, function, year_range]
+                   Input('time_range', 'children'),
+                   Input('function_choice', 'value'),
+                   Input('colors', 'value'),
+                   Input('reverse', 'value')])
+    def makeSeries(click_sync, click, synced_click, choice, time_range,
+                   function, colorscale, reverse_override):
+
+        # Create signal
+        time_range = json.loads(time_range)
+        signal = [choice, function, time_range, colorscale]
 
         # Get data - check which cache first
         if cache == '1':
             [[array, arrays],
-             colorscale, dmax, dmin] = retrieve_data1(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_data1(signal)
         elif cache == '2':
             [[array, arrays],
-             colorscale, dmax, dmin] = retrieve_data2(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_data2(signal)
         elif cache == '3':
             [[array, arrays],
-             colorscale, dmax, dmin] = retrieve_data3(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_data3(signal)
         else:
             [[array, arrays],
-             colorscale, dmax, dmin] = retrieve_data4(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_data4(signal)
+
+        # There a lot of colorscale switching in the default settings
+        if reverse_override == 'yes':
+            reverse = not reverse
 
         # # Check if we are syncing clicks
         if click_sync == 'yes':
@@ -677,16 +839,17 @@ for i in range(1, 5):
         dates = [d.strftime('%Y-%m') for d in dates2]
         just_arrays = [a.data for a in arrays.value]
         timeseries = np.array([round(a[y, x], 4) for a in just_arrays])
+        yaxis=dict(range=[dmin, dmax])
 
         # Build the data dictionaries that plotly reads
         data = [
             dict(
                 type='bar',
-                # yaxis=dict(range=[dmin, dmax]),
                 x=dates,
                 y=timeseries,
                 marker=dict(color=timeseries,
                             colorscale=colorscale,
+                            reversescale=reverse,
                             line=dict(width=0.2, color="#000000")),
             )]
 
@@ -697,6 +860,7 @@ for i in range(1, 5):
         layout_copy['plot_bgcolor'] = "white"
         layout_copy['paper_bgcolor'] = "white"
         layout_copy['height'] = 250
+        layout_copy['yaxis'] = yaxis
         layout_copy['titlefont']['color'] = '#636363'
         layout_copy['font']['color'] = '#636363'
         figure = dict(data=data, layout=layout_copy)
