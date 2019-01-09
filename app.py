@@ -110,14 +110,17 @@ def makeMap(function, choice, year_range):
             data = arrays.mean('time')
             array = data.value.data
             array[array == 0] = np.nan
+            array = array*mask
         elif function == 'max':
             data = arrays.max('time')
             array = data.value.data
             array[array == 0] = np.nan
+            array = array*mask
         else:
             data = arrays.min('time')
             array = data.value.data
             array[array == 0] = np.nan
+            array = array*mask
 
         # Colors - USDM Scale
         colorscale = [[0.00, 'rgb(115,0,0)'],
@@ -154,6 +157,7 @@ def makeMap(function, choice, year_range):
         # Apply chosen funtion
         data = arrays.mean('time')
         array = data.value.data
+        array = array*mask
 
         # Colors - RdYlGnBu
         colorscale = [[0.00, 'rgb(124, 36, 36)'],
@@ -213,12 +217,13 @@ function_options = [{'label': 'Mean - Percentiles', 'value': 'mean_perc'},
                     {'label': 'Maximum - Percentiles', 'value': 'max'},
                     {'label': 'Minimum - Percentiles', 'value': 'min'}]
 function_names = {'mean_perc': 'Average Percentiles',
-                  'mean_original': 'Original Index Values',
+                  'mean_original': 'Average Original Index Values',
                   'min': 'Minimum Percentile',
                   'max': 'Maxmium Percentile'}
 
 # For the city list
 grid = readRaster(data_path + 'data/droughtindices/prfgrid.tif', 1, -9999)[0]
+mask = grid*0+1
 cities_df = pd.read_csv("cities.csv")
 
 cities = [{'label': cities_df['NAME'][i] + ", " + cities_df['STATE'][i],
@@ -248,7 +253,7 @@ source = xr.open_dataarray(os.path.join(data_path,
 # Geometry
 x_length = source.shape[2]
 y_length = source.shape[1]
-res = source.res[0]  
+res = source.res[0]
 lon_min = source.transform[0]
 lat_max = source.transform[3] - res
 
