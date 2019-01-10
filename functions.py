@@ -10,7 +10,7 @@ import os
 
 if platform == 'win32':
     homepath = "C:/users/user/github/"
-    os.chdir(homepath + "PRF-ALTIND")
+    os.chdir(homepath + "Ubuntu-Practice-Machine")
     from flask_cache import Cache  # This one works on Windows but not Linux
     import gdal
     import rasterio
@@ -30,38 +30,11 @@ if platform == 'win32':
     gdal.UseExceptions()
     print("GDAL version:" + str(int(gdal.VersionInfo('VERSION_NUM'))))
 else:
-    homepath = "/home/ubuntu/"
-    os.chdir(homepath+"PRF-ALTIND")
+    homepath = "/root/"
+    os.chdir(homepath + "Ubuntu-Practice-Machine")
     from flask_caching import Cache  # This works on Linux but not Windows :)
 
 ###############################################################################
-import copy
-import dash
-from dash.dependencies import Input, Output, State, Event
-import dash_core_components as dcc
-import dash_html_components as html
-import dash_table_experiments as dt
-import gc
-import glob
-import json
-from flask import Flask
-import matplotlib
-import matplotlib.pyplot as plt 
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.patches import Patch
-from matplotlib.ticker import FuncFormatter
-import numpy as np
-import numpy.ma as ma
-from collections import OrderedDict
-import os
-import pandas as pd
-import plotly
-import re 
-from textwrap import dedent
-import time
-from tqdm import *
-import xarray as xr
-
 # In[] Function to readjust index intervals
 def adjustIntervals(indexlist):
     '''
@@ -110,7 +83,7 @@ def adjustIntervals2(indexlist):
     years = np.unique([u[0][-8:-4] for u in indexlist])
     year1 = min(years)
     year2 = max(years)
-    
+
     # Create a function for individual years
     def adjustYear(year, indexlist):
         # order by year

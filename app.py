@@ -33,9 +33,9 @@ if platform == 'win32':
     from flask_cache import Cache  # This one works on Windows but not Linux
     startyear = 1948
 else:
-    home_path = '/root'  # Not sure yet
-    os.chdir(os.path.join(home_path, 'Ubuntu-Practie-Machine'))
-    data = '/root'
+    home_path = '/root'
+    os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
+    data_path = '/root'
     from flask_caching import Cache  # This works on Linux but not Windows :)
     startyear = 1980
 
@@ -131,8 +131,8 @@ function_names = {'mean_perc': 'Average Percentiles',
                   'omin': 'Minimum Original Value',
                   'ocv': 'Coefficient of Variation for Original Values'}
 
-# For the city list
-grid = readRaster(data_path + 'data/droughtindices/prfgrid.tif', 1, -9999)[0]
+# For the county names - need to get a more complete data set
+grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
 cities_df = pd.read_csv("cities.csv")
 cities = [{'label': cities_df['NAME'][i] + ", " + cities_df['STATE'][i],

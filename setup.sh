@@ -27,9 +27,13 @@ then
     sudo apt-get install software-properties-common
     sudo add-apt-repository ppa:deadsnakes/ppa
     sudo apt-get update
-    sudo apt-get install python3.6 python3.6-dev
+    sudo apt-get install python3.6 python3.6-dev supervisor
     curl https://bootstrap.pypa.io/get-pip.py | sudo python3.6
-    sudo apt-get install nginx
-
-
+    pip3.6 install gunicorn
+   # sudo apt-get install python3.6-venv
+   # mkdir venv
+   # pyvenv-3.6 -m venv
+   # source /venv/bin/activate
+    pip3.6 install dash dash_core_components dash_html_components dash_table_experiments
+    pip3.6 install flask_caching netcdf4 numpy pandas scipy xarray
 fi
