@@ -11,13 +11,12 @@ Created on Tue Nov 27 16:06:52 2018
 @author: User
 """
 import os
-from scipy.stats import percentileofscore as pos
 from scipy.stats import rankdata
-
 import sys
+from tqdm import tqdm
 import warnings
 warnings.filterwarnings("ignore")
-sys.path.insert(0, 'c:/users/user/github/PRF-ALTIND')
+sys.path.insert(0, 'c:/users/user/github/Ubuntu-Practice-Machine')
 from functions import *
 os.chdir('c:/users/user/github/')
 

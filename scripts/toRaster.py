@@ -7,6 +7,7 @@ Created on Tue Jan  8 11:06:01 2019
 
 import os
 os.chdir(r"C:\Users\User\github\Ubuntu-Practice-Machine")
+from tqdm import tqdm
 from functions import *
 mask, geom, proj = readRaster("d:\\data\\masks\\nad83\\mask25.tif", 1, -9999)
 npzpaths = {'noaa': "d:\\data\\droughtindices\\npz\\percentiles\\noaa",

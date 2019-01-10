@@ -37,7 +37,7 @@ else:
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
     data_path = '/root'
     from flask_caching import Cache  # This works on Linux but not Windows :)
-    startyear = 1980
+    startyear = 1948
 
 from functions import indexHist
 from functions import npzIn
@@ -224,7 +224,10 @@ def makeMap(function, choice, time_range, colorscale):
         if colorscale == 'Default':
             colorscale = RdWhBu
 
-        reverse = False
+        if 'eddi' in choice:
+            reverse = True
+        else:
+            reverse = False
 
     else:  # Using original values
         array_path = os.path.join(

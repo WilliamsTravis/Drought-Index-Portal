@@ -34,6 +34,7 @@ else:
     os.chdir(homepath + "Ubuntu-Practice-Machine")
     from flask_caching import Cache  # This works on Linux but not Windows :)
 
+from tqdm import tqdm
 ###############################################################################
 # In[] Function to readjust index intervals
 def adjustIntervals(indexlist):

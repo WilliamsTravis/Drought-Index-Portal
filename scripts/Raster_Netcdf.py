@@ -151,7 +151,11 @@ def toNetCDF(index, savepath):
         itime = itime+1
 
     nco.close()
+    
+indexpaths = {key: value for key,value in indexpaths.items() if 'eddi' in key}
+indexnames = {key: value for key,value in indexnames.items() if 'eddi' in key}
 
-
+# for index in tqdm(indexnames.keys(), position=0):
+#     toNetCDF(index, 'D:/data/droughtindices/netcdfs')
 for index in tqdm(indexnames.keys(), position=0):
     toNetCDF(index, 'D:/data/droughtindices/netcdfs/percentiles')
