@@ -33,9 +33,9 @@ if platform == 'win32':
     from flask_cache import Cache  # This one works on Windows but not Linux
     startyear = 1948
 else:
-    home_path = '/home/ubuntu'  # Not sure yet
+    home_path = '/root'  # Not sure yet
     os.chdir(os.path.join(home_path, 'Ubuntu-Practie-Machine'))
-    data = '/home/ubunutu'
+    data = '/root'
     from flask_caching import Cache  # This works on Linux but not Windows :)
     startyear = 1980
 
