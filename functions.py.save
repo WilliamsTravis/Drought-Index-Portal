@@ -7,7 +7,7 @@ Created on Sun May 28 21:14:48 2017
 ################################# Switching to/from Ubuntu VPS ################
 from sys import platform
 import os
-import numpy as np
+
 if platform == 'win32':
     homepath = "C:/users/user/github/"
     os.chdir(homepath + "Ubuntu-Practice-Machine")
@@ -35,9 +35,6 @@ else:
     from flask_caching import Cache  # This works on Linux but not Windows :)
 
 ###############################################################################
-# In[] Function to readjust index intervals
-def adjustIntervals(indexlist):
-    '''
         Takes in a list of monthly arrays (['index_yyyymm',array])
         Outputs a list of overlapping bimonthly arrays simply averages each
         overlapping two month pair within each year. You have to do this by
@@ -83,7 +80,7 @@ def adjustIntervals2(indexlist):
     years = np.unique([u[0][-8:-4] for u in indexlist])
     year1 = min(years)
     year2 = max(years)
-
+    
     # Create a function for individual years
     def adjustYear(year, indexlist):
         # order by year

@@ -252,10 +252,7 @@ def makeMap(function, choice, time_range, colorscale):
             array = array*mask
             if colorscale == 'Default':
                 colorscale = RdYlGnBu
-            if 'eddi' in choice:
-                reverse = True
-            else:
-                reverse = False
+
         elif function == 'omax':
             data = arrays.max('time')
             array = data.value.data
@@ -263,10 +260,7 @@ def makeMap(function, choice, time_range, colorscale):
             array = array*mask
             if colorscale == 'Default':
                 colorscale = RdYlGnBu
-            if 'eddi' in choice:
-                reverse = True
-            else:
-                reverse = False
+
         elif function == 'omin':
             data = arrays.min('time')
             array = data.value.data
@@ -274,17 +268,23 @@ def makeMap(function, choice, time_range, colorscale):
             array = array*mask
             if colorscale == 'Default':
                 colorscale = RdYlGnBu
-            if 'eddi' in choice:
-                reverse = True
-            else:
-                reverse = False
-        elif function == 'ocv':
+
+        else:
+
             numpy_arrays = arrays.value.data
             array = calculateCV(numpy_arrays)
             array = array*mask
             if colorscale == 'Default':
                 colorscale = 'Portland'
-            reverse = True
+
+   	# The scale is reverse for this
+   	if 'eddi' in choice:
+
+
+ function == 'ocv':
+       	    reverse = True
+    	else:
+            reverse = False
 
     # With an object as a value the label is left blank? Not sure why?
     if colorscale == 'RdWhBu':

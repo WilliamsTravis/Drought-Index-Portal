@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# This is an attempt to automate the process of setting up a computer to run a DASH app.
+# To make this file work do this:
+
+# 1) Add "export PATH=$PATH:/root/<repository-name>/scriptfile or .bash_profile
+# 2) Make this file executable using "chmod u+x setup.sh"
+# 3) Ideally, run the line "./setup.sh" and wait!
+
+# Things to do:
+
+# 1) Turn paths into variables. Use this site:
+	# "https://www.taniarascia.com/how-to-create-and-use-bash-scripts/"
+# 2) Plenty more I'm sure...
+
+echo Setting up the virtual application...
