@@ -1996,3 +1996,4 @@
 47.135.144.13 - - [10/Jan/2019:23:36:51 +0000] "POST /_dash-update-component HTTP/1.1" 500 291 "http://206.81.15.231/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
 47.135.144.13 - - [10/Jan/2019:23:36:51 +0000] "POST /_dash-update-component HTTP/1.1" 500 291 "http://206.81.15.231/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
 47.135.144.13 - - [10/Jan/2019:23:36:51 +0000] "POST /_dash-update-component HTTP/1.1" 500 291 "http://206.81.15.231/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
+47.135.144.13 - - [10/Jan/2019:23:46:58 +0000] "GET / HTTP/1.1" 502 584 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36"
