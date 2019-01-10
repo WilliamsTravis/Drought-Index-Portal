@@ -565,10 +565,8 @@ def retrieve_data4(signal):
               [State('year_slider', 'value'),
                State('month', 'value')])
 def submitSignal(click, year_range, month_range):
-    print(year_range)
     if not month_range:
         month_range = [1, 1]
-    print("Month Range" + str(month_range))
     return json.dumps([year_range, month_range])
 
 
@@ -607,7 +605,6 @@ def toggleOptions(click):
                State('time_4', 'children')])
 def clickPicker(click1, click2, click3, click4, click_sync,
                 time1, time2, time3, time4):
-    print(click_sync)
     if click_sync == 'yes':
         clicks = [click1, click2, click3, click4]
         times = [time1, time2, time3, time4]
@@ -630,7 +627,6 @@ for i in range(1, 5):
     @app.callback(Output('time_{}'.format(i), 'children'),
                   [Input('map_{}'.format(i), 'clickData')])
     def clickTime(click):
-        print(click)
         clicktime = time.time()
         return(clicktime)
 
@@ -810,7 +806,6 @@ for i in range(1, 5):
             x = londict[lon]
             y = latdict[lat]
             gridid = grid[y, x]
-            print(str(gridid))
             county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
 
         # There are often more than one county, sometimes none in this df
