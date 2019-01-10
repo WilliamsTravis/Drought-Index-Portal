@@ -10,34 +10,20 @@ Created on Fri Jan  4 12:39:23 2019
 # In[] Functions and Libraries
 import copy
 import dash
-from dash.dependencies import Input, Output, State, Event
+from dash.dependencies import Input, Output, State
 import dash_core_components as dcc
 import dash_html_components as html
 import datetime as dt
 import gc
-import gdal
-import glob
 import json
-from flask import Flask
-import matplotlib
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.patches import Patch
-from matplotlib.ticker import FuncFormatter
 import numpy as np
-import numpy.ma as ma
-from collections import OrderedDict
 import os
 import pandas as pd
-import plotly
-import re
-from textwrap import dedent
 import time
-from tqdm import tqdm
 import xarray as xr
 from sys import platform
 import warnings
-# warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore")
 
 # Work for Windows and Linux
 if platform == 'win32':
