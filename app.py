@@ -496,11 +496,11 @@ app.layout = html.Div([
 
         # Four by Four Map Layout
         # Row 1
-        html.Div([divMaker(1, 'spei1'), divMaker(2, 'spei2')],
+        html.Div([divMaker(1, 'spei1'), divMaker(2, 'spei6')],
                  className='row'),
 
         # Row 2
-        html.Div([divMaker(3, 'spei3'), divMaker(4, 'spei6')],
+        html.Div([divMaker(3, 'pdsi'), divMaker(4, 'eddi2')],
                  className='row'),
 
         # Signals
