@@ -287,7 +287,7 @@ def makeMap(function, choice, time_range, colorscale):
             array = array*mask
             if colorscale == 'Default':
                 colorscale = 'Portland'
-            reverse = True
+                reverse = False
 
     # With an object as a value the label is left blank? Not sure why?
     if colorscale == 'RdWhBu':
