@@ -40,11 +40,7 @@ else:
     from flask_caching import Cache  # This works on Linux but not Windows :)
     startyear = 1948
 
-from functions import indexHist
-from functions import npzIn
 from functions import calculateCV
-from functions import readRaster
-from functions import RasterArrays
 
 # In[] for development
 # function =  'mean_perc'
@@ -65,16 +61,11 @@ server = app.server
 app.config['suppress_callback_exceptions'] = True
 
 # Create and initialize a cache for data storage
-cache = Cache(config={'CACHE_TYPE': 'simple'})
+cache = Cache(config={'CACHE_TYPE': 'filesystem',
+                      'CACHE_DIR': 'cache-directory'})
+timeout = 5
 cache.init_app(server)
-
-
-# Create function to clear cache
-def clear_cache():
-    cache.init_app(app)
-
-    with app.app_context():
-        cache.clear()
+app.config.suppress_callback_exceptions = True
 
 
 # Mapbox Access
@@ -533,7 +524,7 @@ app.layout = html.Div([
 
 
 # In[]: App callbacks
-@cache.memoize(5)
+@cache.memoize(timeout=timeout)
 def global_store1(signal):
     gc.collect()
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
@@ -545,7 +536,7 @@ def retrieve_data1(signal):
     return data
 
 
-@cache.memoize(5)
+@cache.memoize(timeout=timeout)
 def global_store2(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
@@ -556,7 +547,7 @@ def retrieve_data2(signal):
     return data
 
 
-@cache.memoize(5)
+@cache.memoize(timeout=timeout)
 def global_store3(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
@@ -567,7 +558,7 @@ def retrieve_data3(signal):
     return data
 
 
-@cache.memoize()
+@cache.memoize(timeout=timeout)
 def global_store4(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
@@ -590,7 +581,7 @@ def retrieve_data4(signal):
                State('click_sync', 'value')])
 def submitSignal(click, function, colorscale, reverse, year_range,
                  month_range, map_type, sync):
-    clear_cache()
+    # clear_cache()
     print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                            psutil.virtual_memory().percent))
     if not month_range:
