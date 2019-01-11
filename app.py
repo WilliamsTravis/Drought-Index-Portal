@@ -297,7 +297,9 @@ def makeMap(time_range, function, colorscale, reverse, choice):
     if colorscale == 'RdYlGnBu':
         colorscale = RdYlGnBu
 
-    return [[array, arrays], colorscale, dmax, dmin, reverse]
+    dates = arrays.time.data
+    arrays = arrays.value.data
+    return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
 
 
 # Year Marks for Slider
@@ -702,16 +704,16 @@ for i in range(1, 5):
 
         # Get data - check which cache first
         if cache == '1':
-            [[array, arrays],
+            [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_data1(signal)
         elif cache == '2':
-            [[array, arrays],
+            [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_data2(signal)
         elif cache == '3':
-            [[array, arrays],
+            [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_data3(signal)
         else:
-            [[array, arrays],
+            [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_data4(signal)
 
         # There a lot of colorscale switching in the default settings
@@ -822,16 +824,16 @@ for i in range(1, 5):
 
         # Get data - check which cache first
         if cache == '1':
-            [[array, arrays],
+            [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_time1(signal)
         elif cache == '2':
-            [[array, arrays],
+            [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_time2(signal)
         elif cache == '3':
-            [[array, arrays],
+            [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_time3(signal)
         else:
-            [[array, arrays],
+            [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_time4(signal)
 
         # There a lot of colorscale switching in the default settings
@@ -881,11 +883,9 @@ for i in range(1, 5):
             county = county[0]
 
         # Get time series
-        dates1 = arrays.time.data
-        dates2 = [pd.to_datetime(str(d)) for d in dates1]
-        dates = [d.strftime('%Y-%m') for d in dates2]
-        just_arrays = [a.data for a in arrays.value]
-        timeseries = np.array([round(a[y, x], 4) for a in just_arrays])
+        dates = [pd.to_datetime(str(d)) for d in dates]
+        dates = [d.strftime('%Y-%m') for d in dates]
+        timeseries = np.array([round(a[y, x], 4) for a in arrays])
         yaxis=dict(range=[dmin, dmax])
 
         # Build the data dictionaries that plotly reads
