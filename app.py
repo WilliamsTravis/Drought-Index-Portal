@@ -537,6 +537,11 @@ def retrieve_data1(signal):
     return data
 
 
+def retrieve_time1(signal):
+    data = global_store1(signal)
+    return data
+
+
 @cache.memoize(timeout=timeout)
 def global_store2(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
@@ -545,6 +550,11 @@ def global_store2(signal):
 
 def retrieve_data2(signal):
     cache.delete_memoized(global_store2)
+    data = global_store2(signal)
+    return data
+
+
+def retrieve_time2(signal):
     data = global_store2(signal)
     return data
 
@@ -561,6 +571,10 @@ def retrieve_data3(signal):
     return data
 
 
+def retrieve_time3(signal):
+    data = global_store3(signal)
+    return data
+
 @cache.memoize(timeout=timeout)
 def global_store4(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
@@ -568,7 +582,12 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    cache.delete_memoized(global_store4)
+    cache.delete_memoized(global_store4)  # Sort of defeats the point...
+    data = global_store4(signal)
+    return data
+
+
+def retrieve_time4(signal):
     data = global_store4(signal)
     return data
 
@@ -784,6 +803,11 @@ for i in range(1, 5):
                    Input('choice_{}'.format(i), 'value'),
                    Input('signal', 'children')])
     def makeSeries(cache, click, synced_click, choice, signal):
+        '''
+        Each callback is called even if this isn't synced...It would require
+         a whole new set of callbacks to avoid the lag from that. Also, the
+         synced click process is too slow...what can be done?
+        '''
         print("Rendering Time Series #{}".format(int(cache)))
 
         # Create signal for the global_store
@@ -799,16 +823,16 @@ for i in range(1, 5):
         # Get data - check which cache first
         if cache == '1':
             [[array, arrays],
-             colorscale, dmax, dmin, reverse] = retrieve_data1(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_time1(signal)
         elif cache == '2':
             [[array, arrays],
-             colorscale, dmax, dmin, reverse] = retrieve_data2(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_time2(signal)
         elif cache == '3':
             [[array, arrays],
-             colorscale, dmax, dmin, reverse] = retrieve_data3(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_time3(signal)
         else:
             [[array, arrays],
-             colorscale, dmax, dmin, reverse] = retrieve_data4(signal)
+             colorscale, dmax, dmin, reverse] = retrieve_time4(signal)
 
         # There a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
