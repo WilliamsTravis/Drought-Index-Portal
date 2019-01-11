@@ -174,7 +174,8 @@ color_options.append({'label': 'RdWhBu', 'value': 'RdWhBu'})
 color_options.append({'label': 'RdYlGnBu', 'value': 'RdYlGnBu'})
 
 
-def makeMap(function, choice, time_range, colorscale):
+def makeMap(time_range, function, colorscale, reverse, choice):    
+    # time_range, function, colorscale, reverse_override, choice
     # Split time range up
     year_range = time_range[0]
     month_range = time_range[1]
@@ -287,7 +288,7 @@ def makeMap(function, choice, time_range, colorscale):
             array = array*mask
             if colorscale == 'Default':
                 colorscale = 'Portland'
-                reverse = False
+            reverse = False
 
     # With an object as a value the label is left blank? Not sure why?
     if colorscale == 'RdWhBu':
@@ -426,13 +427,6 @@ app.layout = html.Div([
                      className="row",
                      style={'margin-bottom': '55'}),
     
-            # Submit button
-            html.Div([
-                    html.Button(id='submit',
-                                children='Submit Dates',
-                                type='button',
-                                title='It updates automatically without this.')]),
-                    # html.Hr(),
     
             # Options
             html.Div([
@@ -484,6 +478,13 @@ app.layout = html.Div([
             html.Hr(),
         ]),
 
+        # Submit button
+        html.Div([
+                html.Button(id='submit',
+                            children='Submit Options',
+                            type='button',
+                            title='It updates automatically without this.')]),
+                # html.Hr(),
         # Toggle Options
         html.Div([
                 html.Button(id='toggle_options',
@@ -504,7 +505,7 @@ app.layout = html.Div([
                  className='row'),
 
         # Signals
-        html.Div(id='time_range', style={'display': 'none'}),
+        html.Div(id='signal', style={'display': 'none'}),
         html.Div(id='click_store', style={'display': 'none'}),
         html.Div(id='cache_1', children='1', style={'display': 'none'}),
         html.Div(id='cache_2', children='2', style={'display': 'none'}),
@@ -524,7 +525,7 @@ app.layout = html.Div([
 @cache.memoize()
 def global_store1(signal):
     gc.collect()
-    data = makeMap(signal[1], signal[0], signal[2], signal[3])
+    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
@@ -535,7 +536,7 @@ def retrieve_data1(signal):
 
 @cache.memoize()
 def global_store2(signal):
-    data = makeMap(signal[1], signal[0], signal[2], signal[3])
+    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
@@ -546,7 +547,7 @@ def retrieve_data2(signal):
 
 @cache.memoize()
 def global_store3(signal):
-    data = makeMap(signal[1], signal[0], signal[2], signal[3])
+    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
@@ -557,7 +558,7 @@ def retrieve_data3(signal):
 
 @cache.memoize()
 def global_store4(signal):
-    data = makeMap(signal[1], signal[0], signal[2], signal[3])
+    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
@@ -567,14 +568,19 @@ def retrieve_data4(signal):
 
 
 # Store data in the cache and hide the signal to activate it in the hidden div
-@app.callback(Output('time_range', 'children'),
+@app.callback(Output('signal', 'children'),
               [Input('submit', 'n_clicks')],
-              [State('year_slider', 'value'),
+              [State('function_choice', 'value'),
+               State('colors', 'value'),
+               State('reverse', 'value'),
+               State('year_slider', 'value'),
                State('month', 'value')])
-def submitSignal(click, year_range, month_range):
+def submitSignal(click, function, colorscale, reverse, year_range,
+                 month_range):
     if not month_range:
         month_range = [1, 1]
-    return json.dumps([year_range, month_range])
+    return json.dumps([[year_range, month_range], function,
+                       colorscale, reverse])
 
 
 # Allow users to select a month range if the year slider is set to one year
@@ -638,25 +644,23 @@ for i in range(1, 5):
         return(clicktime)
 
     @app.callback(Output("map_{}".format(i), 'figure'),
-                  [Input('time_range', 'children'),
-                   Input('cache_{}'.format(i), 'children'),
+                  [Input('cache_{}'.format(i), 'children'),
                    Input('choice_{}'.format(i), 'value'),
-                   Input('function_choice', 'value'),
-                   Input('map_type', 'value'),
-                   Input('colors', 'value'),
-                   Input('reverse', 'value')])
-    def makeGraph(time_range, cache, choice, function, map_type,
-                  colorscale, reverse_override):
+                   Input('signal', 'children'),
+                   Input('map_type', 'value')])
+    def makeGraph(cache, choice, signal, map_type):
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
         # Create signal for the global_store
-        time_range = json.loads(time_range)
-        signal = [choice, function, time_range, colorscale]
+        signal = json.loads(signal)
+        signal.append(choice)
 
+        # Collect signals 
+        [[year_range, month_range], function, colorscale,
+         reverse_override, choice] = signal
+        
         # Split the time range up
-        year_range = time_range[0]
-        month_range = time_range[1]
         y1 = year_range[0]
         y2 = year_range[1]
         m1 = month_range[0]
@@ -679,6 +683,7 @@ for i in range(1, 5):
         # There a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
             reverse = not reverse
+
         # Individual array min/max
         amax = np.nanmax(array)
         amin = np.nanmin(array)
@@ -758,20 +763,21 @@ for i in range(1, 5):
         return figure
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
-                  [Input('click_sync', 'value'),
+                  [Input('cache_{}'.format(i), 'children'),
+                   Input('click_sync', 'value'),
                    Input("map_{}".format(i), 'clickData'),
                    Input('click_store', 'children'),
                    Input('choice_{}'.format(i), 'value'),
-                   Input('time_range', 'children'),
-                   Input('function_choice', 'value'),
-                   Input('colors', 'value'),
-                   Input('reverse', 'value')])
-    def makeSeries(click_sync, click, synced_click, choice, time_range,
-                   function, colorscale, reverse_override):
+                   Input('signal', 'children')])
+    def makeSeries(cache, click_sync, click, synced_click, choice, signal):
 
-        # Create signal
-        time_range = json.loads(time_range)
-        signal = [choice, function, time_range, colorscale]
+        # Create signal for the global_store
+        signal = json.loads(signal)
+        signal.append(choice)  # 
+
+        # Collect signals 
+        [[year_range, month_range], function, colorscale,
+         reverse_override, choice] = signal
 
         # Get data - check which cache first
         if cache == '1':
