@@ -19,6 +19,7 @@ import json
 import numpy as np
 import os
 import pandas as pd
+import psutil
 import time
 import xarray as xr
 from sys import platform
@@ -66,6 +67,15 @@ app.config['suppress_callback_exceptions'] = True
 # Create and initialize a cache for data storage
 cache = Cache(config={'CACHE_TYPE': 'simple'})
 cache.init_app(server)
+
+
+# Create function to clear cache
+def clear_cache():
+    cache.init_app(app)
+
+    with app.app_context():
+        cache.clear()
+
 
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
@@ -409,7 +419,7 @@ app.layout = html.Div([
                                  marks=yearmarks)],
                               style={'margin-top': '0',
                                      'margin-bottom': '40'}),
-    
+
                      # Month Slider
                      html.Div(id='month_slider',
                               children=[
@@ -426,8 +436,8 @@ app.layout = html.Div([
                      ],
                      className="row",
                      style={'margin-bottom': '55'}),
-    
-    
+
+
             # Options
             html.Div([
                 # Maptype
@@ -438,7 +448,7 @@ app.layout = html.Div([
                                 value="light",
                                 options=maptypes)],
                          className='two columns'),
-    
+
                 # Function
                 html.Div([
                          html.H3("Function"),
@@ -454,7 +464,7 @@ app.layout = html.Div([
                                                 {'label': 'No', 'value': 'no'}],
                                        value='yes')],
                          className='three columns'),
-    
+
                 # Customize Color Scales
                 html.Div([
                         html.H3('Color Gradient'),
@@ -481,7 +491,7 @@ app.layout = html.Div([
                                 type='button',
                                 title='It updates automatically without this.')]),
                     # html.Hr(),
-    
+
             # Break
             html.Hr(),
         ]),
@@ -523,7 +533,7 @@ app.layout = html.Div([
 
 
 # In[]: App callbacks
-@cache.memoize()
+@cache.memoize(5)
 def global_store1(signal):
     gc.collect()
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
@@ -535,7 +545,7 @@ def retrieve_data1(signal):
     return data
 
 
-@cache.memoize()
+@cache.memoize(5)
 def global_store2(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
@@ -546,7 +556,7 @@ def retrieve_data2(signal):
     return data
 
 
-@cache.memoize()
+@cache.memoize(5)
 def global_store3(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
@@ -580,6 +590,9 @@ def retrieve_data4(signal):
                State('click_sync', 'value')])
 def submitSignal(click, function, colorscale, reverse, year_range,
                  month_range, map_type, sync):
+    clear_cache()
+    print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
+                                           psutil.virtual_memory().percent))
     if not month_range:
         month_range = [1, 1]
     return json.dumps([[year_range, month_range], function,

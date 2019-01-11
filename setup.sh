@@ -35,7 +35,7 @@ then
    # pyvenv-3.6 -m venv
    # source /venv/bin/activate
     pip3.6 install dash dash_core_components dash_html_components dash_table_experiments
-    pip3.6 install flask_caching netcdf4 numpy pandas scipy xarray
+    pip3.6 install flask_caching netcdf4 numpy pandas psutil scipy xarray
 fi
 
 
