@@ -651,6 +651,9 @@ for i in range(1, 5):
                    Input('choice_{}'.format(i), 'value'),
                    Input('signal', 'children')])
     def makeGraph(cache, choice, signal):
+
+        print("Rendering Map #{}".format(int(cache)))
+        
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
@@ -773,6 +776,7 @@ for i in range(1, 5):
                    Input('choice_{}'.format(i), 'value'),
                    Input('signal', 'children')])
     def makeSeries(cache, click, synced_click, choice, signal):
+        print("Rendering Time Series #{}".format(int(cache)))
 
         # Create signal for the global_store
         signal = json.loads(signal)
