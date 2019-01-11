@@ -403,7 +403,7 @@ app.layout = html.Div([
                      html.H3('Study Period Year Range'),
                      html.Div([dcc.RangeSlider(
                                  id='year_slider',
-                                 value=[1985, 1985],
+                                 value=[1985, 2017],
                                  min=startyear,
                                  max=2017,
                                  marks=yearmarks)],
@@ -473,18 +473,19 @@ app.layout = html.Div([
                className='row',
                style={'margin-bottom': '50',
                       'margin-top': '0'}),
+
+            # Submit button
+            html.Div([
+                    html.Button(id='submit',
+                                children='Submit Options',
+                                type='button',
+                                title='It updates automatically without this.')]),
+                    # html.Hr(),
     
             # Break
             html.Hr(),
         ]),
 
-        # Submit button
-        html.Div([
-                html.Button(id='submit',
-                            children='Submit Options',
-                            type='button',
-                            title='It updates automatically without this.')]),
-                # html.Hr(),
         # Toggle Options
         html.Div([
                 html.Button(id='toggle_options',
@@ -574,13 +575,15 @@ def retrieve_data4(signal):
                State('colors', 'value'),
                State('reverse', 'value'),
                State('year_slider', 'value'),
-               State('month', 'value')])
+               State('month', 'value'),
+               State('map_type', 'value'),
+               State('click_sync', 'value')])
 def submitSignal(click, function, colorscale, reverse, year_range,
-                 month_range):
+                 month_range, map_type, sync):
     if not month_range:
         month_range = [1, 1]
     return json.dumps([[year_range, month_range], function,
-                       colorscale, reverse])
+                       colorscale, reverse, map_type, sync])
 
 
 # Allow users to select a month range if the year slider is set to one year
@@ -646,20 +649,21 @@ for i in range(1, 5):
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('cache_{}'.format(i), 'children'),
                    Input('choice_{}'.format(i), 'value'),
-                   Input('signal', 'children'),
-                   Input('map_type', 'value')])
-    def makeGraph(cache, choice, signal, map_type):
+                   Input('signal', 'children')])
+    def makeGraph(cache, choice, signal):
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
         # Create signal for the global_store
         signal = json.loads(signal)
         signal.append(choice)
-
-        # Collect signals 
-        [[year_range, month_range], function, colorscale,
-         reverse_override, choice] = signal
         
+        # Collect and adjust signal 
+        [[year_range, month_range], function, colorscale,
+         reverse_override, map_type, sync, choice] = signal
+        signal.pop(4)
+        signal.pop(4)
+
         # Split the time range up
         y1 = year_range[0]
         y2 = year_range[1]
@@ -764,20 +768,21 @@ for i in range(1, 5):
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
                   [Input('cache_{}'.format(i), 'children'),
-                   Input('click_sync', 'value'),
                    Input("map_{}".format(i), 'clickData'),
                    Input('click_store', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('signal', 'children')])
-    def makeSeries(cache, click_sync, click, synced_click, choice, signal):
+    def makeSeries(cache, click, synced_click, choice, signal):
 
         # Create signal for the global_store
         signal = json.loads(signal)
-        signal.append(choice)  # 
+        signal.append(choice)
 
         # Collect signals 
         [[year_range, month_range], function, colorscale,
-         reverse_override, choice] = signal
+         reverse_override, map_type, sync, choice] = signal
+        signal.pop(4)
+        signal.pop(4)
 
         # Get data - check which cache first
         if cache == '1':
@@ -798,7 +803,7 @@ for i in range(1, 5):
             reverse = not reverse
 
         # # Check if we are syncing clicks
-        if click_sync == 'yes':
+        if sync == 'yes':
             if synced_click:
                 click = json.loads(synced_click)
             else:
