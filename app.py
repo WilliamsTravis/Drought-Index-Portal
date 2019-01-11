@@ -816,27 +816,39 @@ for i in range(1, 5):
 
         # # Check if we are syncing clicks
         if sync == 'yes':
-            if synced_click:
-                click = json.loads(synced_click)
-            else:
+            if synced_click is None:
                 click = {'points': [{'curveNumber': 0, 'pointNumber': 5755,
                                      'pointIndex': 5755, 'lon': -107.75,
                                      'lat': 40.5, 'text': -0.08303022384643555,
                                      'marker.color': -0.08303022384643555}]}
-
-        # Get Coordinates
-        if click is None:
-            x = londict[-100]
-            y = latdict[40]
-            gridid = grid[y, x]
-            county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
+                lon = click['points'][0]['lon']
+                lat = click['points'][0]['lat']
+                x = londict[lon]
+                y = latdict[lat]
+                gridid = grid[y, x]
+                county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
+            else:
+                click = json.loads(synced_click)  
+                lon = click['points'][0]['lon']
+                lat = click['points'][0]['lat']
+                x = londict[lon]
+                y = latdict[lat]
+                gridid = grid[y, x]
+                county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
         else:
-            lon = click['points'][0]['lon']
-            lat = click['points'][0]['lat']
-            x = londict[lon]
-            y = latdict[lat]
-            gridid = grid[y, x]
-            county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
+            # Get Coordinates
+            if click is None:
+                x = londict[-100]
+                y = latdict[40]
+                gridid = grid[y, x]
+                county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
+            else:
+                lon = click['points'][0]['lon']
+                lat = click['points'][0]['lat']
+                x = londict[lon]
+                y = latdict[lat]
+                gridid = grid[y, x]
+                county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
 
         # There are often more than one county, sometimes none in this df
         if len(county) == 0:
