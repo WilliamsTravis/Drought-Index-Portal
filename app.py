@@ -746,7 +746,7 @@ for i in range(1, 5):
         # pdf['grid'] = pdf['grid'].apply(int).apply(str)
         pdf = pd.merge(pdf, counties_df, how='inner')
         pdf['data'] = pdf['data'].astype(float).round(3)
-        pdf['printdata'] = pdf['place'] + ":<br> " + pdf['data'].apply(str)
+        pdf['printdata'] = pdf['place'] + ":<br>     " + pdf['data'].apply(str)
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
