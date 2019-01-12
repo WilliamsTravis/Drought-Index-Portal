@@ -135,7 +135,7 @@ function_names = {'mean_perc': 'Average Percentiles',
 # For the county names - need to get a more complete data set
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
-counties_df = pd.read_csv("data/counties.csv")
+counties_df = pd.read_csv("counties.csv")
 
 # In[] The map
 # Map types
