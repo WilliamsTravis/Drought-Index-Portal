@@ -135,9 +135,7 @@ function_names = {'mean_perc': 'Average Percentiles',
 # For the county names - need to get a more complete data set
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
-cities_df = pd.read_csv("cities.csv")
-cities = [{'label': cities_df['NAME'][i] + ", " + cities_df['STATE'][i],
-           'value': cities_df['grid'][i]} for i in range(len(cities_df))]
+counties_df = pd.read_csv("data/counties.csv")
 
 # In[] The map
 # Map types
@@ -693,6 +691,7 @@ for i in range(1, 5):
         # Collect and adjust signal 
         [[year_range, month_range], function, colorscale,
          reverse_override, map_type, sync, choice] = signal
+        # signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', False, 'light', 'yes', 'pdsi']
         signal.pop(4)
         signal.pop(4)
 
@@ -742,8 +741,9 @@ for i in range(1, 5):
         grid2[np.isnan(grid2)] = 0
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf['grid'] = pdf['grid'].apply(int).apply(str)
+        pdf = pd.merge(pdf, counties_df, how='inner')
         pdf['data'] = pdf['data'].astype(float).round(3)
-        pdf['printdata'] = "GRID #: " + pdf['grid'] + "<br>Data: " + pdf['data'].apply(str)
+        pdf['printdata'] = pdf['county'] + " County<br>: " + pdf['data'].apply(str)
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
@@ -851,30 +851,30 @@ for i in range(1, 5):
                 lat = click['points'][0]['lat']
                 x = londict[lon]
                 y = latdict[lat]
-                gridid = grid[y, x]
-                county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
+                gridid = str(int(grid[y, x]))
+                county = counties_df['county'][counties_df.grid == gridid].unique()
             else:
                 click = json.loads(synced_click)  
                 lon = click['points'][0]['lon']
                 lat = click['points'][0]['lat']
                 x = londict[lon]
                 y = latdict[lat]
-                gridid = grid[y, x]
-                county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
+                gridid = str(int(grid[y, x]))
+                county = counties_df['county'][counties_df.grid == gridid].unique()
         else:
             # Get Coordinates
             if click is None:
                 x = londict[-100]
                 y = latdict[40]
-                gridid = grid[y, x]
-                county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
+                gridid = str(int(grid[y, x]))
+                county = counties_df['county'][counties_df.grid == gridid].unique()
             else:
                 lon = click['points'][0]['lon']
                 lat = click['points'][0]['lat']
                 x = londict[lon]
                 y = latdict[lat]
-                gridid = grid[y, x]
-                county = cities_df['COUNTY'][cities_df.grid == gridid].unique()
+                gridid = str(int(grid[y, x]))
+                county = counties_df['county'][counties_df.grid == gridid].unique()
 
         # There are often more than one county, sometimes none in this df
         if len(county) == 0:
