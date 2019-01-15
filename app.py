@@ -53,6 +53,7 @@ app = dash.Dash(__name__)
 # Go to stylesheet, styled after a DASH example (how to serve locally?)
 app.css.append_css({'external_url': 'https://codepen.io/williamstravis/pen/' +
                                     'maxwvK.css'})
+
 # For the Loading screen - just trying Chriddyp's for now
 #app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
 
@@ -68,7 +69,6 @@ cache = Cache(config={'CACHE_TYPE': 'filesystem',
 timeout = 120
 cache.init_app(server)
 app.config.suppress_callback_exceptions = True
-
 
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
@@ -609,7 +609,7 @@ def retrieve_time4(signal):
                State('click_sync', 'value')])
 def submitSignal(click, function, colorscale, reverse, year_range,
                  month_range, map_type, sync):
-    # clear_cache()
+
     print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                            psutil.virtual_memory().percent))
     if not month_range:
@@ -685,15 +685,15 @@ for i in range(1, 5):
     def makeGraph(cache, choice, signal):
 
         print("Rendering Map #{}".format(int(cache)))
-        
+
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
         # Create signal for the global_store
         signal = json.loads(signal)
         signal.append(choice)
-        
-        # Collect and adjust signal 
+
+        # Collect and adjust signal
         [[year_range, month_range], function, colorscale,
          reverse_override, map_type, sync, choice] = signal
         # signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', False, 'light', 'yes', 'pdsi']
