@@ -53,6 +53,8 @@ app = dash.Dash(__name__)
 # Go to stylesheet, styled after a DASH example (how to serve locally?)
 app.css.append_css({'external_url': 'https://codepen.io/williamstravis/pen/' +
                                     'maxwvK.css'})
+# For the Loading screen - just trying Chriddyp's for now
+#app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
 
 # Create Server Object
 server = app.server
@@ -448,7 +450,7 @@ app.layout = html.Div([
                          html.H3("Function"),
                          dcc.RadioItems(id='function_choice',
                                         options=function_options,
-                                        value='mean_original')],
+                                        value='mean_perc')],
                          className='three columns'),
                 # Syncing locations on click
                 html.Div([
