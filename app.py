@@ -56,7 +56,7 @@ app.css.append_css({'external_url': 'https://codepen.io/williamstravis/pen/' +
                                     'maxwvK.css'})
 
 # For the Loading screen - just trying Chriddyp's for now
-#app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
+app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
 
 # Create Server Object
 server = app.server
@@ -858,7 +858,6 @@ for i in range(1, 5):
 
         print(single_click)
         print("Rendering Time Series #{}".format(int(cache)))
-
 
         # Get data - check which cache first
         if cache == '1':
