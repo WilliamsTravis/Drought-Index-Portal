@@ -523,7 +523,9 @@ app.layout = html.Div([
 
         # Signals
         html.Div(id='signal', style={'display': 'none'}),
-        html.Div(id='click_store', style={'display': 'none'}),
+        html.Div(id='click_store',
+                  children=['{"points": [{"lon": -107.5, "lat": 40.5}]}'],
+                 style={'display': 'none'}),
         html.Div(id='cache_1', children='1', style={'display': 'none'}),
         html.Div(id='cache_2', children='2', style={'display': 'none'}),
         html.Div(id='cache_3', children='3', style={'display': 'none'}),
@@ -655,29 +657,29 @@ def toggleOptions(click):
               [Input('map_1', 'clickData'),
                Input('map_2', 'clickData'),
                Input('map_3', 'clickData'),
-               Input('map_4', 'clickData')],
-              [State('click_sync', 'value'),
-               State('time_1', 'children'),
-               State('time_2', 'children'),
-               State('time_3', 'children'),
-               State('time_4', 'children')])
+               Input('map_4', 'clickData'),
+               Input('click_sync', 'value'),
+               Input('time_1', 'children'),
+               Input('time_2', 'children'),
+               Input('time_3', 'children'),
+               Input('time_4', 'children')])
 def clickPicker(click1, click2, click3, click4, click_sync,
                 time1, time2, time3, time4):
+    clicks = [click1, click2, click3, click4]
     if click_sync == 'yes':
-        clicks = [click1, click2, click3, click4]
         times = [time1, time2, time3, time4]
         if not any(c is not None for c in clicks):
-            click = {'points': [{'curveNumber': 0, 'pointNumber': 5755,
-                                 'pointIndex': 5755, 'lon': -107.75,
-                                 'lat': 40.5, 'text': -0.08303022384643555,
-                                 'marker.color': -0.08303022384643555}]}
+            click = {'points': [{'lon': -107.75, 'lat': 40.5}]}
         else:
             times = [0 if t is None else t for t in times]
             index = times.index(max(times))
             click = clicks[index]
-        return json.dumps(click)
     else:
-        pass
+        if not any(c is not None for c in clicks):
+            clicks= [{'points': [{'lon': -107.75,
+                                  'lat': 40.5}]} for i in range(5)]
+
+    return json.dumps(click)
 
 
 # In[] For the future
@@ -819,11 +821,11 @@ for i in range(1, 5):
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
                   [Input('cache_{}'.format(i), 'children'),
-                   Input("map_{}".format(i), 'clickData'),
+                   # Input("map_{}".format(i), 'clickData'),
                    Input('click_store', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('signal', 'children')])
-    def makeSeries(cache, click, synced_click, choice, signal):
+    def makeSeries(cache, click, choice, signal):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
@@ -861,40 +863,25 @@ for i in range(1, 5):
 
         # # Check if we are syncing clicks
         if sync == 'yes':
-            if synced_click is None:
-                click = {'points': [{'curveNumber': 0, 'pointNumber': 5755,
-                                     'pointIndex': 5755, 'lon': -107.75,
-                                     'lat': 40.5, 'text': -0.08303022384643555,
-                                     'marker.color': -0.08303022384643555}]}
-                lon = click['points'][0]['lon']
-                lat = click['points'][0]['lat']
-                x = londict[lon]
-                y = latdict[lat]
-                gridid = grid[y, x]
-                county = counties_df['place'][counties_df.grid == gridid].unique()
-
-            else:
-                click = json.loads(synced_click)  
-                lon = click['points'][0]['lon']
-                lat = click['points'][0]['lat']
-                x = londict[lon]
-                y = latdict[lat]
-                gridid = grid[y, x]
-                county = counties_df['place'][counties_df.grid == gridid].unique()
+            click = json.loads(click)  
         else:
-            # Get Coordinates
-            if click is None:
-                x = londict[-100]
-                y = latdict[40]
-                gridid = grid[y, x]
-                county = counties_df['place'][counties_df.grid == gridid].unique()
+            clicks = json.loads(click)
+            if cache == '1':
+                click = clicks[0]
+            elif cache == '2':
+                click = clicks[1]
+            elif cache == '3':
+                click = clicks[2]
             else:
-                lon = click['points'][0]['lon']
-                lat = click['points'][0]['lat']
-                x = londict[lon]
-                y = latdict[lat]
-                gridid = grid[y, x]
-                county = counties_df['place'][counties_df.grid == gridid].unique()
+                click = clicks[3]
+
+        lon = click['points'][0]['lon']
+        lat = click['points'][0]['lat']
+        x = londict[lon]
+        y = latdict[lat]
+        gridid = grid[y, x]
+        county = counties_df['place'][counties_df.grid == gridid].unique()
+        print("Click: " + county)
 
         # There are often more than one county, sometimes none in this df
         if len(county) == 0:
