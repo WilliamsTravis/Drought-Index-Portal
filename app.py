@@ -368,7 +368,7 @@ layout = dict(
     plot_bgcolor="#083C04",
     paper_bgcolor="#0D347C",
     legend=dict(font=dict(size=10, fontweight='bold'), orientation='h'),
-    title='<b>Potential Payout Frequencies</b>',
+    title='<b>Index Values/b>',
     mapbox=dict(
         accesstoken=mapbox_access_token,
         style="satellite-streets",
@@ -643,8 +643,8 @@ def monthSlider(year_range):
               [Input('toggle_options', 'n_clicks')])
 def toggleOptions(click):
     if not click:
-        click = 0
-    if click % 2 == 1:
+        click = 1
+    if click % 2 == 0:
         style = {'display': 'none'}
     else:
         style = {}
@@ -681,7 +681,7 @@ def clickPicker(click1, click2, click3, click4, click_sync,
 
 
 # In[] For the future
-for i in range(1, 2):
+for i in range(1, 5):
     @app.callback(Output('time_{}'.format(i), 'children'),
                   [Input('map_{}'.format(i), 'clickData')])
     def clickTime(click):
