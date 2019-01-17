@@ -30,9 +30,8 @@ then
     sudo apt-get install python3.6 python3.6-dev supervisor
     curl https://bootstrap.pypa.io/get-pip.py | sudo python3.6
     pip3.6 install gunicorn
-    sudo apt-get install python3.6-venv
-    mkdir venv
-    pyvenv-3.6 -m venv
+    sudo pip3.6 install virtualenv
+    virtualenv venv
     source /venv/bin/activate
     pip3.6 install dash dash_core_components dash_html_components dash_table_experiments
     pip3.6 install flask_caching netcdf4 numpy pandas psutil scipy tqdm xarray
