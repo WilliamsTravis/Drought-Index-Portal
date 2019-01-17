@@ -137,11 +137,21 @@ function_names = {'mean_perc': 'Average Percentiles',
 # For the county names - need to get a more complete data set
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
-counties_df = pd.read_csv("counties.csv")
+counties_df = pd.read_csv("data/counties.csv")
 counties_df = counties_df[['grid', 'county', 'state']]
 # counties_df['grid'] = counties_df['grid'].astype(str)
 counties_df['place'] = (counties_df['county'] +
                         ' County, ' + counties_df['state'])
+
+# For when EDDI before 1980 is selected
+with np.load("data/NA_overlay.npz") as data:
+    na = data.f.arr_0
+    data.close()
+
+# Make the color scale stand out 
+for i in range(na.shape[0]):
+    na[i] = na[i]*i
+
 # In[] The map
 # Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
@@ -671,7 +681,7 @@ def clickPicker(click1, click2, click3, click4, click_sync,
 
 
 # In[] For the future
-for i in range(1, 5):
+for i in range(1, 2):
     @app.callback(Output('time_{}'.format(i), 'children'),
                   [Input('map_{}'.format(i), 'clickData')])
     def clickTime(click):
@@ -730,6 +740,10 @@ for i in range(1, 5):
 
         # Set to this thing
         source.data[0] = array
+        
+        # Because EDDI only extends back to 1980
+        if 'eddi' in choice and y1 < 1980 and y2 < 1980:
+            source.data[0] = na
 
         # Now all this
         dfs = xr.DataArray(source, name="data")
