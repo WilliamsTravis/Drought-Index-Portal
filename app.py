@@ -550,7 +550,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1)
+    cache.delete_memoized(global_store1, 'signal')
     # cache.clear()
     data = global_store1(signal)
     return data
@@ -568,7 +568,7 @@ def global_store2(signal):
 
 
 def retrieve_data2(signal):
-    cache.delete_memoized(global_store2)
+    cache.delete_memoized(global_store2, 'signal')
     # cache.clear()
     data = global_store2(signal)
     return data
@@ -586,7 +586,7 @@ def global_store3(signal):
 
 
 def retrieve_data3(signal):
-    cache.delete_memoized(global_store3)
+    cache.delete_memoized(global_store3, 'signal')
     # cache.clear()
     data = global_store3(signal)
     return data
@@ -603,8 +603,8 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    # cache.delete_memoized(global_store4)
-    cache.clear()
+    cache.delete_memoized(global_store4, 'signal')
+    # cache.clear()
     data = global_store4(signal)
     return data
 
