@@ -669,21 +669,19 @@ def toggleOptions(click):
 def clickPicker(click1, click2, click3, click4,
                 time1, time2, time3, time4,
                 click_sync, click_store):
+    clicks = [click1, click2, click3, click4]
+    times = [time1, time2, time3, time4]
+    times = [0 if t is None else t for t in times]
+    index = times.index(max(times))
     if click_sync == 'yes':
-        clicks = [click1, click2, click3, click4]
-        times = [time1, time2, time3, time4]
         if not any(c is not None for c in clicks):
             click = {'points': [{'lon': -107.75, 'lat': 40.5}]}
         else:
-            times = [0 if t is None else t for t in times]
-            index = times.index(max(times))
             click = clicks[index]
         return json.dumps(click)
     else:
-        print("Preventing Sync Callback")
-        return click_store
-
-
+        print("Not Syncing")
+        return json.dumps(index + 1)
 
 
 # In[] For the future
@@ -835,8 +833,6 @@ for i in range(1, 5):
          a whole new set of callbacks to avoid the lag from that. Also, the
          synced click process is too slow...what can be done?
         '''
-        print(single_click)
-        print("Rendering Time Series #{}".format(int(cache)))
 
         # Create signal for the global_store
         signal = json.loads(signal)
@@ -847,6 +843,22 @@ for i in range(1, 5):
          reverse_override, map_type, sync, choice] = signal
         signal.pop(4)
         signal.pop(4)
+
+        #  Check if we are syncing clicks
+        if sync == 'yes':
+            click = json.loads(click)  
+        else:
+            if cache == click:
+                if single_click is None:
+                    click = {"points": [{"lon": -107.5, "lat": 40.5}]}
+                else:
+                    click = single_click
+            else:
+                raise PreventUpdate
+
+        print(single_click)
+        print("Rendering Time Series #{}".format(int(cache)))
+
 
         # Get data - check which cache first
         if cache == '1':
@@ -866,23 +878,6 @@ for i in range(1, 5):
         if reverse_override == 'yes':
             reverse = not reverse
 
-        # # Check if we are syncing clicks
-        if sync == 'yes':
-            click = json.loads(click)  
-        else:
-            # clicks = json.loads(click)
-            # if cache == '1':
-            #     click = clicks[0]
-            # elif cache == '2':
-            #     click = clicks[1]
-            # elif cache == '3':
-            #     click = clicks[2]
-            # else:
-            #     click = clicks[3]
-            if single_click is None:
-                click = {"points": [{"lon": -107.5, "lat": 40.5}]}
-            else:
-                click = single_click
 
         lon = click['points'][0]['lon']
         lat = click['points'][0]['lat']
