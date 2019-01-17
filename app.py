@@ -526,7 +526,7 @@ app.layout = html.Div([
         html.Div(id='signal', style={'display': 'none'}),
         html.Div(id='sync_check', style={'display': 'none'}),
         html.Div(id='click_store',
-                  children=['{"points": [{"lon": -107.5, "lat": 40.5}]}'],
+                 children=['{"points": [{"lon": -107.5, "lat": 40.5}]}'],
                  style={'display': 'none'}),
         html.Div(id='cache_1', children='1', style={'display': 'none'}),
         html.Div(id='cache_2', children='2', style={'display': 'none'}),
