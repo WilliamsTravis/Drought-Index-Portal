@@ -844,17 +844,6 @@ for i in range(1, 5):
         signal.pop(4)
         signal.pop(4)
 
-        # #  Check if we are syncing clicks
-        # if sync == 'yes':
-        #     click = json.loads(click)  
-        # else:
-        #     if cache == click:
-        #         if single_click is None:
-        #             click = {"points": [{"lon": -107.5, "lat": 40.5}]}
-        #         else:
-        #             click = single_click
-        #     else:
-        #         raise PreventUpdate
 
         print(single_click)
         print("Rendering Time Series #{}".format(int(cache)))
@@ -877,6 +866,15 @@ for i in range(1, 5):
         if reverse_override == 'yes':
             reverse = not reverse
 
+        #  Check if we are syncing clicks
+        if sync == 'yes':
+            click = json.loads(click)  
+        else:
+            if cache == click:
+                if single_click is None:
+                    click = {"points": [{"lon": -107.5, "lat": 40.5}]}
+                else:
+                    click = single_click
 
         lon = click['points'][0]['lon']
         lat = click['points'][0]['lat']
