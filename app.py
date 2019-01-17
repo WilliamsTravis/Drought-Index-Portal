@@ -643,7 +643,7 @@ def monthSlider(year_range):
               [Input('toggle_options', 'n_clicks')])
 def toggleOptions(click):
     if not click:
-        click = 1
+        click = 0
     if click % 2 == 0:
         style = {'display': 'none'}
     else:
@@ -681,7 +681,7 @@ def clickPicker(click1, click2, click3, click4, click_sync,
 
 
 # In[] For the future
-for i in range(1, 5):
+for i in range(1, 2):
     @app.callback(Output('time_{}'.format(i), 'children'),
                   [Input('map_{}'.format(i), 'clickData')])
     def clickTime(click):
