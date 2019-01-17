@@ -67,7 +67,7 @@ app.config['suppress_callback_exceptions'] = True
 # Create and initialize a cache for data storage
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'cache-directory'})
-timeout = 120
+timeout = 30
 cache.init_app(server)
 app.config.suppress_callback_exceptions = True
 
@@ -601,7 +601,7 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    cache.delete_memoized(global_store4)  # Sort of defeats the point...
+    cache.delete_memoized(global_store4)
     data = global_store4(signal)
     return data
 
