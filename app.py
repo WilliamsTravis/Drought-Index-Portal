@@ -17,6 +17,7 @@ import dash_html_components as html
 import datetime as dt
 import gc
 import json
+from flask_caching import Cache
 import numpy as np
 import os
 import pandas as pd
@@ -32,13 +33,11 @@ if platform == 'win32':
     home_path = 'c:/users/user/github'
     data_path = 'd:/'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
-    from flask_cache import Cache  # This one works on Windows but not Linux
     startyear = 1948
 else:
     home_path = '/root'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
     data_path = '/root'
-    from flask_caching import Cache  # This works on Linux but not Windows :)
     startyear = 1948
 
 from functions import calculateCV
@@ -551,7 +550,8 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1)
+    # cache.delete_memoized(global_store1)
+    cache.clear()
     data = global_store1(signal)
     return data
 
@@ -568,7 +568,8 @@ def global_store2(signal):
 
 
 def retrieve_data2(signal):
-    cache.delete_memoized(global_store2)
+    # cache.delete_memoized(global_store2)
+    cache.clear()
     data = global_store2(signal)
     return data
 
@@ -585,7 +586,8 @@ def global_store3(signal):
 
 
 def retrieve_data3(signal):
-    cache.delete_memoized(global_store3)
+    # cache.delete_memoized(global_store3)
+    cache.clear()
     data = global_store3(signal)
     return data
 
@@ -601,7 +603,8 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    cache.delete_memoized(global_store4)
+    # cache.delete_memoized(global_store4)
+    cache.clear()
     data = global_store4(signal)
     return data
 
