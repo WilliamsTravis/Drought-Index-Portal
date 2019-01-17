@@ -681,7 +681,7 @@ def clickPicker(click1, click2, click3, click4,
         return json.dumps(click)
     else:
         print("Preventing Sync Callback")
-        raise PreventUpdate
+        return click_store
 
 
 
@@ -948,4 +948,4 @@ for i in range(1, 5):
 
 # In[] Run Application through the server
 if __name__ == '__main__':
-    app.run_server(threaded=True)
+    app.run_server()
