@@ -682,7 +682,7 @@ def clickPicker(click1, click2, click3, click4,
             click = clicks[index]
         return json.dumps(click)
     else:
-        print("Not Syncing")
+        # print("Not Syncing")
         return json.dumps(index + 1)
 
 
