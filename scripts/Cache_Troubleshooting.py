@@ -86,7 +86,7 @@ class storage:
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1)
+    cache.delete_memoized(storage.global_store1)
     # cache.clear()
     data = storage.global_store1(signal)
     return data
@@ -240,7 +240,7 @@ print('''
       retrieve_time1(signal)
       global_store1(signal)
       
-      print("CPU: {}% Memory: {}%".format(psutil.cpu_percent(), psutil.virtual_memory().percent))
+      print("CPU: {}% Memory: {}%".format(psutil.cpu_percent(), psutil.virtual_memorsy().percent))
       ''')
 
 
