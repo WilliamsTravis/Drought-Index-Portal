@@ -77,7 +77,7 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
 
 # In[] Cache Functions
-@cache.cached(timeout=50)
+@cache.memoize(timeout=50)
 def global_store1(signal):
     gc.collect()
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
@@ -85,7 +85,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1)
+    # cache.delete_memoized(global_store1)
     # cache.clear()
     data = global_store1(signal)
     return data

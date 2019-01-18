@@ -546,7 +546,7 @@ app.layout = html.Div([
 
 
 # In[]: App callbacks
-@cache.memoize(timeout=timeout)
+# @cache.memoize(timeout=timeout)
 def global_store1(signal):
     gc.collect()
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
@@ -554,7 +554,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1)  # Is it even doing anything anymore?
+    # cache.delete_memoized(global_store1)  # Is it even doing anything anymore?
     data = global_store1(signal)
     return data
 
@@ -564,14 +564,14 @@ def retrieve_time1(signal):
     return data
 
 
-@cache.memoize(timeout=timeout)
+# @cache.memoize(timeout=timeout)
 def global_store2(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
 def retrieve_data2(signal):
-    cache.delete_memoized(global_store2)
+    # cache.delete_memoized(global_store2)
     data = global_store2(signal)
     return data
 
@@ -581,14 +581,14 @@ def retrieve_time2(signal):
     return data
 
 
-@cache.memoize(timeout=timeout)
+# @cache.memoize(timeout=timeout)
 def global_store3(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
 def retrieve_data3(signal):
-    cache.delete_memoized(global_store3)
+    # cache.delete_memoized(global_store3)
     data = global_store3(signal)
     return data
 
@@ -597,14 +597,14 @@ def retrieve_time3(signal):
     data = global_store3(signal)
     return data
 
-@cache.memoize(timeout=timeout)
+# @cache.memoize(timeout=timeout)
 def global_store4(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
 def retrieve_data4(signal):
-    cache.delete_memoized(global_store4)
+    # cache.delete_memoized(global_store4)
     data = global_store4(signal)
     return data
 
@@ -847,6 +847,7 @@ for i in range(1, 5):
          reverse_override, map_type, sync, choice] = signal
         signal.pop(4)
         signal.pop(4)
+
         # Get data - check which cache first
         if cache == '1':
             [[array, arrays, dates],
@@ -878,7 +879,7 @@ for i in range(1, 5):
                 raise PreventUpdate
 
         print("Rendering Time Series #{}".format(int(cache)))
-        print("####################877: " + str(click))
+        print("#################### Line 882: " + str(click))
 
         lon = click['points'][0]['lon']
         lat = click['points'][0]['lat']
