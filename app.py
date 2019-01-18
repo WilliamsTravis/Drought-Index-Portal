@@ -53,19 +53,21 @@ app = dash.Dash(__name__)
 # Go to stylesheet, styled after a DASH example (how to serve locally?)
 app.css.append_css({'external_url': 'https://codepen.io/williamstravis/pen/' +
                                     'maxwvK.css'})
+app.scripts.config.serve_locally = True
 
 # For the Loading screen - just trying Chriddyp's for now
-# app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
+app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
 
 # Create Server Object
 server = app.server
 
 # Disable exceptions (attempt to speed things up)
-# app.config['suppress_callback_exceptions'] = True
+app.config['suppress_callback_exceptions'] = True
 
 # Create and initialize a cache for data storage
-cache = Cache(config={'CACHE_TYPE': 'filesystem',
-                       'CACHE_DIR': 'cache-directory'})
+cache = Cache(config={'CACHE_TYPE': 'memcached'})
+                    #  'CACHE_MEMCACHED_SERVERS': ['127.0.0.1:8000']})
+                    # 'CACHE_DIR': 'cache-directory'})
 timeout = 200
 cache.init_app(server)
 
@@ -550,10 +552,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    try:
-        cache.delete_memoized(global_store1)
-    except:
-        print("cache did not delete for global store #1")
+    cache.delete_memoized(global_store1)
     # cache.clear()
     data = global_store1(signal)
     return data
@@ -571,10 +570,7 @@ def global_store2(signal):
 
 
 def retrieve_data2(signal):
-    try:
-        cache.delete_memoized(global_store2)
-    except:
-        print("cache did not delete for global store #2")
+    cache.delete_memoized(global_store2)
     # cache.clear()
     data = global_store2(signal)
     return data
@@ -592,10 +588,7 @@ def global_store3(signal):
 
 
 def retrieve_data3(signal):
-    try:
-        cache.delete_memoized(global_store3)
-    except:
-        print("cache did not delete for global store #3")
+    cache.delete_memoized(global_store3)
     # cache.clear()
     data = global_store3(signal)
     return data
@@ -612,10 +605,7 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    try:
-        cache.delete_memoized(global_store4)
-    except:
-        print("cache did not delete for global store #4")
+    cache.delete_memoized(global_store4)
     # cache.clear()
     data = global_store4(signal)
     return data

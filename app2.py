@@ -143,7 +143,7 @@ function_names = {'mean_perc': 'Average Percentiles',
 # For the county names - need to get a more complete data set
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
-counties_df = pd.read_csv("counties.csv")
+counties_df = pd.read_csv("data/counties.csv")
 counties_df = counties_df[['grid', 'county', 'state']]
 # counties_df['grid'] = counties_df['grid'].astype(str)
 counties_df['place'] = (counties_df['county'] +
@@ -391,7 +391,7 @@ def divMaker(id_num, index='noaa'):
 
 
 # In[]: Create App Layout
-app.layout = dcc.Loading(children=html.Div([
+app.layout = html.Div([
         # html.Div([
         #         html.Img(id='banner',
         #                  src=('https://github.com/WilliamsTravis/' +
@@ -531,7 +531,7 @@ app.layout = dcc.Loading(children=html.Div([
 
 
         # The end!
-        ], className='ten columns offset-by-one'))
+        ], className='ten columns offset-by-one')
 
 
 # In[]: App callbacks
