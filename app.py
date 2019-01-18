@@ -623,7 +623,7 @@ def retrieve_time4(signal):
                State('year_slider', 'value'),
                State('month', 'value'),
                State('map_type', 'value'),
-               State('click_sync', 'value'])
+               State('click_sync', 'value')])
 def submitSignal(click, function, colorscale, reverse, year_range,
                  month_range, map_type, click_sync):
 
@@ -704,15 +704,17 @@ for i in range(1, 5):
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
+        # Original signal order: [[year_range, month_range], function,
+                                 # colorscale, reverse, map_type, click_sync]
         # Create signal for the global_store
-        signal = json.loads(signal)
+        signal = json.loads(signal)  # [[[2000, 2017], [1,12]], 'mean_perc', 'Viridis', 'no', 'light', 'yes']
         signal.append(choice)
 
         # Collect and adjust signal
         [[year_range, month_range], function, colorscale,
          reverse_override, map_type, click_sync, choice] = signal
         # signal = [[[2000, 2017], [1, 12]], 'mean_perc',
-        #             'Viridis', False, 'light', 'pdsi']
+        #             'Viridis', 'no', 'light', 'yes', 'pdsi']
         signal.pop(4)
         signal.pop(4)
 
@@ -837,14 +839,14 @@ for i in range(1, 5):
         '''
 
         # Create signal for the global_store
-        signal = json.loads(signal)
+        signal = json.loads(signal) #[[[2000, 2017], [1,12]], 'mean_perc', 'Viridis', 'no', 'light', 'yes']
         signal.append(choice)
 
         # Collect signals
         [[year_range, month_range], function, colorscale,
          reverse_override, map_type, sync, choice] = signal
         signal.pop(4)
-
+        signal.pop(4)
         # Get data - check which cache first
         if cache == '1':
             [[array, arrays, dates],
