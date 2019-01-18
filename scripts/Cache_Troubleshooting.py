@@ -39,10 +39,43 @@ else:
     startyear = 1948
 
 from functions import calculateCV
-
+grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
+mask = grid*0+1
 signal = [[[2000, 2017], [1, 12]], 'mean_perc',
           'Viridis', 'no', 'pdsi']
 
+# In[] Create Cache
+app = dash.Dash(__name__)
+
+# Go to stylesheet, styled after a DASH example (how to serve locally?)
+app.css.append_css({'external_url':
+                    'https://codepen.io/williamstravis/pen/maxwvK.css'})
+app.scripts.config.serve_locally = True
+
+# For the Loading screen - just trying Chriddyp's for now
+app.css.append_css({"external_url":
+                    "https://codepen.io/williamstravis/pen/EGrWde.css"})
+
+# Create Server Object
+server = app.server
+
+# Disable exceptions (attempt to speed things up)
+app.config['suppress_callback_exceptions'] = True
+
+# Create and initialize a cache for data storage
+# cache = Cache(config={'CACHE_TYPE': 'memcached',
+                    #  'CACHE_MEMCACHED_SERVERS': ['127.0.0.1:8000']})
+
+cache = Cache(config={'CACHE_TYPE': 'filesystem',
+                      'CACHE_DIR': 'cache-directory'})
+timeout = 200
+cache.init_app(server)
+
+# Mapbox Access
+mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
+                       'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
+
+# In[] Cache Functions
 @cache.memoize(timeout=timeout)
 def global_store1(signal):
     gc.collect()
@@ -189,9 +222,9 @@ def makeMap(time_range, function, colorscale, reverse, choice):
     return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
 
 
-# retrieve_data1(signal)
-# retrieve_time1(signal)
-# global_store1(signal)
-# print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
-#                                        psutil.virtual_memory().percent))
+retrieve_data1(signal)
+retrieve_time1(signal)
+global_store1(signal)
+print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
+                                        psutil.virtual_memory().percent))
 # exec(open("root/Ubuntu-Practice-Machine/scripts/Cache_Troubleshooting.py").read())
