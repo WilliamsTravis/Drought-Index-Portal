@@ -221,10 +221,15 @@ def makeMap(time_range, function, colorscale, reverse, choice):
     arrays = arrays.value.data
     return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
 
+print('''
+      Functions to test:
+      retrieve_data1(signal)
+      retrieve_time1(signal)
+      global_store1(signal)
+      
+      print("CPU: {}% Memory: {}%".format(psutil.cpu_percent(), psutil.virtual_memory().percent))
+      ''')
 
-retrieve_data1(signal)
-retrieve_time1(signal)
-global_store1(signal)
 print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                         psutil.virtual_memory().percent))
-# exec(open("root/Ubuntu-Practice-Machine/scripts/Cache_Troubleshooting.py").read())
+# exec(open("/root/Ubuntu-Practice-Machine/scripts/Cache_Troubleshooting.py").read())
