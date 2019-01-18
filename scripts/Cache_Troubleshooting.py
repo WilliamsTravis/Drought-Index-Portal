@@ -77,23 +77,22 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
 
 # In[] Cache Functions
-class storage:
-    @cache.memoize(timeout=timeout)
-    def global_store1(signal):
-        gc.collect()
-        data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
-        return data
+@cache.memoize(timeout=timeout)
+def global_store1(signal):
+    gc.collect()
+    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
+    return data
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(storage.global_store1)
+    cache.delete_memoized(global_store1)
     # cache.clear()
-    data = storage.global_store1(signal)
+    data = global_store1(signal)
     return data
 
 
 def retrieve_time1(signal):
-    data = storage.global_store1(signal)
+    data = global_store1(signal)
     return data
 
 # In a function that return a large dataset
