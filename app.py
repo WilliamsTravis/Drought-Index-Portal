@@ -51,12 +51,13 @@ from functions import calculateCV
 app = dash.Dash(__name__)
 
 # Go to stylesheet, styled after a DASH example (how to serve locally?)
-app.css.append_css({'external_url': 'https://codepen.io/williamstravis/pen/' +
-                                    'maxwvK.css'})
+app.css.append_css({'external_url':
+                    'https://codepen.io/williamstravis/pen/maxwvK.css'})
 app.scripts.config.serve_locally = True
 
 # For the Loading screen - just trying Chriddyp's for now
-app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
+app.css.append_css({"external_url":
+                    "https://codepen.io/williamstravis/pen/EGrWde.css"})
 
 # Create Server Object
 server = app.server
@@ -65,9 +66,11 @@ server = app.server
 app.config['suppress_callback_exceptions'] = True
 
 # Create and initialize a cache for data storage
-cache = Cache(config={'CACHE_TYPE': 'memcached'})
+# cache = Cache(config={'CACHE_TYPE': 'memcached',
                     #  'CACHE_MEMCACHED_SERVERS': ['127.0.0.1:8000']})
-                    # 'CACHE_DIR': 'cache-directory'})
+
+cache = Cache(config={'CACHE_TYPE': 'filesystem',
+                      'CACHE_DIR': 'cache-directory'})
 timeout = 200
 cache.init_app(server)
 
@@ -188,7 +191,7 @@ color_options = [{'label': c, 'value': c} for c in colorscales]
 color_options.append({'label': 'RdWhBu', 'value': 'RdWhBu'})
 color_options.append({'label': 'RdYlGnBu', 'value': 'RdYlGnBu'})
 
-
+# Stand in function. I will create a simpler class out of this...
 def makeMap(time_range, function, colorscale, reverse, choice):    
     # time_range, function, colorscale, reverse_override, choice
     # Split time range up
@@ -552,7 +555,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1)
+    # cache.delete_memoized(global_store1)
     # cache.clear()
     data = global_store1(signal)
     return data
@@ -570,7 +573,7 @@ def global_store2(signal):
 
 
 def retrieve_data2(signal):
-    cache.delete_memoized(global_store2)
+    # cache.delete_memoized(global_store2)
     # cache.clear()
     data = global_store2(signal)
     return data
@@ -588,7 +591,7 @@ def global_store3(signal):
 
 
 def retrieve_data3(signal):
-    cache.delete_memoized(global_store3)
+    # cache.delete_memoized(global_store3)
     # cache.clear()
     data = global_store3(signal)
     return data
@@ -605,7 +608,7 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    cache.delete_memoized(global_store4)
+    # cache.delete_memoized(global_store4)
     # cache.clear()
     data = global_store4(signal)
     return data
