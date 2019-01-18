@@ -64,8 +64,8 @@ server = app.server
 # app.config['suppress_callback_exceptions'] = True
 
 # Create and initialize a cache for data storage
-cache = Cache(config={'CACHE_TYPE': 'simple'})
-                      # 'CACHE_DIR': 'cache-directory'})
+cache = Cache(config={'CACHE_TYPE': 'filesystem',
+                       'CACHE_DIR': 'cache-directory'})
 timeout = 200
 cache.init_app(server)
 
