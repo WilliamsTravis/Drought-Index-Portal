@@ -31,6 +31,7 @@ then
     curl https://bootstrap.pypa.io/get-pip.py | sudo python3.6
     pip3.6 install gunicorn
     sudo pip3.6 install virtualenv
+    sudo apt-get install gcc  # might be needed for some python packages
     # virtualenv venv
     # source /venv/bin/activate
     pip3.6 install dash dash_core_components dash_html_components dash_table_experiments

@@ -555,7 +555,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    # cache.delete_memoized(global_store1)
+    cache.delete_memoized(global_store1)
     # cache.clear()
     data = global_store1(signal)
     return data
@@ -573,7 +573,7 @@ def global_store2(signal):
 
 
 def retrieve_data2(signal):
-    # cache.delete_memoized(global_store2)
+    cache.delete_memoized(global_store2)
     # cache.clear()
     data = global_store2(signal)
     return data
@@ -591,7 +591,7 @@ def global_store3(signal):
 
 
 def retrieve_data3(signal):
-    # cache.delete_memoized(global_store3)
+    cache.delete_memoized(global_store3)
     # cache.clear()
     data = global_store3(signal)
     return data
@@ -608,7 +608,7 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    # cache.delete_memoized(global_store4)
+    cache.delete_memoized(global_store4)
     # cache.clear()
     data = global_store4(signal)
     return data
@@ -670,8 +670,8 @@ def toggleOptions(click):
                Input('time_1', 'children'),
                Input('time_2', 'children'),
                Input('time_3', 'children'),
-               Input('time_4', 'children'),
-               Input('click_sync', 'value')])
+               Input('time_4', 'children')],
+              [State('click_sync', 'value')])
 def clickPicker(click1, click2, click3, click4,
                 time1, time2, time3, time4,
                 click_sync):
@@ -748,7 +748,7 @@ for i in range(1, 5):
 
         # Set to this thing
         source.data[0] = array
-        
+
         # Because EDDI only extends back to 1980
         if 'eddi' in choice and y1 < 1980 and y2 < 1980:
             source.data[0] = na
@@ -827,11 +827,11 @@ for i in range(1, 5):
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
                   [Input("map_{}".format(i), 'clickData'),
-                   Input('click_store', 'children')],
-                  [State('cache_{}'.format(i), 'children'),
-                   State('choice_{}'.format(i), 'value'),
-                   State('signal', 'children'),
-                   State('click_sync', 'value')])
+                   Input('click_store', 'children'),
+                   Input('cache_{}'.format(i), 'children'),
+                   Input('choice_{}'.format(i), 'value'),
+                   Input('signal', 'children')],
+                  [State('click_sync', 'value')])
     def makeSeries(single_click, click, cache, choice, signal, sync):
         '''
         Each callback is called even if this isn't synced...It would require
@@ -843,11 +843,10 @@ for i in range(1, 5):
         signal = json.loads(signal)
         signal.append(choice)
 
-        # Collect signals 
+        # Collect signals
         [[year_range, month_range], function, colorscale,
          reverse_override, map_type, choice] = signal
         signal.pop(4)
-
 
         # Get data - check which cache first
         if cache == '1':
@@ -878,7 +877,7 @@ for i in range(1, 5):
                     click = single_click
             else:
                 raise PreventUpdate
-                    
+
         print("Rendering Time Series #{}".format(int(cache)))
         print("####################877: " + str(click))
 
