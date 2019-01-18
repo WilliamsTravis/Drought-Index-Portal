@@ -455,7 +455,7 @@ app.layout = html.Div([
                         html.H3("Map Type"),
                          dcc.RadioItems(
                                 id="map_type",
-                                value="light",
+                                value="dark",
                                 options=maptypes)],
                          className='two columns'),
 
@@ -464,7 +464,7 @@ app.layout = html.Div([
                          html.H3("Function"),
                          dcc.RadioItems(id='function_choice',
                                         options=function_options,
-                                        value='mean_original')],
+                                        value='mean_perc')],
                          className='three columns'),
 
                 # Syncing locations on click
@@ -519,16 +519,15 @@ app.layout = html.Div([
 
         # Four by Four Map Layout
         # Row 1
-        html.Div([divMaker(1, 'eddi1'), divMaker(2, 'eddi2')],
+        html.Div([divMaker(1, 'pdsi'), divMaker(2, 'spei1')],
                  className='row'),
 
         # Row 2
-        html.Div([divMaker(3, 'eddi3'), divMaker(4, 'eddi6')],
+        html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],
                  className='row'),
 
         # Signals
         html.Div(id='signal', style={'display': 'none'}),
-        # html.Div(id='sync_check', style={'display': 'none'}),
         html.Div(id='click_store',
                  # children=['{"points": [{"lon": -107.5, "lat": 40.5}]}'],
                  style={'display': 'none'}),
@@ -555,8 +554,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1)
-    # cache.clear()
+    cache.delete_memoized(global_store1)  # Is it even doing anything anymore?
     data = global_store1(signal)
     return data
 
@@ -574,7 +572,6 @@ def global_store2(signal):
 
 def retrieve_data2(signal):
     cache.delete_memoized(global_store2)
-    # cache.clear()
     data = global_store2(signal)
     return data
 
@@ -592,7 +589,6 @@ def global_store3(signal):
 
 def retrieve_data3(signal):
     cache.delete_memoized(global_store3)
-    # cache.clear()
     data = global_store3(signal)
     return data
 
@@ -715,7 +711,8 @@ for i in range(1, 5):
         # Collect and adjust signal
         [[year_range, month_range], function, colorscale,
          reverse_override, map_type, choice] = signal
-        # signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', False, 'light', 'pdsi']
+        # signal = [[[2000, 2017], [1, 12]], 'mean_perc',
+        #             'Viridis', False, 'light', 'pdsi']
         signal.pop(4)
 
         # Split the time range up

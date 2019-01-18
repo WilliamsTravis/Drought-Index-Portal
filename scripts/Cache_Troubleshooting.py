@@ -77,7 +77,7 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
 
 # In[] Cache Functions
-@cache.memoize(timeout=timeout)
+@cache.cached(timeout=50)
 def global_store1(signal):
     gc.collect()
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
@@ -230,7 +230,7 @@ def cm():
                                         psutil.virtual_memory().percent))
 
 # Set up some cached information
-x = retrieve_data1(signal)
+x = retrieve_time1(signal)
 
 # In[]: What we'll see in Linux
 print('''
