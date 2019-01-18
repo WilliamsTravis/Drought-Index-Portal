@@ -71,7 +71,7 @@ app.config['suppress_callback_exceptions'] = True
 
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'cache-directory'})
-timeout = 200
+timeout = 50
 cache.init_app(server)
 
 # Mapbox Access
@@ -605,7 +605,6 @@ def global_store4(signal):
 
 def retrieve_data4(signal):
     cache.delete_memoized(global_store4)
-    # cache.clear()
     data = global_store4(signal)
     return data
 
@@ -623,16 +622,17 @@ def retrieve_time4(signal):
                State('reverse', 'value'),
                State('year_slider', 'value'),
                State('month', 'value'),
-               State('map_type', 'value'),])
+               State('map_type', 'value'),
+               State('click_sync', 'value'])
 def submitSignal(click, function, colorscale, reverse, year_range,
-                 month_range, map_type):
+                 month_range, map_type, click_sync):
 
     print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                            psutil.virtual_memory().percent))
     if not month_range:
         month_range = [1, 1]
     return json.dumps([[year_range, month_range], function,
-                       colorscale, reverse, map_type])
+                       colorscale, reverse, map_type, click_sync])
 
 
 # Allow users to select a month range if the year slider is set to one year
@@ -710,9 +710,10 @@ for i in range(1, 5):
 
         # Collect and adjust signal
         [[year_range, month_range], function, colorscale,
-         reverse_override, map_type, choice] = signal
+         reverse_override, map_type, click_sync, choice] = signal
         # signal = [[[2000, 2017], [1, 12]], 'mean_perc',
         #             'Viridis', False, 'light', 'pdsi']
+        signal.pop(4)
         signal.pop(4)
 
         # Split the time range up
@@ -827,9 +828,8 @@ for i in range(1, 5):
                    Input('click_store', 'children'),
                    Input('cache_{}'.format(i), 'children'),
                    Input('choice_{}'.format(i), 'value'),
-                   Input('signal', 'children')],
-                  [State('click_sync', 'value')])
-    def makeSeries(single_click, click, cache, choice, signal, sync):
+                   Input('signal', 'children')])
+    def makeSeries(single_click, click, cache, choice, signal):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
@@ -842,7 +842,7 @@ for i in range(1, 5):
 
         # Collect signals
         [[year_range, month_range], function, colorscale,
-         reverse_override, map_type, choice] = signal
+         reverse_override, map_type, sync, choice] = signal
         signal.pop(4)
 
         # Get data - check which cache first
