@@ -550,7 +550,10 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1)
+    try:
+        cache.delete_memoized(global_store1)
+    except:
+        print("cache did not delete for global store #1")
     # cache.clear()
     data = global_store1(signal)
     return data
@@ -568,7 +571,10 @@ def global_store2(signal):
 
 
 def retrieve_data2(signal):
-    cache.delete_memoized(global_store2)
+    try:
+        cache.delete_memoized(global_store2)
+    except:
+        print("cache did not delete for global store #2")
     # cache.clear()
     data = global_store2(signal)
     return data
@@ -586,7 +592,10 @@ def global_store3(signal):
 
 
 def retrieve_data3(signal):
-    cache.delete_memoized(global_store3)
+    try:
+        cache.delete_memoized(global_store3)
+    except:
+        print("cache did not delete for global store #3")
     # cache.clear()
     data = global_store3(signal)
     return data
@@ -603,7 +612,10 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    cache.delete_memoized(global_store4)
+    try:
+        cache.delete_memoized(global_store4)
+    except:
+        print("cache did not delete for global store #4")
     # cache.clear()
     data = global_store4(signal)
     return data
@@ -665,12 +677,11 @@ def toggleOptions(click):
                Input('time_1', 'children'),
                Input('time_2', 'children'),
                Input('time_3', 'children'),
-               Input('time_4', 'children')],
-              [State('click_sync', 'value'),
-               State('click_store', 'children')])
+               Input('time_4', 'children'),
+               Input('click_sync', 'value')])
 def clickPicker(click1, click2, click3, click4,
                 time1, time2, time3, time4,
-                click_sync, click_store):
+                click_sync):
     clicks = [click1, click2, click3, click4]
     times = [time1, time2, time3, time4]
     times = [0 if t is None else t for t in times]
@@ -682,7 +693,6 @@ def clickPicker(click1, click2, click3, click4,
             click = clicks[index]
         return json.dumps(click)
     else:
-        # print("Not Syncing")
         return json.dumps(index + 1)
 
 
