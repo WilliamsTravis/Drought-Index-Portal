@@ -22,6 +22,7 @@ import pandas as pd
 import psutil
 import time
 import xarray as xr
+import sys
 from sys import platform
 import warnings
 warnings.filterwarnings("ignore")
@@ -94,6 +95,7 @@ def retrieve_time1(signal):
     data = global_store1(signal)
     return data
 
+# In a function that return a large dataset
 # Stand in function. I will create a simpler class out of this...
 def makeMap(time_range, function, colorscale, reverse, choice):    
     # time_range, function, colorscale, reverse_override, choice
@@ -221,6 +223,16 @@ def makeMap(time_range, function, colorscale, reverse, choice):
     arrays = arrays.value.data
     return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
 
+# In[]: diagnostic functions
+# Check Memory
+def cm():
+    print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
+                                        psutil.virtual_memory().percent))
+
+# Set up some cached information
+x = retrieve_data1(signal)
+
+# In[]: What we'll see in Linux
 print('''
       Functions to test:
       retrieve_data1(signal)
@@ -230,6 +242,5 @@ print('''
       print("CPU: {}% Memory: {}%".format(psutil.cpu_percent(), psutil.virtual_memory().percent))
       ''')
 
-print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
-                                        psutil.virtual_memory().percent))
+
 # exec(open("/root/Ubuntu-Practice-Machine/scripts/Cache_Troubleshooting.py").read())
