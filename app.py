@@ -55,20 +55,19 @@ app.css.append_css({'external_url': 'https://codepen.io/williamstravis/pen/' +
                                     'maxwvK.css'})
 
 # For the Loading screen - just trying Chriddyp's for now
-app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
+# app.css.append_css({"external_url": "https://codepen.io/williamstravis/pen/EGrWde.css"})
 
 # Create Server Object
 server = app.server
 
 # Disable exceptions (attempt to speed things up)
-app.config['suppress_callback_exceptions'] = True
+# app.config['suppress_callback_exceptions'] = True
 
 # Create and initialize a cache for data storage
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'cache-directory'})
-timeout = 30
+timeout = 200
 cache.init_app(server)
-app.config.suppress_callback_exceptions = True
 
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
@@ -460,8 +459,9 @@ app.layout = html.Div([
                          html.H3("Function"),
                          dcc.RadioItems(id='function_choice',
                                         options=function_options,
-                                        value='mean_perc')],
+                                        value='mean_original')],
                          className='three columns'),
+
                 # Syncing locations on click
                 html.Div([
                         html.H3("Sync Click Locations"),
@@ -514,18 +514,18 @@ app.layout = html.Div([
 
         # Four by Four Map Layout
         # Row 1
-        html.Div([divMaker(1, 'spei1'), divMaker(2, 'spei6')],
+        html.Div([divMaker(1, 'eddi1'), divMaker(2, 'eddi2')],
                  className='row'),
 
         # Row 2
-        html.Div([divMaker(3, 'pdsi'), divMaker(4, 'eddi2')],
+        html.Div([divMaker(3, 'eddi3'), divMaker(4, 'eddi6')],
                  className='row'),
 
         # Signals
         html.Div(id='signal', style={'display': 'none'}),
-        html.Div(id='sync_check', style={'display': 'none'}),
+        # html.Div(id='sync_check', style={'display': 'none'}),
         html.Div(id='click_store',
-                 children=['{"points": [{"lon": -107.5, "lat": 40.5}]}'],
+                 # children=['{"points": [{"lon": -107.5, "lat": 40.5}]}'],
                  style={'display': 'none'}),
         html.Div(id='cache_1', children='1', style={'display': 'none'}),
         html.Div(id='cache_2', children='2', style={'display': 'none'}),
@@ -550,7 +550,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    cache.delete_memoized(global_store1, 'signal')
+    cache.delete_memoized(global_store1)
     # cache.clear()
     data = global_store1(signal)
     return data
@@ -568,7 +568,7 @@ def global_store2(signal):
 
 
 def retrieve_data2(signal):
-    cache.delete_memoized(global_store2, 'signal')
+    cache.delete_memoized(global_store2)
     # cache.clear()
     data = global_store2(signal)
     return data
@@ -586,7 +586,7 @@ def global_store3(signal):
 
 
 def retrieve_data3(signal):
-    cache.delete_memoized(global_store3, 'signal')
+    cache.delete_memoized(global_store3)
     # cache.clear()
     data = global_store3(signal)
     return data
@@ -603,7 +603,7 @@ def global_store4(signal):
 
 
 def retrieve_data4(signal):
-    cache.delete_memoized(global_store4, 'signal')
+    cache.delete_memoized(global_store4)
     # cache.clear()
     data = global_store4(signal)
     return data
@@ -622,17 +622,16 @@ def retrieve_time4(signal):
                State('reverse', 'value'),
                State('year_slider', 'value'),
                State('month', 'value'),
-               State('map_type', 'value'),
-               State('click_sync', 'value')])
+               State('map_type', 'value'),])
 def submitSignal(click, function, colorscale, reverse, year_range,
-                 month_range, map_type, sync):
+                 month_range, map_type):
 
     print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                            psutil.virtual_memory().percent))
     if not month_range:
         month_range = [1, 1]
     return json.dumps([[year_range, month_range], function,
-                       colorscale, reverse, map_type, sync])
+                       colorscale, reverse, map_type])
 
 
 # Allow users to select a month range if the year slider is set to one year
@@ -712,9 +711,8 @@ for i in range(1, 5):
 
         # Collect and adjust signal
         [[year_range, month_range], function, colorscale,
-         reverse_override, map_type, sync, choice] = signal
-        # signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', False, 'light', 'yes', 'pdsi']
-        signal.pop(4)
+         reverse_override, map_type, choice] = signal
+        # signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', False, 'light', 'pdsi']
         signal.pop(4)
 
         # Split the time range up
@@ -829,8 +827,9 @@ for i in range(1, 5):
                    Input('click_store', 'children')],
                   [State('cache_{}'.format(i), 'children'),
                    State('choice_{}'.format(i), 'value'),
-                   State('signal', 'children')])
-    def makeSeries(single_click, click, cache, choice, signal):
+                   State('signal', 'children'),
+                   State('click_sync', 'value')])
+    def makeSeries(single_click, click, cache, choice, signal, sync):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
@@ -843,13 +842,9 @@ for i in range(1, 5):
 
         # Collect signals 
         [[year_range, month_range], function, colorscale,
-         reverse_override, map_type, sync, choice] = signal
-        signal.pop(4)
+         reverse_override, map_type, choice] = signal
         signal.pop(4)
 
-
-        print(single_click)
-        print("Rendering Time Series #{}".format(int(cache)))
 
         # Get data - check which cache first
         if cache == '1':
@@ -865,7 +860,7 @@ for i in range(1, 5):
             [[array, arrays, dates],
              colorscale, dmax, dmin, reverse] = retrieve_time4(signal)
 
-        # There a lot of colorscale switching in the default settings
+        # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
             reverse = not reverse
 
@@ -878,6 +873,11 @@ for i in range(1, 5):
                     click = {"points": [{"lon": -107.5, "lat": 40.5}]}
                 else:
                     click = single_click
+            else:
+                raise PreventUpdate
+                    
+        print("Rendering Time Series #{}".format(int(cache)))
+        print("####################877: " + str(click))
 
         lon = click['points'][0]['lon']
         lat = click['points'][0]['lat']
