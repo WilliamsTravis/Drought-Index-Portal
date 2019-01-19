@@ -70,7 +70,8 @@ app.config['suppress_callback_exceptions'] = True
                     #  'CACHE_MEMCACHED_SERVERS': ['127.0.0.1:8000']})
 
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
-                      'CACHE_DIR': 'cache-directory'})
+                      'CACHE_DIR': 'cache-directory',
+                      'CACHE_THRESHOLD': '4'})
 timeout = 50
 cache.init_app(server)
 
@@ -546,7 +547,7 @@ app.layout = html.Div([
 
 
 # In[]: App callbacks
-# @cache.memoize(timeout=timeout)
+@cache.memoize(timeout=timeout)
 def global_store1(signal):
     gc.collect()
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
@@ -554,7 +555,7 @@ def global_store1(signal):
 
 
 def retrieve_data1(signal):
-    # cache.delete_memoized(global_store1)  # Is it even doing anything anymore?
+    cache.delete_memoized(global_store1)  # Is it even doing anything anymore?
     data = global_store1(signal)
     return data
 
@@ -564,14 +565,14 @@ def retrieve_time1(signal):
     return data
 
 
-# @cache.memoize(timeout=timeout)
+@cache.memoize(timeout=timeout)
 def global_store2(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
 def retrieve_data2(signal):
-    # cache.delete_memoized(global_store2)
+    cache.delete_memoized(global_store2)
     data = global_store2(signal)
     return data
 
@@ -581,14 +582,14 @@ def retrieve_time2(signal):
     return data
 
 
-# @cache.memoize(timeout=timeout)
+@cache.memoize(timeout=timeout)
 def global_store3(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
 def retrieve_data3(signal):
-    # cache.delete_memoized(global_store3)
+    cache.delete_memoized(global_store3)
     data = global_store3(signal)
     return data
 
@@ -597,14 +598,14 @@ def retrieve_time3(signal):
     data = global_store3(signal)
     return data
 
-# @cache.memoize(timeout=timeout)
+@cache.memoize(timeout=timeout)
 def global_store4(signal):
     data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
     return data
 
 
 def retrieve_data4(signal):
-    # cache.delete_memoized(global_store4)
+    cache.delete_memoized(global_store4)
     data = global_store4(signal)
     return data
 
