@@ -1,105 +1,43 @@
 # -*- coding: utf-8 -*-
 """
-Support functions for Ubunut-Practice-Machine
-Created on Tue Jan 22 18:02:17 2019
+Created on Sun Jan 20 12:36:36 2019
 
+Creating a class out of the mapMaker function
 @author: User
 """
-import copy
-import dash
-from dash.dependencies import Input, Output, State
-from dash.exceptions import PreventUpdate
-import dash_core_components as dcc
-import dash_html_components as html
+
+# In[] Functions and Libraries
 import datetime as dt
-import gc
-import os
+import warnings
 import numpy as np
-import json
-from sys import platform
+import os
+import pandas as pd
+import psutil
+import sys
+import time
+import warnings
 import xarray as xr
 
-# Check if windows or linux
-if platform == 'win32':
-    home_path = 'z:/Sync'
+warnings.filterwarnings("ignore")
+
+# Check if we are working in Windows or Linux
+if sys.platform == 'win32':
+    home_path = 'c:/users/user/github'
     data_path = 'd:/'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
+    startyear = 1948
 else:
     home_path = '/root/Sync'
-    data_path = '/root'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
+    data_path = '/root'
+    startyear = 1948
 
+from functions import calculateCV
+from functions import standardize
+source_signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', 'no', 'pdsi']
 
-def calculateCV(indexlist):
-    '''
-     A single array showing the distribution of coefficients of variation
-         throughout the time period represented by the chosen rasters
-    '''
-    # is it a named list or not?
-    if type(indexlist[0]) is list:
-        # Get just the arrays from this
-        indexlist = [a[1] for a in indexlist]
-    else:
-        indexlist = indexlist
-
-    # Adjust for outliers
-    sd = np.nanstd(indexlist)
-    thresholds = [-3*sd, 3*sd]
-    for a in indexlist:
-        a[a <= thresholds[0]] = thresholds[0]
-        a[a >= thresholds[1]] = thresholds[1]
-
-    # Standardize Range
-    indexlist = standardize(indexlist)
-
-    # Simple Cellwise calculation of variance
-    sds = np.nanstd(indexlist, axis=0)
-    avs = np.nanmean(indexlist, axis=0)
-    covs = sds/avs
-
-    return covs
-
-class Cacher:
-    def __init__(self,key):
-        self.cache={}
-        self.key=key
-    def memoize(self, function):
-        def cacher(*args):
-            # print("Cache Key: " + str(self.key))
-            arg = [a for a in args]
-            key = json.dumps(arg)
-            if key not in self.cache.keys():
-                print("Generating/replacing dataset...")
-                self.cache.clear()
-                gc.collect()
-                self.cache[key] = function(*args)
-            else:
-                print("Returning existing dataset...")
-            return self.cache[key]
-        return cacher
-
-
-def coordinateDictionaries(source):
-    '''
-    Create Coordinate index positions from xarray
-    '''
-    # Geometry
-    x_length = source.shape[2]
-    y_length = source.shape[1]
-    res = source.res[0]
-    lon_min = source.transform[0]
-    lat_max = source.transform[3] - res
-    
-    # Make dictionaires with coordinates and array index positions
-    xs = range(x_length)
-    ys = range(y_length)
-    lons = [lon_min + res*x for x in xs]
-    lats = [lat_max - res*y for y in ys]
-    londict = dict(zip(lons, xs))
-    latdict = dict(zip(lats, ys))
-
-    return londict, latdict, res
-
+# In[] Original Function
+# Stand in function. I will create a simpler class out of this...
 
 class Index_Maps():
     '''
@@ -220,35 +158,7 @@ class Index_Maps():
 
         return [arrays, dmin, dmax]
 
-    def calculateCV(indexlist):
-        '''
-         A single array showing the distribution of coefficients of variation
-             throughout the time period represented by the chosen rasters
-        '''
-        # is it a named list or not?
-        if type(indexlist[0]) is list:
-            # Get just the arrays from this
-            indexlist = [a[1] for a in indexlist]
-        else:
-            indexlist = indexlist
-    
-        # Adjust for outliers
-        sd = np.nanstd(indexlist)
-        thresholds = [-3*sd, 3*sd]
-        for a in indexlist:
-            a[a <= thresholds[0]] = thresholds[0]
-            a[a >= thresholds[1]] = thresholds[1]
-    
-        # Standardize Range
-        indexlist = standardize(indexlist)
-    
-        # Simple Cellwise calculation of variance
-        sds = np.nanstd(indexlist, axis=0)
-        avs = np.nanmean(indexlist, axis=0)
-        covs = sds/avs
-    
-        return covs
-    
+
     def meanOriginal(self):
         '''
         Calculate mean of original index values
@@ -469,27 +379,3 @@ class Index_Maps():
 
         return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
 
-
-def standardize(indexlist):
-    '''
-    Min/max standardization
-    '''    
-    def single(array, mins, maxes):
-        newarray = (array - mins)/(maxes - mins)
-        return(newarray)
-
-    if type(indexlist[0][0]) == str:
-        arrays = [a[1] for a in indexlist]
-        mins = np.nanmin(arrays)
-        maxes = np.nanmax(arrays)
-        standardizedlist = [[indexlist[i][0],
-                             single(indexlist[i][1],
-                                    mins,
-                                    maxes)] for i in range(len(indexlist))]
-
-    else:
-        mins = np.nanmin(indexlist)
-        maxes = np.nanmax(indexlist)
-        standardizedlist = [single(indexlist[i],
-                                   mins, maxes) for i in range(len(indexlist))]
-    return(standardizedlist)

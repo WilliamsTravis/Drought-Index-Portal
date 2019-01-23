@@ -5,9 +5,13 @@ Just an app to visualize raster time series.
 Created on Fri Jan  4 12:39:23 2019
 
 @author: User
+
+Sync Check: 01/20/2019
 """
 
 # In[] Functions and Libraries
+import os
+import sys
 import copy
 import dash
 from dash.dependencies import Input, Output, State
@@ -17,35 +21,29 @@ import dash_html_components as html
 import datetime as dt
 import gc
 import json
-from flask_caching import Cache
-import numpy as np
-import os
 import pandas as pd
+import numpy as np
 import psutil
 import time
-import xarray as xr
-from sys import platform
 import warnings
+import xarray as xr
 warnings.filterwarnings("ignore")
 
-# Work for Windows and Linux
-if platform == 'win32':
-    home_path = 'c:/users/user/github'
+# Check if we are working in Windows or Linux
+if sys.platform == 'win32':
+    home_path = 'z:/Sync'
     data_path = 'd:/'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
-    startyear = 1948
 else:
-    home_path = '/root'
+    home_path = '/root/Sync'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
     data_path = '/root'
-    startyear = 1948
 
-from functions import calculateCV
+# sys.path.insert(0, os.path.join(home_path,
+#                                 'Ubuntu-Practice-Machine', 'scripts'))
 
-# In[] for development
-# function =  'mean_perc'
-# choice = 'pdsi'
-# year_range = [2000, 2017]
+import functions
+from functions import Index_Maps
 
 # In[] Create the DASH App object
 app = dash.Dash(__name__)
@@ -65,20 +63,11 @@ server = app.server
 # Disable exceptions (attempt to speed things up)
 app.config['suppress_callback_exceptions'] = True
 
-# Create and initialize a cache for data storage
-# cache = Cache(config={'CACHE_TYPE': 'memcached',
-                    #  'CACHE_MEMCACHED_SERVERS': ['127.0.0.1:8000']})
-
-cache = Cache(config={'CACHE_TYPE': 'filesystem',
-                      'CACHE_DIR': 'cache-directory',
-                      'CACHE_THRESHOLD': '4'})
-timeout = 50
-cache.init_app(server)
-
-# Mapbox Access
-mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
-                       'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
-
+# Create four simple caches, each holds one large array, one for each map
+cache1 = functions.Cacher(1)
+cache2 = functions.Cacher(2)
+cache3 = functions.Cacher(3)
+cache4 = functions.Cacher(4)
 
 # In[] Drought and Climate Indices (looking to include any raster time series)
 # Index Paths (for npz files)
@@ -158,6 +147,15 @@ for i in range(na.shape[0]):
     na[i] = na[i]*i
 
 # In[] The map
+# Mapbox Access
+mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
+                       'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
+
+# For testing
+source_signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', 'no', 'pdsi']
+
+
+
 # Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
             {'label': 'Dark', 'value': 'dark'},
@@ -192,136 +190,8 @@ color_options = [{'label': c, 'value': c} for c in colorscales]
 color_options.append({'label': 'RdWhBu', 'value': 'RdWhBu'})
 color_options.append({'label': 'RdYlGnBu', 'value': 'RdYlGnBu'})
 
-# Stand in function. I will create a simpler class out of this...
-def makeMap(time_range, function, colorscale, reverse, choice):    
-    # time_range, function, colorscale, reverse_override, choice
-    # Split time range up
-    year_range = time_range[0]
-    month_range = time_range[1]
-    y1 = year_range[0]
-    y2 = year_range[1]
-    if y1 == y2:
-        m1 = month_range[0]
-        m2 = month_range[1]
-    else:
-        m1 = 1
-        m2 = 12
-
-    # Get numpy arrays
-    if function not in ['mean_original', 'omin', 'omax', 'ocv']:
-        array_path = os.path.join(
-                data_path, "data/droughtindices/netcdfs/percentiles",
-                choice + '.nc')
-        indexlist = xr.open_dataset(array_path)
-
-        # Get total Min and Max Values for colors
-        dmin = 0
-        dmax = 1
-
-        # filter by date
-        d1 = dt.datetime(y1, m1, 1)
-        d2 = dt.datetime(y2, m2, 1)
-        arrays = indexlist.sel(time=slice(d1, d2))
-
-        # Apply chosen funtion
-        if function == 'mean_perc':
-            data = arrays.mean('time')
-            array = data.value.data
-            array[array == 0] = np.nan
-            array = array*mask
-        elif function == 'max':
-            data = arrays.max('time')
-            array = data.value.data
-            array[array == 0] = np.nan
-            array = array*mask
-        else:
-            data = arrays.min('time')
-            array = data.value.data
-            array[array == 0] = np.nan
-            array = array*mask
-
-        # Colors - Default is USDM style, sort of
-        if colorscale == 'Default':
-            colorscale = RdWhBu
-
-        if 'eddi' in choice:
-            reverse = True
-        else:
-            reverse = False
-
-    else:  # Using original values
-        array_path = os.path.join(
-                data_path, "data/droughtindices/netcdfs",
-                choice + '.nc')
-
-        indexlist = xr.open_dataset(array_path)
-
-        # Get total Min and Max Values for colors
-        values = indexlist.value.data
-        values[values == 0] = np.nan
-        limits = [abs(np.nanmin(values)), abs(np.nanmax(values))]
-        dmax = max(limits)
-        dmin = dmax*-1
-
-        # Filter by Date
-        d1 = dt.datetime(y1, m1, 1)
-        d2 = dt.datetime(y2, m2, 1)
-        arrays = indexlist.sel(time=slice(d1, d2))
-
-        # Apply chosen funtion
-        if function == 'mean_original':
-            data = arrays.mean('time')
-            array = data.value.data
-            array = array*mask
-            if colorscale == 'Default':
-                colorscale = RdYlGnBu
-            if 'eddi' in choice:
-                reverse = True
-            else:
-                reverse = False
-        elif function == 'omax':
-            data = arrays.max('time')
-            array = data.value.data
-            array[array == 0] = np.nan
-            array = array*mask
-            if colorscale == 'Default':
-                colorscale = RdYlGnBu
-            if 'eddi' in choice:
-                reverse = True
-            else:
-                reverse = False
-        elif function == 'omin':
-            data = arrays.min('time')
-            array = data.value.data
-            array[array == 0] = np.nan
-            array = array*mask
-            if colorscale == 'Default':
-                colorscale = RdYlGnBu
-            if 'eddi' in choice:
-                reverse = True
-            else:
-                reverse = False
-        elif function == 'ocv':
-            numpy_arrays = arrays.value.data
-            array = calculateCV(numpy_arrays)
-            array = array*mask
-            if colorscale == 'Default':
-                colorscale = 'Portland'
-            reverse = False
-
-    # With an object as a value the label is left blank? Not sure why?
-    if colorscale == 'RdWhBu':
-        colorscale = RdWhBu
-    if colorscale == 'RdYlGnBu':
-        colorscale = RdYlGnBu
-
-    dates = arrays.time.data
-    arrays = arrays.value.data
-    return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
-
-
 # Year Marks for Slider
-years = [int(y) for y in range(startyear, 2018)]
+years = [int(y) for y in range(1948, 2018)]
 yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
@@ -334,23 +204,8 @@ for y in yearmarks:
 source = xr.open_dataarray(os.path.join(data_path,
                                         "data/droughtindices/source_array.nc"))
 
-# Create Coordinate index positions from xarray
-# Geometry
-x_length = source.shape[2]
-y_length = source.shape[1]
-res = source.res[0]
-lon_min = source.transform[0]
-lat_max = source.transform[3] - res
-
-# Make dictionaires with coordinates and array index positions
-xs = range(x_length)
-ys = range(y_length)
-lons = [lon_min + res*x for x in xs]
-lats = [lat_max - res*y for y in ys]
-londict = dict(zip(lons, xs))
-latdict = dict(zip(lats, ys))
-londict2 = {y: x for x, y in londict.items()}
-latdict2 = {y: x for x, y in latdict.items()}
+# This converts array coordinates into array positions
+londict, latdict, res = functions.coordinateDictionaries(source)
 
 # Map Layout:
 # Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
@@ -425,7 +280,7 @@ app.layout = html.Div([
                      html.Div([dcc.RangeSlider(
                                  id='year_slider',
                                  value=[1985, 2017],
-                                 min=startyear,
+                                 min=1948,
                                  max=2017,
                                  marks=yearmarks)],
                               style={'margin-top': '0',
@@ -448,7 +303,6 @@ app.layout = html.Div([
                      className="row",
                      style={'margin-bottom': '55'}),
 
-
             # Options
             html.Div([
                 # Maptype
@@ -466,15 +320,6 @@ app.layout = html.Div([
                          dcc.RadioItems(id='function_choice',
                                         options=function_options,
                                         value='mean_perc')],
-                         className='three columns'),
-
-                # Syncing locations on click
-                html.Div([
-                        html.H3("Sync Click Locations"),
-                        dcc.RadioItems(id='click_sync',
-                                       options=[{'label': 'Yes', 'value': 'yes'},
-                                                {'label': 'No', 'value': 'no'}],
-                                       value='yes')],
                          className='three columns'),
 
                 # Customize Color Scales
@@ -496,25 +341,32 @@ app.layout = html.Div([
                style={'margin-bottom': '50',
                       'margin-top': '0'}),
 
-            # Submit button
-            html.Div([
-                    html.Button(id='submit',
-                                children='Submit Options',
-                                type='button',
-                                title='It updates automatically without this.')]),
-                    # html.Hr(),
-
             # Break
             html.Hr(),
         ]),
 
         # Toggle Options
         html.Div([
-                html.Button(id='toggle_options',
-                            children='Toggle Options On/Off',
+                html.Button(id='submit',
+                            children='Submit Options',
                             type='button',
-                            title='Click to collapse the options above')],
-                style={'margin-buttom': '50'}),
+                            title='It updates automatically without this.',
+                            style={'background-color':'#3168ce',
+                                   'color': 'white',
+                                   'margin-right': '20'}),
+                html.Button(id='toggle_options',
+                            children='Toggle Options: Off',
+                            type='button',
+                            title='Click to collapse the options above'),
+                html.Button(id="click_sync",
+                            children="Click Syncing: On",
+                            title=("Toggle this on and off to sync the " +
+                                    "location of the time series between each" +
+                                    "map"),
+                            style={'background-color': '#c7d4ea',
+                                    'border-radius': '4px'})],
+                style={'margin-buttom': '50',}),
+
         # Break
         html.Br(style={'line-height': '150%'}),
 
@@ -532,14 +384,19 @@ app.layout = html.Div([
         html.Div(id='click_store',
                  # children=['{"points": [{"lon": -107.5, "lat": 40.5}]}'],
                  style={'display': 'none'}),
-        html.Div(id='cache_1', children='1', style={'display': 'none'}),
-        html.Div(id='cache_2', children='2', style={'display': 'none'}),
-        html.Div(id='cache_3', children='3', style={'display': 'none'}),
-        html.Div(id='cache_4', children='4', style={'display': 'none'}),
+        html.Div(id='key_1', children='1', style={'display': 'none'}),
+        html.Div(id='key_2', children='2', style={'display': 'none'}),
+        html.Div(id='key_3', children='3', style={'display': 'none'}),
+        html.Div(id='key_4', children='4', style={'display': 'none'}),
         html.Div(id='time_1', style={'display': 'none'}),
         html.Div(id='time_2', style={'display': 'none'}),
         html.Div(id='time_3', style={'display': 'none'}),
         html.Div(id='time_4', style={'display': 'none'}),
+        html.Div(id='cache_check_1', style={'display': 'none'}),
+        html.Div(id='cache_check_2', style={'display': 'none'}),
+        html.Div(id='cache_check_3', style={'display': 'none'}),
+        html.Div(id='cache_check_4', style={'display': 'none'}),
+
 
 
         # The end!
@@ -547,72 +404,63 @@ app.layout = html.Div([
 
 
 # In[]: App callbacks
-# @cache.memoize(timeout=timeout)
-def global_store1(signal):
+def makeMap(signal, choice):
+    '''
+    To choose which function to return from Index_Maps
+    '''
     gc.collect()
-    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
+
+    [time_range, function, colorscale, reverse] = signal
+
+    maps = Index_Maps(time_range, colorscale, reverse, choice)
+
+    if function == "mean_original":
+        data = maps.meanOriginal()
+    if function == "omax":
+        data = maps.maxOriginal()
+    if function == "omin":
+        data = maps.minOriginal()
+    if function == "mean_perc":
+        data = maps.meanPercentile()
+    if function == "max":
+        data = maps.maxPercentile()
+    if function == "min":
+        data = maps.minPercentile()
+    if function == "ocv":
+        data = maps.coefficientVariation()
+    
     return data
 
 
-def retrieve_data1(signal):
-    # cache.delete_memoized(global_store1)  # Is it even doing anything anymore?
-    data = global_store1(signal)
-    return data
+@cache1.memoize
+def retrieve_data1(signal, choice):
+    return makeMap(signal, choice)
 
 
-def retrieve_time1(signal):
-    data = global_store1(signal)
-    return data
+@cache2.memoize
+def retrieve_data2(signal, choice):
+    return makeMap(signal, choice)
 
 
-# @cache.memoize(timeout=timeout)
-def global_store2(signal):
-    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
-    return data
+@cache3.memoize
+def retrieve_data3(signal, choice):
+    return makeMap(signal, choice)
 
 
-def retrieve_data2(signal):
-    # cache.delete_memoized(global_store2)
-    data = global_store2(signal)
-    return data
+@cache4.memoize
+def retrieve_data4(signal, choice):
+    return makeMap(signal, choice)
 
 
-def retrieve_time2(signal):
-    data = global_store2(signal)
-    return data
-
-
-# @cache.memoize(timeout=timeout)
-def global_store3(signal):
-    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
-    return data
-
-
-def retrieve_data3(signal):
-    # cache.delete_memoized(global_store3)
-    data = global_store3(signal)
-    return data
-
-
-def retrieve_time3(signal):
-    data = global_store3(signal)
-    return data
-
-# @cache.memoize(timeout=timeout)
-def global_store4(signal):
-    data = makeMap(signal[0], signal[1], signal[2], signal[3], signal[4])
-    return data
-
-
-def retrieve_data4(signal):
-    # cache.delete_memoized(global_store4)
-    data = global_store4(signal)
-    return data
-
-
-def retrieve_time4(signal):
-    data = global_store4(signal)
-    return data
+def chooseCache(key, signal, choice):
+    if key == '1':
+        return retrieve_data1(signal, choice)
+    elif key == '2':
+        return retrieve_data2(signal, choice)
+    elif key == '3':
+        return retrieve_data3(signal, choice)
+    else:
+        return retrieve_data4(signal, choice)
 
 
 # Store data in the cache and hide the signal to activate it in the hidden div
@@ -623,19 +471,17 @@ def retrieve_time4(signal):
                State('reverse', 'value'),
                State('year_slider', 'value'),
                State('month', 'value'),
-               State('map_type', 'value'),
-               State('click_sync', 'value')])
+               State('map_type', 'value')])
 def submitSignal(click, function, colorscale, reverse, year_range,
-                 month_range, map_type, click_sync):
+                 month_range, map_type):
 
-    print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
-                                           psutil.virtual_memory().percent))
     if not month_range:
         month_range = [1, 1]
-    return json.dumps([[year_range, month_range], function,
-                       colorscale, reverse, map_type, click_sync])
+    signal = [[year_range, month_range], function,
+                       colorscale, reverse, map_type]
+    return json.dumps(signal)
 
-
+    
 # Allow users to select a month range if the year slider is set to one year
 @app.callback(Output('month_slider', 'style'),
               [Input('year_slider', 'value')])
@@ -659,6 +505,56 @@ def toggleOptions(click):
     return style
 
 
+@app.callback(Output('toggle_options', 'style'),
+              [Input('toggle_options', 'n_clicks')])
+def toggleToggleColor(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        style = {'background-color': '#a8b3c4',
+                  'border-radius': '4px'}
+    else:
+        style = {'background-color': '#c7d4ea',
+                  'border-radius': '4px'}
+    return style
+
+@app.callback(Output('toggle_options', 'children'),
+              [Input('toggle_options', 'n_clicks')])
+def toggleOptionsLabel(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = "Display Options: Off"
+    else:
+        children = "Display Options: On"
+    return children
+
+@app.callback(Output('click_sync', 'style'),
+              [Input('click_sync', 'n_clicks')])
+def toggleSyncColor(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        style = {'background-color': '#c7d4ea',
+                 'border-radius': '4px'}
+    else:
+        style = {'background-color': '#a8b3c4',
+                  'border-radius': '4px'}
+    return style
+
+
+@app.callback(Output('click_sync', 'children'),
+              [Input('click_sync', 'n_clicks')])
+def toggleSyncLabel(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = "Click Syncing: On"
+    else:
+        children = "Click Syncing: Off"
+    return children
+
+
 @app.callback(Output('click_store', 'children'),
               [Input('map_1', 'clickData'),
                Input('map_2', 'clickData'),
@@ -668,7 +564,7 @@ def toggleOptions(click):
                Input('time_2', 'children'),
                Input('time_3', 'children'),
                Input('time_4', 'children')],
-              [State('click_sync', 'value')])
+              [State('click_sync', 'children')])
 def clickPicker(click1, click2, click3, click4,
                 time1, time2, time3, time4,
                 click_sync):
@@ -676,15 +572,14 @@ def clickPicker(click1, click2, click3, click4,
     times = [time1, time2, time3, time4]
     times = [0 if t is None else t for t in times]
     index = times.index(max(times))
-    if click_sync == 'yes':
+    if 'On' in click_sync:
         if not any(c is not None for c in clicks):
             click = {'points': [{'lon': -107.75, 'lat': 40.5}]}
         else:
             click = clicks[index]
         return json.dumps(click)
     else:
-        return json.dumps(index + 1)
-
+        return(json.dumps(clicks))
 
 # In[] For the future
 for i in range(1, 5):
@@ -694,29 +589,38 @@ for i in range(1, 5):
         clicktime = time.time()
         return(clicktime)
 
-    @app.callback(Output("map_{}".format(i), 'figure'),
-                  [Input('cache_{}'.format(i), 'children'),
+    @app.callback(Output('cache_check_{}'.format(i), 'children'),
+                  [Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
-                   Input('signal', 'children')])
-    def makeGraph(cache, choice, signal):
+                   Input('key_{}'.format(i), 'children')])
+    def storeData(signal, choice, key):
+        signal = json.loads(signal)
+        signal.pop(4)
+        chooseCache(key, signal, choice)
+        print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
+                                       psutil.virtual_memory().percent))
+        key = json.dumps([signal, choice])
+        return key
 
-        print("Rendering Map #{}".format(int(cache)))
-        print(signal)
+
+    @app.callback(Output("map_{}".format(i), 'figure'),
+                  [Input('cache_check_{}'.format(i), 'children')],
+                  [State('key_{}'.format(i), 'children'),
+                   State('choice_{}'.format(i), 'value'),
+                   State('signal', 'children')])
+    def makeGraph(trigger, key, choice, signal):
+
+        print("Rendering Map #{}".format(int(key)))
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
-        # Original signal order: [[year_range, month_range], function,
-                                 # colorscale, reverse, map_type, click_sync]
+
         # Create signal for the global_store
-        signal = json.loads(signal)  # [[[2000, 2017], [1,12]], 'mean_perc', 'Viridis', 'no', 'light', 'yes']
-        signal.append(choice)
+        signal = json.loads(signal)
 
         # Collect and adjust signal
         [[year_range, month_range], function, colorscale,
-         reverse_override, map_type, click_sync, choice] = signal
-        # signal = [[[2000, 2017], [1, 12]], 'mean_perc',
-        #             'Viridis', 'no', 'light', 'yes', 'pdsi']
-        signal.pop(4)
+         reverse_override, map_type] = signal
         signal.pop(4)
 
         # Split the time range up
@@ -726,20 +630,11 @@ for i in range(1, 5):
         m2 = month_range[1]
 
         # Get data - check which cache first
-        if cache == '1':
-            [[array, arrays, dates],
-             colorscale, dmax, dmin, reverse] = retrieve_data1(signal)
-        elif cache == '2':
-            [[array, arrays, dates],
-             colorscale, dmax, dmin, reverse] = retrieve_data2(signal)
-        elif cache == '3':
-            [[array, arrays, dates],
-             colorscale, dmax, dmin, reverse] = retrieve_data3(signal)
-        else:
-            [[array, arrays, dates],
-             colorscale, dmax, dmin, reverse] = retrieve_data4(signal)
+        print(json.dumps([signal, choice]))
+        [[array, arrays, dates],
+         colorscale, dmax, dmin, reverse] = chooseCache(key, signal, choice)
 
-        # There a lot of colorscale switching in the default settings
+        # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
             reverse = not reverse
 
@@ -826,13 +721,15 @@ for i in range(1, 5):
         figure = dict(data=data, layout=layout_copy)
         return figure
 
+
     @app.callback(Output('series_{}'.format(i), 'figure'),
                   [Input("map_{}".format(i), 'clickData'),
                    Input('click_store', 'children'),
-                   Input('cache_{}'.format(i), 'children'),
-                   Input('choice_{}'.format(i), 'value'),
-                   Input('signal', 'children')])
-    def makeSeries(single_click, click, cache, choice, signal):
+                   Input('signal', 'children'),
+                   Input('choice_{}'.format(i), 'value')],
+                  [State('key_{}'.format(i), 'children'),
+                   State('click_sync', 'children')])
+    def makeSeries(single_click, click, signal, choice,  key, sync):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
@@ -840,47 +737,39 @@ for i in range(1, 5):
         '''
 
         # Create signal for the global_store
-        signal = json.loads(signal) #[[[2000, 2017], [1,12]], 'mean_perc', 'Viridis', 'no', 'light', 'yes']
-        signal.append(choice)
+        signal = json.loads(signal) 
+        # [[year_range, month_range], function, colorscale, reverse, map_type, click_sync]
 
         # Collect signals
         [[year_range, month_range], function, colorscale,
-         reverse_override, map_type, sync, choice] = signal
-        signal.pop(4)
+         reverse_override, map_type] = signal
         signal.pop(4)
 
+        # [[year_range, month_range], function, colorscale, reverse, map_type, click_sync, 'pdsi']
+
         # Get data - check which cache first
-        if cache == '1':
-            [[array, arrays, dates],
-             colorscale, dmax, dmin, reverse] = retrieve_time1(signal)
-        elif cache == '2':
-            [[array, arrays, dates],
-             colorscale, dmax, dmin, reverse] = retrieve_time2(signal)
-        elif cache == '3':
-            [[array, arrays, dates],
-             colorscale, dmax, dmin, reverse] = retrieve_time3(signal)
-        else:
-            [[array, arrays, dates],
-             colorscale, dmax, dmin, reverse] = retrieve_time4(signal)
+        print(json.dumps([signal, choice]))
+        [[array, arrays, dates],
+         colorscale, dmax, dmin, reverse] = chooseCache(key, signal, choice)
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
             reverse = not reverse
 
         #  Check if we are syncing clicks
-        if sync == 'yes':
-            click = json.loads(click)  
+        click = json.loads(click)  
+        if 'On' in sync:
+            click=click
         else:
-            if cache == click:
-                if single_click is None:
-                    click = {"points": [{"lon": -107.5, "lat": 40.5}]}
-                else:
-                    click = single_click
-            else:
-                raise PreventUpdate
-
-        print("Rendering Time Series #{}".format(int(cache)))
-        print("#################### Line 882: " + str(click))
+            index = int(key) - 1
+            if single_click is None:
+                click = click[index]
+                # click = {"points": [{"lon": -107.5, "lat": 40.5}]}
+            elif single_click is not None:
+                click = single_click
+      
+        if click is None:
+            raise PreventUpdate
 
         lon = click['points'][0]['lon']
         lat = click['points'][0]['lat']
@@ -922,12 +811,12 @@ for i in range(1, 5):
         layout_copy['paper_bgcolor'] = "white"
         layout_copy['height'] = 250
         layout_copy['yaxis'] = yaxis
+        layout_copy['hovermode'] = 'closest',
         layout_copy['titlefont']['color'] = '#636363'
         layout_copy['font']['color'] = '#636363'
         figure = dict(data=data, layout=layout_copy)
 
         return figure
-
 
 # In[]
 # @app.callback(Output('banner', 'src'),
