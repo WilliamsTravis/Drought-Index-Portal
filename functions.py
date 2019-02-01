@@ -26,7 +26,7 @@ if platform == 'win32':
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 else:
     home_path = '/root/Sync'
-    data_path = '/root'
+    data_path = '/root/Sync'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 
 
@@ -89,7 +89,7 @@ def coordinateDictionaries(source):
     res = source.res[0]
     lon_min = source.transform[0]
     lat_max = source.transform[3] - res
-    
+
     # Make dictionaires with coordinates and array index positions
     xs = range(x_length)
     ys = range(y_length)
@@ -105,10 +105,9 @@ class Index_Maps():
     '''
     This class creates a singular map as a function of some timeseries of
         rasters for use in the Ubuntu-Practice-Machine index comparison app.
-        It also returns information needed for rendering. 
+        It also returns information needed for rendering.
 
         Initializing arguments:
-            
             timerange (list)    = [[Year1, Year2], [Month1, Month2]]
             function (string)   = 'mean_perc': 'Average Percentiles',
                                   'max': 'Maxmium Percentile',
@@ -122,7 +121,7 @@ class Index_Maps():
                                   'spei3', 'spei6', 'eddi1', 'eddi2', 'eddi3',
                                   'eddi6'
         Each function returns:
-    
+
             array      = Singular 2D Numpy array of function output
             arrays     = Timeseries of 2D Numpy arrays within time range
             dates      = List of Posix time stamps

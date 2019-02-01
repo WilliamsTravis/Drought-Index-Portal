@@ -37,10 +37,7 @@ if sys.platform == 'win32':
 else:
     home_path = '/root/Sync'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
-    data_path = '/root'
-
-# sys.path.insert(0, os.path.join(home_path,
-#                                 'Ubuntu-Practice-Machine', 'scripts'))
+    data_path = '/root/Sync'
 
 import functions
 from functions import Index_Maps
@@ -133,7 +130,6 @@ grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
 counties_df = pd.read_csv("data/counties.csv")
 counties_df = counties_df[['grid', 'county', 'state']]
-# counties_df['grid'] = counties_df['grid'].astype(str)
 counties_df['place'] = (counties_df['county'] +
                         ' County, ' + counties_df['state'])
 
@@ -142,9 +138,16 @@ with np.load("data/NA_overlay.npz") as data:
     na = data.f.arr_0
     data.close()
 
-# Make the color scale stand out 
+# Make the color scale stand out
 for i in range(na.shape[0]):
     na[i] = na[i]*i
+
+# Default click before the first click for any map
+default_click = {'points': [{'lon': -107.75, 'lat': 40.5}]}
+
+# Default for click store (includes an index for most recent click)
+default_clicks = [list(np.repeat(default_click, 4)), 0]
+default_clicks = json.dumps(default_clicks)
 
 # In[] The map
 # Mapbox Access
@@ -253,17 +256,15 @@ def divMaker(id_num, index='noaa'):
               ], className='six columns')
     return div
 
+# For making outlines...move to css
+def outLine(color, width):
+    string = ('-{1}px -{1}px 0 {0}, {1}px -{1}px 0 {0}, ' +
+              '-{1}px {1}px 0 {0}, {1}px {1}px 0 {0}').format(color, width)
+    return string
 
 # In[]: Create App Layout
 app.layout = html.Div([
-        # html.Div([
-        #         html.Img(id='banner',
-        #                  src=('https://github.com/WilliamsTravis/' +
-        #                       'Ubuntu-Practice-Machine/blob/master/images/' +
-        #                       'banner1.png?raw=true'),
-        #                  style={'width': '100%',
-        #                         'box-shadow': '1px 1px 1px 1px black'})]),
-        # html.Hr(),
+        # Title
         html.Div([html.H1('Raster to Scatterplot Visualization'),
                   html.Hr()],
                  className='twelve columns',
@@ -272,16 +273,49 @@ app.layout = html.Div([
                         'font-size': '50px',
                         'font-family': 'Times New Roman'}),
 
+        # Toggle Options
+        html.Div([
+                html.Button(id='toggle_options',
+                            children='Toggle Options: Off',
+                            type='button',
+                            title='Click to collapse the options above'),
+                html.Button(id="desc_button",
+                            children="Project Description: Off",
+                            title=("Toggle this on and off to show a " +
+                                    "description of the project with " +
+                                    "some instructions."),
+                            style={'background-color': '#c7d4ea',
+                                    'border-radius': '4px'}),
+                html.Button(id="click_sync",
+                            children="Location Syncing: On",
+                            title=("Toggle this on and off to sync the " +
+                                    "location of the time series between each" +
+                                    "map"),
+                            style={'background-color': '#c7d4ea',
+                                   'border-radius': '4px',
+                                   'margin-bottom': '30'})],
+                style={'margin-bottom': '30',
+                       'text-align': 'center',
+                       }),
+        html.Div([html.Div([dcc.Markdown(id='description')],
+                            style={'text-align':'center',
+                                   'width':'70%',
+                                   'margin':'0px auto'})],
+                   style={'text-align':'center',
+                          'margin': '0 auto',
+                          'width': '100%'}),
         # Year Slider
         html.Div(id='options',
                  children=[
                      html.Div([
-                     html.H3('Study Period Year Range'),
+                     html.H3(id='date_range',
+                             children=['Study Period Year Range']),
                      html.Div([dcc.RangeSlider(
                                  id='year_slider',
                                  value=[1985, 2017],
                                  min=1948,
                                  max=2017,
+                                 updatemode='drag',
                                  marks=yearmarks)],
                               style={'margin-top': '0',
                                      'margin-bottom': '40'}),
@@ -289,15 +323,16 @@ app.layout = html.Div([
                      # Month Slider
                      html.Div(id='month_slider',
                               children=[
-                                      html.H3('Month Range'),
+                                      html.H3(id='month_range',
+                                              children=['Month Range']),
                                       html.Div([
                                                dcc.RangeSlider(id='month',
                                                                value=[1, 12],
                                                                min=1, max=12,
+                                                               updatemode='drag',
                                                                marks=monthmarks)],
                                                style={'width': '35%'})],
                               style={'display': 'none'},
-                              # className="six columns"
                               )
                      ],
                      className="row",
@@ -335,37 +370,32 @@ app.layout = html.Div([
                                                 {'label': 'No',
                                                  'value': 'no'}],
                                        value='no')],
-                         className='two columns')
+                         className='two columns'),
                 ],
                className='row',
                style={'margin-bottom': '50',
                       'margin-top': '0'}),
 
-            # Break
-            html.Hr(),
         ]),
 
-        # Toggle Options
-        html.Div([
-                html.Button(id='submit',
-                            children='Submit Options',
-                            type='button',
-                            title='It updates automatically without this.',
-                            style={'background-color':'#3168ce',
-                                   'color': 'white',
-                                   'margin-right': '20'}),
-                html.Button(id='toggle_options',
-                            children='Toggle Options: Off',
-                            type='button',
-                            title='Click to collapse the options above'),
-                html.Button(id="click_sync",
-                            children="Click Syncing: On",
-                            title=("Toggle this on and off to sync the " +
-                                    "location of the time series between each" +
-                                    "map"),
-                            style={'background-color': '#c7d4ea',
-                                    'border-radius': '4px'})],
-                style={'margin-buttom': '50',}),
+        # Break line
+        html.Hr(),
+
+        # Submission Button
+        html.Div([html.Button(id='submit',
+                    children='Submit Options',
+                    type='button',
+                    title='It updates automatically without this.',
+                    style={'background-color':'rgb(3,101,224)',
+                           'color': 'white',
+                           'text-align':'center',
+                           'margin': '0 auto',
+                           'max-width': '20%',
+                           'text-shadow': outLine('black', .5)})],
+                    style={'text-align':'center',
+                           'margin': '0 auto',
+                           'width': '100%',
+                           'margin-buttom': '50',}),
 
         # Break
         html.Br(style={'line-height': '150%'}),
@@ -382,7 +412,7 @@ app.layout = html.Div([
         # Signals
         html.Div(id='signal', style={'display': 'none'}),
         html.Div(id='click_store',
-                 # children=['{"points": [{"lon": -107.5, "lat": 40.5}]}'],
+                  children=default_clicks,
                  style={'display': 'none'}),
         html.Div(id='key_1', children='1', style={'display': 'none'}),
         html.Div(id='key_2', children='2', style={'display': 'none'}),
@@ -396,8 +426,7 @@ app.layout = html.Div([
         html.Div(id='cache_check_2', style={'display': 'none'}),
         html.Div(id='cache_check_3', style={'display': 'none'}),
         html.Div(id='cache_check_4', style={'display': 'none'}),
-
-
+        html.Div(id='choice_store', style={'display': 'none'}),
 
         # The end!
         ], className='ten columns offset-by-one')
@@ -428,7 +457,7 @@ def makeMap(signal, choice):
         data = maps.minPercentile()
     if function == "ocv":
         data = maps.coefficientVariation()
-    
+
     return data
 
 
@@ -481,7 +510,7 @@ def submitSignal(click, function, colorscale, reverse, year_range,
                        colorscale, reverse, map_type]
     return json.dumps(signal)
 
-    
+
 # Allow users to select a month range if the year slider is set to one year
 @app.callback(Output('month_slider', 'style'),
               [Input('year_slider', 'value')])
@@ -549,10 +578,75 @@ def toggleSyncLabel(click):
     if not click:
         click = 0
     if click % 2 == 0:
-        children = "Click Syncing: On"
+        children = "Location Syncing: On"
     else:
-        children = "Click Syncing: Off"
+        children = "Location Syncing: Off"
     return children
+
+
+@app.callback(Output('description', 'children'),
+              [Input('desc_button', 'n_clicks')])
+def toggleDescription(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = ""
+    else:
+        children = open('data/description.txt').read()
+    return children
+
+
+@app.callback(Output('desc_button', 'style'),
+              [Input('desc_button', 'n_clicks')])
+def toggleDescColor(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        style = {'background-color': '#a8b3c4',
+                  'border-radius': '4px'}
+    else:
+        style = {'background-color': '#c7d4ea',
+                 'border-radius': '4px'}
+    return style
+
+
+@app.callback(Output('desc_button', 'children'),
+              [Input('desc_button', 'n_clicks')])
+def toggleDescLabel(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = "Description: Off"
+    else:
+        children = "Description: On"
+    return children
+
+@app.callback(Output('date_range', 'children'),
+              [Input('year_slider', 'value')])
+def printYearRange(years):
+    if years[0] != years[1]:
+        string = 'Study Period Year Range: {} - {}'.format(years[0], years[1])
+    else:
+        string = 'Study Period Year Range: {}'.format(years[0])
+    return string
+
+@app.callback(Output('month_range', 'children'),
+              [Input('month', 'value')])
+def printMonthRange(months):
+    if months[0] != months[1]:
+        string = 'Month Range: {} - {}'.format(monthmarks[months[0]],
+                                               monthmarks[months[1]])
+    else:
+        string = 'Month Range: {}'.format(monthmarks[months[0]])
+    return string
+
+@app.callback(Output('choice_store', 'children'),
+              [Input('choice_1', 'value'),
+               Input('choice_2', 'value'),
+               Input('choice_3', 'value'),
+               Input('choice_4', 'value')])
+def choiceStore(choice1, choice2, choice3, choice4):
+    return (json.dumps([choice1, choice2, choice3, choice4]))
 
 
 @app.callback(Output('click_store', 'children'),
@@ -564,22 +658,32 @@ def toggleSyncLabel(click):
                Input('time_2', 'children'),
                Input('time_3', 'children'),
                Input('time_4', 'children')],
-              [State('click_sync', 'children')])
+               # Input('choice', 'value')
+              [State('click_sync', 'children'),
+               State('click_store', 'children')])
 def clickPicker(click1, click2, click3, click4,
                 time1, time2, time3, time4,
-                click_sync):
-    clicks = [click1, click2, click3, click4]
+                click_sync, old_clicks):
+
+    # A list of individual clicks
+    new_clicks = [click1, click2, click3, click4]
+    clicks = [c if c is not None else default_click for c in new_clicks]
+
+    # A list of times for each click
     times = [time1, time2, time3, time4]
-    times = [0 if t is None else t for t in times]
+
+    # The index position of the last click
     index = times.index(max(times))
-    if 'On' in click_sync:
-        if not any(c is not None for c in clicks):
-            click = {'points': [{'lon': -107.75, 'lat': 40.5}]}
-        else:
-            click = clicks[index]
-        return json.dumps(click)
+
+    # if there are any clicks with a None value?
+    if not any(c is not None for c in clicks):
+        clicks = [list(np.repeat(default_click, 4)), index]
     else:
-        return(json.dumps(clicks))
+        clicks = [clicks, index]
+
+    # return the list of current clicks with the recent index
+    return json.dumps(clicks)
+
 
 # In[] For the future
 for i in range(1, 5):
@@ -633,6 +737,12 @@ for i in range(1, 5):
         print(json.dumps([signal, choice]))
         [[array, arrays, dates],
          colorscale, dmax, dmin, reverse] = chooseCache(key, signal, choice)
+
+        # Need to figure out he best way to allow custom colors
+        if colorscale == 'RdWhBu':
+            colorscale = RdWhBu
+        if colorscale == 'RdYlGnBu':
+            colorscale = RdYlGnBu
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
@@ -728,27 +838,49 @@ for i in range(1, 5):
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value')],
                   [State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children')])
-    def makeSeries(single_click, click, signal, choice,  key, sync):
+                   State('click_sync', 'children'),
+                   State('choice_store', 'children')])
+    def makeSeries(single_click, clicks, signal, choice,  key, sync,
+                   choice_store):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
          synced click process is too slow...what can be done?
         '''
+        #  Check if we are syncing clicks, prevent update if needed
+
+        print("Rendering Time Series #" + key)
+        clicks = json.loads(clicks)
+        index = clicks[1]
+        choice_store = json.loads(choice_store)
+
+
+        if 'On' in sync:
+            clicks = clicks[0]
+            click = clicks[index]
+        if 'Off' in sync:
+            if str(index+1) == key or choice_store[int(key)-1] != choice:
+                clicks = clicks[0]
+                click = single_click
+            else:
+                print("Skipping Time series #" + key)
+                raise PreventUpdate
 
         # Create signal for the global_store
-        signal = json.loads(signal) 
-        # [[year_range, month_range], function, colorscale, reverse, map_type, click_sync]
+        signal = json.loads(signal)
 
         # Collect signals
         [[year_range, month_range], function, colorscale,
          reverse_override, map_type] = signal
         signal.pop(4)
 
-        # [[year_range, month_range], function, colorscale, reverse, map_type, click_sync, 'pdsi']
+        # Need to figure out he best way to allow custom colors
+        if colorscale == 'RdWhBu':
+            colorscale = RdWhBu
+        if colorscale == 'RdYlGnBu':
+            colorscale = RdYlGnBu
 
         # Get data - check which cache first
-        print(json.dumps([signal, choice]))
         [[array, arrays, dates],
          colorscale, dmax, dmin, reverse] = chooseCache(key, signal, choice)
 
@@ -756,21 +888,7 @@ for i in range(1, 5):
         if reverse_override == 'yes':
             reverse = not reverse
 
-        #  Check if we are syncing clicks
-        click = json.loads(click)  
-        if 'On' in sync:
-            click=click
-        else:
-            index = int(key) - 1
-            if single_click is None:
-                click = click[index]
-                # click = {"points": [{"lon": -107.5, "lat": 40.5}]}
-            elif single_click is not None:
-                click = single_click
-      
-        if click is None:
-            raise PreventUpdate
-
+        # Find array position and county
         lon = click['points'][0]['lon']
         lat = click['points'][0]['lat']
         x = londict[lon]
@@ -817,6 +935,7 @@ for i in range(1, 5):
         figure = dict(data=data, layout=layout_copy)
 
         return figure
+
 
 # In[]
 # @app.callback(Output('banner', 'src'),

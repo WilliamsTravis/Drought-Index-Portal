@@ -79,6 +79,6 @@ fi
 #       2) Is https allowed? If Nginx HTTP is instead do this:
 #		sudo ufw all 'Nginx Full'
 #		sudo ufw delete allow 'Nginx HTTP'
-#  11) Get certificate 
+#  11) Get certificate
 #	1) sudo certbot --nginx -d <domain_name>
 #  12) If this works setup the automatic renewal process with crontab
