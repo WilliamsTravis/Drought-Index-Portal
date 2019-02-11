@@ -18,8 +18,8 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 import dash_core_components as dcc
 import dash_html_components as html
-import datetime as dt
 import gc
+from inspect import currentframe, getframeinfo
 import json
 import pandas as pd
 import numpy as np
@@ -27,20 +27,23 @@ import psutil
 import time
 import warnings
 import xarray as xr
-warnings.filterwarnings("ignore")
 
-# Check if we are working in Windows or Linux
-if sys.platform == 'win32':
-    home_path = 'z:/Sync'
-    data_path = 'd:/'
-    os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
-else:
-    home_path = '/root/Sync'
-    os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
-    data_path = '/root/Sync'
+# Where should this go?
+f = getframeinfo(currentframe()).filename
+p = os.path.dirname(os.path.abspath(f))
+os.chdir(p)
 
 import functions
 from functions import Index_Maps
+
+# Check if we are working in Windows or Linux to find the data
+if sys.platform == 'win32':
+    data_path = 'd:/'
+else:
+    data_path = '/root/Sync'
+
+# What to do with the mean of empty slice warning?
+warnings.filterwarnings("ignore")
 
 # In[] Create the DASH App object
 app = dash.Dash(__name__)
@@ -50,7 +53,7 @@ app.css.append_css({'external_url':
                     'https://codepen.io/williamstravis/pen/maxwvK.css'})
 app.scripts.config.serve_locally = True
 
-# For the Loading screen - just trying Chriddyp's for now
+# For the Loading screen
 app.css.append_css({"external_url":
                     "https://codepen.io/williamstravis/pen/EGrWde.css"})
 
@@ -167,34 +170,46 @@ maptypes = [{'label': 'Light', 'value': 'light'},
             {'label': 'Satellite', 'value': 'satellite'},
             {'label': 'Satellite Streets', 'value': 'satellite-streets'}]
 
-RdWhBu = [[0.00, 'rgb(115,0,0)'],
-          [0.10, 'rgb(230,0,0)'],
-          [0.20, 'rgb(255,170,0)'],
-          [0.30, 'rgb(252,211,127)'],
-          [0.40, 'rgb(255, 255, 0)'],
-          [0.45, 'rgb(255, 255, 255)'],
-          [0.55, 'rgb(255, 255, 255)'],
-          [0.60, 'rgb(143, 238, 252)'],
-          [0.70, 'rgb(12,164,235)'],
-          [0.80, 'rgb(0,125,255)'],
-          [0.90, 'rgb(10,55,166)'],
-          [1.00, 'rgb(5,16,110)']]
-
+RdWhBu  = [[0.00, 'rgb(115,0,0)'],
+           [0.10, 'rgb(230,0,0)'],
+           [0.20, 'rgb(255,170,0)'],
+           [0.30, 'rgb(252,211,127)'],
+           [0.40, 'rgb(255, 255, 0)'],
+           [0.45, 'rgb(255, 255, 255)'],
+           [0.55, 'rgb(255, 255, 255)'],
+           [0.60, 'rgb(143, 238, 252)'],
+           [0.70, 'rgb(12,164,235)'],
+           [0.80, 'rgb(0,125,255)'],
+           [0.90, 'rgb(10,55,166)'],
+           [1.00, 'rgb(5,16,110)']]
+RdWhBu2 = [[0.00, 'rgb(115,0,0)'],
+           [0.02, 'rgb(230,0,0)'],
+           [0.05, 'rgb(255,170,0)'],
+           [0.10, 'rgb(252,211,127)'],
+           [0.20, 'rgb(255, 255, 0)'],
+           [0.30, 'rgb(255, 255, 255)'],
+           [0.70, 'rgb(255, 255, 255)'],
+           [0.80, 'rgb(143, 238, 252)'],
+           [0.90, 'rgb(12,164,235)'],
+           [0.95, 'rgb(0,125,255)'],
+           [0.98, 'rgb(10,55,166)'],
+           [1.00, 'rgb(5,16,110)']]
 RdYlGnBu = [[0.00, 'rgb(124, 36, 36)'],
             [0.25, 'rgb(255, 255, 48)'],
             [0.5, 'rgb(76, 145, 33)'],
             [0.85, 'rgb(0, 92, 221)'],
             [1.00, 'rgb(0, 46, 110)']]
 
-colorscales = ['Blackbody', 'Bluered', 'Blues', 'Earth', 'Electric', 'Greens',
-               'Greys', 'Hot', 'Jet', 'Picnic', 'Portland', 'Rainbow', 'RdBu',
-               'Reds', 'Viridis', 'Default']
+colorscales = ['Default', 'Blackbody', 'Bluered', 'Blues', 'Earth', 'Electric',
+               'Greens', 'Greys', 'Hot', 'Jet', 'Picnic', 'Portland',
+               'Rainbow', 'RdBu', 'Reds', 'Viridis', 'RdWhBu', 'RdWhBu2',
+               'RdYlGnBu']
 color_options = [{'label': c, 'value': c} for c in colorscales]
-color_options.append({'label': 'RdWhBu', 'value': 'RdWhBu'})
-color_options.append({'label': 'RdYlGnBu', 'value': 'RdYlGnBu'})
+color_options[-2]['label'] = 'RdWhBu (NOAA PSD Scale)'
 
 # Year Marks for Slider
-years = [int(y) for y in range(1948, 2018)]
+max_year = 2019
+years = [int(y) for y in range(1948, max_year + 1)]
 yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
@@ -250,7 +265,8 @@ def divMaker(id_num, index='noaa'):
                  html.Div([dcc.Dropdown(id='choice_{}'.format(id_num),
                                         options=indices, value=index)],
                           style={'width': '30%'}),
-                 dcc.Graph(id='map_{}'.format(id_num)),
+                 dcc.Graph(id='map_{}'.format(id_num),
+                           config={'staticPlot': False}),
                  html.Div([dcc.Graph(id='series_{}'.format(id_num))]),
 
               ], className='six columns')
@@ -264,14 +280,83 @@ def outLine(color, width):
 
 # In[]: Create App Layout
 app.layout = html.Div([
+             html.Div([
+                # Sponsers
+                html.A(html.Img(
+                    src = ("https://github.com/WilliamsTravis/" +
+                            "Pasture-Rangeland-Forage/blob/master/" +
+                            "data/earthlab.png?raw=true"),
+                    className='one columns',
+                    style={
+                        'height': '40',
+                        'width': '100',
+                        'float': 'right',
+                        'position': 'static'
+                        },
+                            ),
+                        href="https://www.colorado.edu/earthlab/",
+                        target="_blank"
+                        ),
+                html.A(html.Img(
+                    src = ('https://github.com/WilliamsTravis/Pasture-' +
+                           'Rangeland-Forage/blob/master/data/' +
+                           'wwa_logo2015.png?raw=true'),
+                    className='one columns',
+                    style={
+                        'height': '50',
+                        'width': '150',
+                        'float': 'right',
+                        'position': 'static',
+                        },
+                            ),
+                        href = "http://wwa.colorado.edu/",
+                        target = "_blank"
+                            ),
+                 html.A(html.Img(
+                    src =( "https://github.com/WilliamsTravis/Pasture-" +
+                          "Rangeland-Forage/blob/master/data/" +
+                          "nidis.png?raw=true"),
+                    className='one columns',
+                    style={
+                        'height': '50',
+                        'width': '200',
+                        'float': 'right',
+                        'position': 'relative',
+                        },
+                            ),
+                        href = "https://www.drought.gov/drought/",
+                        target = "_blank"
+                        ),
+                 html.A(html.Img(
+                    src = ("https://github.com/WilliamsTravis/Pasture-" +
+                           "Rangeland-Forage/blob/master/data/" +
+                           "cires.png?raw=true"),
+                    className='one columns',
+                    style={
+                        'height': '50',
+                        'width': '100',
+                        'float': 'right',
+                        'position': 'relative',
+                        'margin-right': '20',
+                        },
+                            ),
+                        href = "https://cires.colorado.edu/",
+                        target = "_blank"
+                        ),
+
+                ],
+                className = 'row'
+                ),
+
         # Title
-        html.Div([html.H1('Raster to Scatterplot Visualization'),
+        html.Div([html.H1('Drought Index Comparison Portal'),
                   html.Hr()],
                  className='twelve columns',
                  style={'font-weight': 'bolder',
                         'text-align': 'center',
                         'font-size': '50px',
-                        'font-family': 'Times New Roman'}),
+                        'font-family': 'Times New Roman',
+                        'margin-top': '25'}),
 
         # Toggle Options
         html.Div([
@@ -312,9 +397,9 @@ app.layout = html.Div([
                              children=['Study Period Year Range']),
                      html.Div([dcc.RangeSlider(
                                  id='year_slider',
-                                 value=[1985, 2017],
+                                 value=[1985, max_year],
                                  min=1948,
-                                 max=2017,
+                                 max=max_year,
                                  updatemode='drag',
                                  marks=yearmarks)],
                               style={'margin-top': '0',
@@ -345,7 +430,7 @@ app.layout = html.Div([
                         html.H3("Map Type"),
                          dcc.RadioItems(
                                 id="map_type",
-                                value="dark",
+                                value="basic",
                                 options=maptypes)],
                          className='two columns'),
 
@@ -685,13 +770,14 @@ def clickPicker(click1, click2, click3, click4,
     return json.dumps(clicks)
 
 
-# In[] For the future
+# In[] Any callback with four parts goes here
 for i in range(1, 5):
     @app.callback(Output('time_{}'.format(i), 'children'),
                   [Input('map_{}'.format(i), 'clickData')])
     def clickTime(click):
         clicktime = time.time()
         return(clicktime)
+
 
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
                   [Input('signal', 'children'),
@@ -741,6 +827,8 @@ for i in range(1, 5):
         # Need to figure out he best way to allow custom colors
         if colorscale == 'RdWhBu':
             colorscale = RdWhBu
+        if colorscale == 'RdWhBu2':
+            colorscale = RdWhBu2
         if colorscale == 'RdYlGnBu':
             colorscale = RdYlGnBu
 
@@ -752,12 +840,13 @@ for i in range(1, 5):
         amax = np.nanmax(array)
         amin = np.nanmin(array)
 
-        # Set to this thing
-        source.data[0] = array
-
         # Because EDDI only extends back to 1980
-        if 'eddi' in choice and y1 < 1980 and y2 < 1980:
+        if len(arrays) == 0:
             source.data[0] = na
+            colorscale = [[0.0, 'rgb(50, 50, 50)'],
+                          [1.0, 'rgb(50, 50, 50)']]
+        else:
+            source.data[0] = array * mask
 
         # Now all this
         dfs = xr.DataArray(source, name="data")
@@ -780,6 +869,29 @@ for i in range(1, 5):
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
+
+        # There are several possible date ranges to display
+        if y1 != y2:
+            date_print = '{} - {}'.format(y1, y2)
+        elif y1 == y2 and m1 != m2:
+            date_print = "{} - {}, {}".format(monthmarks[m1],
+                                              monthmarks[m2], y1)
+        else:
+            date_print = "{}, {}".format(monthmarks[m1], y1)
+
+        # The y-axis depends on the chosen function
+        labels = {d['value']: d['label'] for d in function_options}
+        if 'Percentiles' in labels[function]:
+            yaxis = dict(title='Percentiles',
+                         range=[0, 100])
+            df['data'] = df['data'] * 100
+            amin = amin * 100
+            amax = amax * 100
+        elif 'Original' in labels[function]:    
+            yaxis = dict(range=[dmin, dmax],
+                         title='Index')
+        else:
+            yaxis = dict(title='C.V.')
 
         # Create the scattermapbox object
         data = [
@@ -809,21 +921,13 @@ for i in range(1, 5):
                 )
             )]
 
-        if y1 != y2:
-            date_print = '{} - {}'.format(y1, y2)
-        elif y1 == y2 and m1 != m2:
-            date_print = "{} - {}, {}".format(monthmarks[m1],
-                                              monthmarks[m2], y1)
-        else:
-            date_print = "{}, {}".format(monthmarks[m1], y1)
-
         layout_copy = copy.deepcopy(layout)
         layout_copy['mapbox'] = dict(
             accesstoken=mapbox_access_token,
             style=map_type,
             center=dict(lon=-95.7, lat=37.1),
             zoom=2)
-
+        layout_copy['yaxis'] = yaxis
         layout_copy['title'] = (indexnames[choice] + '<br>' +
                                 function_names[function] + ': ' +
                                 date_print)
@@ -874,17 +978,20 @@ for i in range(1, 5):
          reverse_override, map_type] = signal
         signal.pop(4)
 
-        # Need to figure out he best way to allow custom colors
-        if colorscale == 'RdWhBu':
-            colorscale = RdWhBu
-        if colorscale == 'RdYlGnBu':
-            colorscale = RdYlGnBu
-
         # Get data - check which cache first
         [[array, arrays, dates],
          colorscale, dmax, dmin, reverse] = chooseCache(key, signal, choice)
 
-        # There's a lot of colorscale switching in the default settings
+        # Need to figure out he best way to allow custom colors
+        if colorscale == 'RdWhBu':
+            colorscale = RdWhBu
+        if colorscale == 'RdWhBu2':
+            colorscale = RdWhBu2
+        if colorscale == 'RdYlGnBu':
+            colorscale = RdYlGnBu
+
+        # There's a lot of colorscale switching in the default settings...
+        # ...so sorry any one who's trying to figure this out, I will fix this
         if reverse_override == 'yes':
             reverse = not reverse
 
@@ -907,7 +1014,18 @@ for i in range(1, 5):
         dates = [pd.to_datetime(str(d)) for d in dates]
         dates = [d.strftime('%Y-%m') for d in dates]
         timeseries = np.array([round(a[y, x], 4) for a in arrays])
-        yaxis=dict(range=[dmin, dmax])
+
+        # The y-axis depends on the chosen function
+        labels = {d['value']: d['label'] for d in function_options}
+        if 'Percentiles' in labels[function]:
+            yaxis = dict(title='Percentiles',
+                         range=[0, 100])
+            timeseries = timeseries * 100
+        elif 'Original' in labels[function]:    
+            yaxis = dict(range=[dmin, dmax],
+                         title='Index')
+        else:
+            yaxis = dict(title='C.V.')
 
         # Build the data dictionaries that plotly reads
         data = [
@@ -920,6 +1038,7 @@ for i in range(1, 5):
                             reversescale=reverse,
                             line=dict(width=0.2, color="#000000")),
             )]
+
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
@@ -935,21 +1054,6 @@ for i in range(1, 5):
         figure = dict(data=data, layout=layout_copy)
 
         return figure
-
-
-# In[]
-# @app.callback(Output('banner', 'src'),
-#               [Input('choice_1', 'value')])
-# def whichBanner(value):
-#     # which banner?
-#     time_modulo = round(time.time()) % 5
-#     print(str(time_modulo))
-#     banners = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5}
-#     image_time = banners[time_modulo]
-#     image = ('https://github.com/WilliamsTravis/' +
-#              'Ubuntu-Practice-Machine/blob/master/images/' +
-#              'banner' + str(image_time) + '.png?raw=true')
-#     return image
 
 
 # In[] Run Application through the server

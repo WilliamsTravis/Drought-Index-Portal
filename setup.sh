@@ -28,6 +28,8 @@ then
     sudo add-apt-repository ppa:deadsnakes/ppa
     sudo apt-get update
     sudo apt-get install python3.6 python3.6-dev supervisor
+    sudo add-apt-repository -y ppa:ubuntugis/ppa
+    sudo apt install gdal-bin python-gdal python3-gdal
     curl https://bootstrap.pypa.io/get-pip.py | sudo python3.6
     pip3.6 install gunicorn
     sudo pip3.6 install virtualenv

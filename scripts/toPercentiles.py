@@ -70,7 +70,7 @@ def percentileArrays(indexlist):
         pct = rankdata(lst)/len(lst)
         return pct
 
-    arrays = [a[1] for a in indexlist]  # scipy.stats
+    arrays = [a[1] for a in indexlist]
     names = [a[0] for a in indexlist]
     mask = arrays[0] * 0 + 1
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)

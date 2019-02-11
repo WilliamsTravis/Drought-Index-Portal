@@ -1,6 +1,6 @@
 /cache-directory
 
-/venv
+/env
 *.log
 
 *.pot
