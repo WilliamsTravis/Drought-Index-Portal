@@ -502,7 +502,7 @@ def percentileArrays(arrays):
 
     mask = arrays[0] * 0 + 1
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
-    # pcts = pcts*mask
+    pcts = pcts*mask
     return pcts
 
 

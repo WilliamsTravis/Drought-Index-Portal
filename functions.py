@@ -25,13 +25,11 @@ import xarray as xr
 
 # Check if windows or linux
 if platform == 'win32':
-    home_path = 'z:/Sync'
     data_path = 'd:/'
-    os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
+#     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 else:
-    home_path = '/root/Sync'
     data_path = '/root/Sync'
-    os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
+#     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 
 
 def calculateCV(indexlist):

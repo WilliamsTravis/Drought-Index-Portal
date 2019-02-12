@@ -70,8 +70,6 @@ today = np.datetime64(todays_date)
 
 # In[] Index options
 indices = ['eddi1', 'eddi2', 'eddi3', 'eddi6']
-#indices = ['eddi1']
-
 
 # In[] Define scraping routine
 def getEDDI(scale, date, save_folder, write=False):
@@ -218,7 +216,7 @@ for index in indices:
                        dstSRS='EPSG:4269',
                        xRes=0.25, yRes=0.25,
                        outputBounds=[-130, 20, -55, 50])
-        ds = None
+        del ds
 
         # Okay, read the new data from the raster made above
         array = readRaster(temp_path, 1, -9999)[0]
