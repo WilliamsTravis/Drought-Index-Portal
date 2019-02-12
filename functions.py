@@ -25,7 +25,7 @@ import xarray as xr
 
 # Check if windows or linux
 if platform == 'win32':
-    data_path = 'd:/'
+    data_path = 'f:/'
 #     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 else:
     data_path = '/root/Sync'

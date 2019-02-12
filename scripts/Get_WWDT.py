@@ -17,6 +17,7 @@ Created on Fri Feb  10 14:33:38 2019
 
 @author: User
 """
+from bs4 import BeautifulSoup
 from collections import OrderedDict
 import datetime as dt
 from osgeo import gdal
@@ -25,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
-import re
+import requests
 import sys
 from tqdm import tqdm
 from urllib.error import HTTPError, URLError
@@ -74,9 +75,6 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'eddi3': 'Evaporative Demand Drought Index - 3 month',
              'eddi6': 'Evaporative Demand Drought Index - 6 month'}
 
-mask = readRaster(os.path.join(data_path, 'data/droughtindices/prfgrid.tif'),
-                  1, -9999)[0]
-
 # For quick array imaging
 def im(array):
     plt.imshow(array)
@@ -95,7 +93,7 @@ for index in indices:
     wwdt_index_url = wwdt_url + '/' + index
 
     if os.path.exists(nc_path):
-        # If we only need to add a few dates
+        ############## If we only need to add a few dates ###################
         with xr.open_dataset(nc_path) as data:
             nc_index = data.load()
             data.close()
@@ -109,15 +107,12 @@ for index in indices:
         t2 = dates[-1]
 
         # Get a list of the dates already in the netcdf file
-        existing_dates = pd.date_range(*(pd.to_datetime([t1, t2])
-                                       + pd.offsets.MonthEnd()), freq='M')
+        existing_dates = pd.date_range(*(pd.to_datetime([t1, t2]) + pd.offsets.MonthEnd()), freq='M')
 
         # now break the data set into individual months
         nc_index_list = [nc_index.value[i] for i in range(len(nc_index.value))]
 
         # Get available dates from wwdt
-        from bs4 import BeautifulSoup
-        import requests
         html = requests.get(wwdt_index_url)
         soup = BeautifulSoup(html.content, "html.parser")
         all_links = soup.find_all('a')
@@ -133,7 +128,7 @@ for index in indices:
 
         # Now, get the range of dates
         t2 = pd.datetime(final_year, final_month, 15)
-        available_dates = pd.date_range(t1, t2, freq="M")  # day converted to last day watch out
+        available_dates = pd.date_range(*(pd.to_datetime([t1, t2]) + pd.offsets.MonthEnd()), freq='M')
         needed_dates = [a for a in available_dates if a not in existing_dates]
 
         # Download new files
@@ -188,10 +183,15 @@ for index in indices:
         nc_path = os.path.join(data_path,
                                'data/droughtindices/netcdfs/',
                                 index_map[index] + '.nc')
+
+        # In case they release an empty data set
+        index_nc = index_nc.dropna(dim='time', how='all')
+
+        # Now save
         index_nc.to_netcdf(nc_path)
 
     else:
-        # If we need to start over
+        ############## If we need to start over #######################
         print(nc_path + " not detected, building new data set...")
 
         # Get the data from wwdt
@@ -278,7 +278,7 @@ for index in indices:
 
     # let's rank this according to the 1948 to present time period
     percentiles = percentileArrays(pc_nc.value.data)
-    pc_nc.value.data = percentiles * mask
+    pc_nc.value.data = percentiles
     pc_nc.attrs['long_name'] = 'Monthly percentile values since 1948'
     pc_nc.attrs['standard_name'] = 'percentile'
     pc_path = os.path.join(data_path,

@@ -38,7 +38,7 @@ from functions import Index_Maps
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
-    data_path = 'd:/'
+    data_path = 'f:/'
 else:
     data_path = '/root/Sync'
 
