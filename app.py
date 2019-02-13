@@ -411,12 +411,7 @@ app.layout = html.Div([
                               children=[
                                       html.H3(id='month_range',
                                               children=['Month Range']),
-                                      html.Div([
-                                               dcc.RangeSlider(id='month',
-                                                               value=[1, 12],
-                                                               min=1, max=12,
-                                                               updatemode='drag',
-                                                               marks=monthmarks)],
+                                      html.Div([],
                                                style={'width': '35%'})],
                               style={'display': 'none'},
                               )
