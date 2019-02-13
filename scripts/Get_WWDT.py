@@ -33,8 +33,9 @@ import xarray as xr
 
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    os.chdir('Z:/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
-    data_path = 'f:/'  # Watch out its d: on the laptop (which isn't available on this pc!)
+    sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
+                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
+    data_path = 'f:/'
 else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
     data_path = '/root/Sync'
@@ -83,6 +84,16 @@ today = np.datetime64(todays_date)
 
 ############ Get and Build Data Sets ########################################
 for index in indices:
+    # Default attributes.
+    new_attrs = OrderedDict([('title', title_map[index]),
+                             ('Description', 'Monthly gridded data at 0.25 decimal degree (15 arc-minute)' +
+                              ' resolution, calibrated to 1895-2010 for the continental United States.'),
+                             ('Original Author',
+                              'John Abatzoglou - University of Idaho, jabatzoglou@uidaho.edu'),
+                             ('Date', pd.to_datetime(str(today)).strftime('%Y-%m-%d')),
+                             ('Projection', 'North American Datum 1983, EPSG: 4269'),
+                             ('Citation', 'Westwide Drought Tracker, http://www.wrcc.dri.edu/monitor/WWDT')])
+
     # We need the key 'value' to point to local data
     nc_path = os.path.join(data_path,
                              'data/droughtindices/netcdfs/',
@@ -95,9 +106,6 @@ for index in indices:
         with xr.open_dataset(nc_path) as data:
             nc_index = data.load()
             data.close()
-
-        # Get attributes
-        new_attrs = nc_index.attrs
 
         # Extract Dates
         dates = pd.DatetimeIndex(nc_index.time.data)
@@ -128,50 +136,59 @@ for index in indices:
         t2 = pd.datetime(final_year, final_month, 15)
         available_dates = pd.date_range(*(pd.to_datetime([t1, t2]) + pd.offsets.MonthEnd()), freq='M')
         needed_dates = [a for a in available_dates if a not in existing_dates]
+        for d in needed_dates:
+            if d > pd.Timestamp(today):
+                idx = needed_dates.index(d)
+                needed_dates.pop(idx)
 
         # Download new files
-        for d in tqdm(needed_dates, position=0):
-            # build paths
-            file = '{}_{}_{}_PRISM.nc'.format(index, d.year, d.month)
-            url = wwdt_url + '/' + index + '/' + file
-            source_path = os.path.join(local_path, 'temp.nc')
+        if len(needed_dates) > 0:
+            print_statement = '{} missing file(s) since {}, adding data now...'
+            print(print_statement.format(len(needed_dates), needed_dates[0]))
+            for d in tqdm(needed_dates, position=0):
+                # build paths
+                file = '{}_{}_{}_PRISM.nc'.format(index, d.year, d.month)
+                url = wwdt_url + '/' + index + '/' + file
+                source_path = os.path.join(local_path, 'temp.nc')
 
-            # They save their dates on day 15
-            date = pd.datetime(d.year, d.month, 15)
+                # They save their dates on day 15
+                date = pd.datetime(d.year, d.month, 15)
 
-            # Get file
-            try:
-                urllib.request.urlretrieve(url, source_path)
-            except (HTTPError, URLError) as error:
-                logging.error('%s not retrieved because %s\nURL: %s',
-                              file, error, url)
-            except timeout:
-                logging.error('Socket timed out: %s', url)
+                # Get file
+                try:
+                    urllib.request.urlretrieve(url, source_path)
+                except (HTTPError, URLError) as error:
+                    logging.error('%s not retrieved because %s\nURL: %s',
+                                  file, error, url)
+                except timeout:
+                    logging.error('Socket timed out: %s', url)
 
-            # now transform that file
-            out_path = os.path.join(local_path, 'temp.tif')
-            if os.path.exists(out_path):
-                os.remove(out_path)
+                # now transform that file
+                out_path = os.path.join(local_path, 'temp.tif')
+                if os.path.exists(out_path):
+                    os.remove(out_path)
 
-            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4269', xRes=0.25,
-                           yRes=0.25, outputBounds=[-130, 20, -55, 50])
-            del ds
+                ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4269', xRes=0.25,
+                               yRes=0.25, outputBounds=[-130, 20, -55, 50])
+                del ds
 
-            # Read it in and append the data array to the list
-            base_data = gdal.Open(out_path)
-            array = base_data.ReadAsArray()
-            del base_data
-            array[array == -9999.] = np.nan
+                # Read it in and append the data array to the list
+                base_data = gdal.Open(out_path)
+                array = base_data.ReadAsArray()
+                del base_data
+                array[array == -9999.] = np.nan
 
-            # Use one of the old data arrays as a template
-            new = nc_index_list[-1].copy()
+                # Use one of the old data arrays as a template
+                new = nc_index_list[-1].copy()
 
-            # Assign new value and date to the template
-            new.data = array
-            new.time.data = date
+                # Assign new value and date to the template
+                new.data = array
+                new.time.data = date
 
-            # And append it to the old list
-            nc_index_list.append(new)
+                # And append it to the old list
+                nc_index_list.append(new)
+        else:
+            print('No missing files.')
 
         nc_index_arrays = xr.concat(nc_index_list, dim='time')
         index_nc = xr.Dataset(data_vars={'value': nc_index_arrays},
@@ -182,8 +199,8 @@ for index in indices:
                                'data/droughtindices/netcdfs/',
                                 index_map[index] + '.nc')
 
-        # In case they release an empty data set
-        index_nc = index_nc.dropna(dim='time', how='all')
+        # This will update attributes regardless of missing data
+        index_nc.attrs = new_attrs
 
         # Now save
         index_nc.to_netcdf(nc_path)
@@ -208,20 +225,6 @@ for index in indices:
                 logging.info('Access successful.')
 
         # Get some of the attributes from one of the new data sets
-        source_path = os.path.join(local_path, 'temp_1.nc')
-        source_data = xr.open_dataset(source_path)
-        attrs = source_data.attrs
-        author = attrs['author']
-        citation = attrs['note3']
-        index_title = title_map[index]
-        description = ('Monthly gridded data at 0.25 decimal degrees ' +
-                       '(15 arc-minute) resolution, calibrated to 1895-2010 for ' +
-                       'the continental United States.')
-        new_attrs = OrderedDict({'title': index_title, 'description': description,
-                                 'units': 'unitless', 'long_name': 'Index Value',
-                                 'standard_name': 'index', 'Original Author': author,
-                                 'citation': citation})
-
         monthly_ncs = []
         for i in tqdm(range(1, 13), position=0):
             # Okay, so I'd like to keep the original information and only change
@@ -282,4 +285,5 @@ for index in indices:
     pc_path = os.path.join(data_path,
                            'data/droughtindices/netcdfs/percentiles',
                             index_map[index] + '.nc')
+    os.remove(pc_path)
     pc_nc.to_netcdf(pc_path)
