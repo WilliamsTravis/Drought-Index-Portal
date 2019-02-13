@@ -215,6 +215,8 @@ max_year = pd.Timestamp(max_date).year
 max_month = pd.Timestamp(max_date).month
 years = [int(y) for y in range(1948, max_year + 1)]
 yearmarks = dict(zip(years, years))
+monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+              7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
 for y in yearmarks:
     if y % 5 != 0:
         yearmarks[y] = ""
@@ -411,7 +413,12 @@ app.layout = html.Div([
                               children=[
                                       html.H3(id='month_range',
                                               children=['Month Range']),
-                                      html.Div([],
+                                      html.Div([
+                                               dcc.RangeSlider(id='month',
+                                                               value=[1, 12],
+                                                               min=1, max=12,
+                                                               updatemode='drag',
+                                                               marks=monthmarks)],
                                                style={'width': '35%'})],
                               style={'display': 'none'},
                               )
@@ -594,8 +601,6 @@ def submitSignal(click, function, colorscale, reverse, year_range,
 @app.callback(Output('month_slider', 'children'),
               [Input('year_slider', 'value')])
 def monthSlider(year_range):
-    monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-                  7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
     if year_range[0] == year_range[1]:
         if year_range[1] == max_year:
             month2 = max_month
