@@ -135,6 +135,10 @@ counties_df = pd.read_csv("data/counties.csv")
 counties_df = counties_df[['grid', 'county', 'state']]
 counties_df['place'] = (counties_df['county'] +
                         ' County, ' + counties_df['state'])
+all_counties = counties_df['place'].unique()
+dfs = [counties_df[counties_df.place == p] for p in all_counties]
+df = [df.iloc[0] for df in dfs]
+county_options = [{'label': d['place'], 'value': d['grid']} for d in df]
 
 # For when EDDI before 1980 is selected
 with np.load("data/NA_overlay.npz") as data:
@@ -228,6 +232,8 @@ source = xr.open_dataarray(os.path.join(data_path,
 
 # This converts array coordinates into array positions
 londict, latdict, res = functions.coordinateDictionaries(source)
+londict_rev = {value: key for key, value in londict.items()}
+latdict_rev = {value: key for key, value in latdict.items()}
 
 # Map Layout:
 # Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
@@ -264,10 +270,18 @@ layout = dict(
 # In[]: Create a Div maker
 def divMaker(id_num, index='noaa'):
     div = html.Div([
-
-                 html.Div([dcc.Dropdown(id='choice_{}'.format(id_num),
-                                        options=indices, value=index)],
-                          style={'width': '30%'}),
+                html.Div([
+                    html.Div([dcc.Dropdown(id='choice_{}'.format(id_num),
+                                           options=indices, value=index)],
+                             style={'width': '30%',
+                                    'float': 'left'}),
+                    html.Div([dcc.Dropdown(id='county_{}'.format(id_num),
+                                           options=county_options,
+                                           placeholder='County Options',
+                                           value=grid[50, 50])],
+                             style={'width': '30%',
+                                    'float': 'left'})],
+                    className='row'),
                  dcc.Graph(id='map_{}'.format(id_num),
                            config={'staticPlot': False}),
                  html.Div([dcc.Graph(id='series_{}'.format(id_num))]),
@@ -275,11 +289,22 @@ def divMaker(id_num, index='noaa'):
               ], className='six columns')
     return div
 
+
 # For making outlines...move to css
 def outLine(color, width):
     string = ('-{1}px -{1}px 0 {0}, {1}px -{1}px 0 {0}, ' +
               '-{1}px {1}px 0 {0}, {1}px {1}px 0 {0}').format(color, width)
     return string
+
+
+# Let's say we also a list of gridids
+def gridToPoint(gridid):
+    y, x = np.where(grid == gridid)
+    lon = londict_rev[int(x[0])]
+    lat = latdict_rev[int(y[0])]
+    point = {'points': [{'lon': lon, 'lat': lat}]}
+    return point
+
 
 # In[]: Create App Layout
 app.layout = html.Div([
@@ -346,7 +371,6 @@ app.layout = html.Div([
                         href = "https://cires.colorado.edu/",
                         target = "_blank"
                         ),
-
                 ],
                 className = 'row'
                 ),
@@ -463,7 +487,6 @@ app.layout = html.Div([
                className='row',
                style={'margin-bottom': '50',
                       'margin-top': '0'}),
-
         ]),
 
         # Break line
@@ -500,7 +523,7 @@ app.layout = html.Div([
         # Signals
         html.Div(id='signal', style={'display': 'none'}),
         html.Div(id='click_store',
-                  children=default_clicks,
+                 children=default_clicks,
                  style={'display': 'none'}),
         html.Div(id='key_1', children='1', style={'display': 'none'}),
         html.Div(id='key_2', children='2', style={'display': 'none'}),
@@ -510,6 +533,10 @@ app.layout = html.Div([
         html.Div(id='time_2', style={'display': 'none'}),
         html.Div(id='time_3', style={'display': 'none'}),
         html.Div(id='time_4', style={'display': 'none'}),
+        html.Div(id='county_time_1', style={'display': 'none'}),
+        html.Div(id='county_time_2', style={'display': 'none'}),
+        html.Div(id='county_time_3', style={'display': 'none'}),
+        html.Div(id='county_time_4', style={'display': 'none'}),
         html.Div(id='cache_check_1', style={'display': 'none'}),
         html.Div(id='cache_check_2', style={'display': 'none'}),
         html.Div(id='cache_check_3', style={'display': 'none'}),
@@ -548,7 +575,7 @@ def makeMap(signal, choice):
     return data
 
 
-@cache1.memoize
+@cache1.memoize  # To be replaced with something more efficient
 def retrieve_data1(signal, choice):
     return makeMap(signal, choice)
 
@@ -764,23 +791,38 @@ def choiceStore(choice1, choice2, choice3, choice4):
                Input('map_2', 'clickData'),
                Input('map_3', 'clickData'),
                Input('map_4', 'clickData'),
+               Input('county_1', 'value'),
+               Input('county_2', 'value'),
+               Input('county_3', 'value'),
+               Input('county_4', 'value'),
                Input('time_1', 'children'),
                Input('time_2', 'children'),
                Input('time_3', 'children'),
-               Input('time_4', 'children')],
-               # Input('choice', 'value')
-              [State('click_sync', 'children'),
-               State('click_store', 'children')])
+               Input('time_4', 'children'),
+               Input('county_time_1', 'children'),
+               Input('county_time_2', 'children'),
+               Input('county_time_3', 'children'),
+               Input('county_time_4', 'children')
+               ])
 def clickPicker(click1, click2, click3, click4,
+                county1, county2, county3, county4,
                 time1, time2, time3, time4,
-                click_sync, old_clicks):
+                ctime1, ctime2, ctime3, ctime4):
+
+    counties = [county1, county2, county3, county4]
+    counties = [gridToPoint(c) for c in counties]
 
     # A list of individual clicks
     new_clicks = [click1, click2, click3, click4]
     clicks = [c if c is not None else default_click for c in new_clicks]
 
-    # A list of times for each click
-    times = [time1, time2, time3, time4]
+    # A list of times for each click/ county choice
+    times = [time1, time2, time3, time4,
+             ctime1, ctime2, ctime3, ctime4]
+
+    # Merge clicks and county selections
+    for c in counties:
+        clicks.append(c)
 
     # The index position of the last click
     index = times.index(max(times))
@@ -803,6 +845,11 @@ for i in range(1, 5):
         clicktime = time.time()
         return(clicktime)
 
+    @app.callback(Output('county_time_{}'.format(i), 'children'),
+                  [Input('county_{}'.format(i), 'value')])
+    def clickTime(county):
+        countytime = time.time()
+        return(countytime)
 
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
                   [Input('signal', 'children'),
@@ -962,15 +1009,22 @@ for i in range(1, 5):
 
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
-                  [Input("map_{}".format(i), 'clickData'),
+                  [Input('map_{}'.format(i), 'clickData'),
+                   Input('county_{}'.format(i), 'value'),
                    Input('click_store', 'children'),
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
-                   State('choice_store', 'children')])
-    def makeSeries(single_click, clicks, signal, choice,  key, sync,
-                   choice_store):
+                   State('choice_store', 'children'),
+                   State('time_{}'.format(i), 'children'),
+                   State('county_time_{}'.format(i), 'children')
+                   ])
+    def makeSeries(single_click,
+                   single_county,
+                   clicks, signal, choice,  key,
+                   sync, choice_store,
+                   cl_time, co_time):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
@@ -983,14 +1037,25 @@ for i in range(1, 5):
         index = clicks[1]
         choice_store = json.loads(choice_store)
 
-
         if 'On' in sync:
             clicks = clicks[0]
             click = clicks[index]
         if 'Off' in sync:
+            print("Breaking Point...")
+            print("CLICK TIME: " + str(cl_time))
+            print("COUNTY TIME: " + str(co_time))
+            print("SELECTION INDEX: " + str(index))
+            if index > 3:
+                index = index - 4
             if str(index+1) == key or choice_store[int(key)-1] != choice:
+
                 clicks = clicks[0]
-                click = single_click
+                # click = single_click
+                if cl_time > co_time:
+                    print("The click was most recent")
+                    click = single_click
+                else:
+                    click = gridToPoint(single_county)
             else:
                 print("Skipping Time series #" + key)
                 raise PreventUpdate
@@ -1061,9 +1126,11 @@ for i in range(1, 5):
                 marker=dict(color=timeseries,
                             colorscale=colorscale,
                             reversescale=reverse,
+                            autocolorscale=False,
+                            cmin=dmin*100,
+                            cmax=dmax*100,
                             line=dict(width=0.2, color="#000000")),
             )]
-
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
