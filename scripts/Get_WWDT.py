@@ -25,7 +25,7 @@ import os
 import pandas as pd
 import requests
 import sys
-from tqdm import tqdm
+from progressbar import progressbar as pb
 from urllib.error import HTTPError, URLError
 import urllib
 from socket import timeout
@@ -41,6 +41,7 @@ else:
     data_path = '/root/Sync'
 
 from functions import Index_Maps, readRaster, percentileArrays
+gdal.PushErrorHandler('CPLQuietErrorHandler')
 
 # In[] set up
 wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM'
@@ -145,7 +146,7 @@ for index in indices:
         if len(needed_dates) > 0:
             print_statement = '{} missing file(s) since {}, adding data now...'
             print(print_statement.format(len(needed_dates), needed_dates[0]))
-            for d in tqdm(needed_dates, position=0):
+            for d in pb(needed_dates, redirect_stdout=True):
                 # build paths
                 file = '{}_{}_{}_PRISM.nc'.format(index, d.year, d.month)
                 url = wwdt_url + '/' + index + '/' + file
@@ -226,7 +227,7 @@ for index in indices:
 
         # Get some of the attributes from one of the new data sets
         monthly_ncs = []
-        for i in tqdm(range(1, 13), position=0):
+        for i in pb(range(1, 13), redirect_stdout=True):
             # Okay, so I'd like to keep the original information and only change
             # geometries. Use each temp_X.nc for the dates and attributes
             source_path = os.path.join(local_path, 'temp_{}.nc'.format(i))
@@ -275,6 +276,7 @@ for index in indices:
         index_nc.to_netcdf(nc_path)
 
     # Now recreate the entire percentile data set
+    print('Reranking percentiles...')
     pc_nc = index_nc.copy()
 
     # let's rank this according to the 1948 to present time period

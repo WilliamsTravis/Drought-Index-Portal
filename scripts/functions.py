@@ -20,19 +20,18 @@ import numpy as np
 import json
 import scipy
 from scipy.stats import rankdata
-from sys import platform
+import sys
 import xarray as xr
 
 # Check if windows or linux
-if platform == 'win32':
-    home_path = 'z:/Sync'
+if sys.platform == 'win32':
     data_path = 'd:/'
-    os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
+    sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
+                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
 else:
     home_path = '/root/Sync'
     data_path = '/root/Sync'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
-
 
 def calculateCV(indexlist):
     '''

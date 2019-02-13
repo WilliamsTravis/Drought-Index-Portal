@@ -160,8 +160,6 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
 # For testing
 source_signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', 'no', 'pdsi']
 
-
-
 # Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
             {'label': 'Dark', 'value': 'dark'},
@@ -208,11 +206,15 @@ color_options = [{'label': c, 'value': c} for c in colorscales]
 color_options[-2]['label'] = 'RdWhBu (NOAA PSD Scale)'
 
 # Year Marks for Slider
-max_year = 2019
+with xr.open_dataset(os.path.join(data_path, 'data/droughtindices/netcdfs/spi1.nc')) as data:
+    sample_nc = data
+    data.close()
+max_date = sample_nc.time.data[-1]
+del sample_nc
+max_year = pd.Timestamp(max_date).year
+max_month = pd.Timestamp(max_date).month
 years = [int(y) for y in range(1948, max_year + 1)]
 yearmarks = dict(zip(years, years))
-monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-              7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
 for y in yearmarks:
     if y % 5 != 0:
         yearmarks[y] = ""
@@ -256,7 +258,6 @@ layout = dict(
         zoom=2,
     )
 )
-
 
 # In[]: Create a Div maker
 def divMaker(id_num, index='noaa'):
@@ -542,7 +543,6 @@ def makeMap(signal, choice):
         data = maps.minPercentile()
     if function == "ocv":
         data = maps.coefficientVariation()
-
     return data
 
 
@@ -588,7 +588,6 @@ def chooseCache(key, signal, choice):
                State('map_type', 'value')])
 def submitSignal(click, function, colorscale, reverse, year_range,
                  month_range, map_type):
-
     if not month_range:
         month_range = [1, 1]
     signal = [[year_range, month_range], function,
@@ -597,14 +596,40 @@ def submitSignal(click, function, colorscale, reverse, year_range,
 
 
 # Allow users to select a month range if the year slider is set to one year
-@app.callback(Output('month_slider', 'style'),
+@app.callback(Output('month_slider', 'children'),
               [Input('year_slider', 'value')])
 def monthSlider(year_range):
+    monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+                  7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
     if year_range[0] == year_range[1]:
-        style = {}
+        if year_range[1] == max_year:
+            month2 = max_month
+            marks = {key: value for key, value in monthmarks.items() if key <= month2}
+        else:
+            month2 = 12
+            marks = monthmarks
+        children = [
+            html.H3(id='month_range',
+                    children=['Month Range']),
+            html.Div([
+                dcc.RangeSlider(id='month',
+                                value=[1, month2],
+                                min=1, max=month2,
+                                updatemode='drag',
+                                marks=marks)],
+                style={'width': '35%'})]
     else:
-        style = {'display': 'none'}
-    return style
+        children=[
+            html.H3(id='month_range',
+                    children=['Month Range']),
+            html.Div([
+                dcc.RangeSlider(id='month',
+                                value=[1, month2],
+                                min=1, max=month2,
+                                updatemode='drag',
+                                marks=marks)],
+                style={'display': 'none'})]
+    return children
 
 
 @app.callback(Output('options', 'style'),

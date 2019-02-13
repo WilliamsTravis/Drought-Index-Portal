@@ -47,8 +47,9 @@ p = os.path.dirname(os.path.abspath(f))  # Not working consistently
 
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    os.chdir('Z:/Sync/Ubuntu-Practice-Machine/')
-    data_path = 'd:/'
+    sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
+                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
+    data_path = 'f:/'
 else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine/')
     data_path = '/root/Sync'
@@ -203,6 +204,7 @@ for index in indices:
         print(print_statement.format(len(needed_dates), needed_dates[0]))
     else:
         print('No missing files.')
+
     # Loop through these dates, build the query and download data
     for date in tqdm(needed_dates, position=0):
         ftp.cwd(os.path.join('/Projects/EDDI/CONUS_archive/data/',
@@ -258,25 +260,6 @@ for index in indices:
     arraylist = percentileArrays(arraylist)    
     percentiles.value.data = arraylist
     percentiles.to_netcdf(percentile_path, mode='w')
-
-    # Add new dates to the time slider in the app script if needed
-    app_text = []
-    with open('app.py' ,'r') as f:
-        for line in f:
-            app_text.append(line)
-
-    # Find the line with the appropriate text
-    target_text = "max_year = "
-    line_text = [l for l in app_text if target_text in l]
-
-    #If the year needs to be updated, do it here
-    if int(line_text[0][-6:-2]) < todays_date.year + 1:
-        line_pos = app_text.index(line_text[0])
-        with open('app.py', 'w') as f:
-            update = "max_year = {}\n"
-            app_text[line_pos] = update.format(todays_date.year)
-            for i in range(len(app_text)):
-                f.write(app_text[i])
 
 # Close connection with FTP server
 ftp.quit()
