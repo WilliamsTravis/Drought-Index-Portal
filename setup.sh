@@ -38,6 +38,8 @@ then
     # source /venv/bin/activate
     pip3.6 install dash dash_core_components dash_html_components dash_table_experiments
     pip3.6 install flask_caching netcdf4 numpy pandas psutil scipy tqdm xarray
+    pip3.6 install beautifulsoup4 matplotlib
+
 fi
 
 

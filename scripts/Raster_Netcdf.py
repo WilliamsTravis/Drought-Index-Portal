@@ -13,8 +13,8 @@ import netCDF4
 # from netCDF4 import date2num, num2date
 from tqdm import tqdm
 
-os.chdir('D:/data/droughtindices/netcdfs')
-rasterpath = 'D:/data/droughtindices/pdsisc/nad83'
+os.chdir('F:/data/droughtindices/netcdfs')
+rasterpath = 'F:/data/droughtindices/pdsisc/nad83'
 
 # Titles
 # Index dropdown labels

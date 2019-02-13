@@ -5,12 +5,9 @@
     Target Functionality:
     So using either crontab and letting it
     go on the virtual machine, or finding a hybrid approach, every month this
-    will pull the asc file from the NOAA's EDDI server, transform it, and
+    will pull the asc file from the WestWide Drought Tracker, transform it, and
     append it to the netcdf file of original values. It will also need to
-    rebuild the entire percentile netcdf because that is rank based. It will
-    also need to update the script to allow for new dates.
-
-    Production Notes:
+    rebuild the entire percentile netcdf because that is rank based.
 
 
 Created on Fri Feb  10 14:33:38 2019
@@ -36,10 +33,10 @@ import xarray as xr
 
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    # os.chdir('Z:/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
+    os.chdir('Z:/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
     data_path = 'f:/'  # Watch out its d: on the laptop (which isn't available on this pc!)
 else:
-    # os.chdir('/root/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
+    os.chdir('/root/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
     data_path = '/root/Sync'
 
 from functions import Index_Maps, readRaster, percentileArrays
@@ -47,7 +44,8 @@ from functions import Index_Maps, readRaster, percentileArrays
 # In[] set up
 wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM'
 local_path = os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt/')
-
+if not os.path.exists(local_path):
+    os.mkdir(local_path)
 indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3', 'spei6',
            'pdsi', 'scpdsi', 'pzi']
 local_indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2',
