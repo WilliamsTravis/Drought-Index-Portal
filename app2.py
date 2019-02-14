@@ -277,7 +277,6 @@ def divMaker(id_num, index='noaa'):
                     html.Div([dcc.Dropdown(id='county_{}'.format(id_num),
                                            options=county_options,
                                            placeholder='Moffat County, CO',
-                                           clearable=False,
                                            value=grid[50, 50])],
                              style={'width': '30%',
                                     'float': 'left'})],
@@ -854,7 +853,7 @@ for i in range(1, 5):
         return(countytime)
 
 
-    @app.callback(Output('county_{}'.format(i), 'placeholder'),  # <----------change to value?
+    @app.callback(Output('county_{}'.format(i), 'value'),
                   [Input('click_store', 'children'),
                    Input('county_time_{}'.format(i), 'children'),
                    Input('time_{}'.format(i), 'children'),
@@ -863,12 +862,6 @@ for i in range(1, 5):
                   [State('click_sync', 'children')])
     def countyLabel(click_store, county_time, click_time,
                     county_choice, click_choice, sync):
-        '''
-        Here, to change the value after a selection, we might need
-        to filter all of the selection through this...outputting 
-        'value'. If this changes the value, and the value changes 
-        the map, voila?
-        '''
         print(sync)
         click_store = json.loads(click_store)
         if 'On' in sync:
@@ -881,23 +874,20 @@ for i in range(1, 5):
                 x = londict[lon]
                 y = latdict[lat]
                 gridid = grid[y, x]
-                county = counties_df.place[counties_df.grid == gridid] 
             else:
-                county = counties_df.place[counties_df.grid == choice] 
+                gridid = choice
         else:
             # which time is greater
             if county_time > click_time:
                 gridid = county_choice
-                county = counties_df.place[counties_df.grid == gridid] 
             else:
                 lon = click_choice['points'][0]['lon']
                 lat = click_choice['points'][0]['lat']
                 x = londict[lon]
                 y = latdict[lat]
                 gridid = grid[y, x]
-                county = counties_df.place[counties_df.grid == gridid] 
         
-        return county # <---------- return gridid
+        return gridid
 
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
                   [Input('signal', 'children'),
@@ -1057,20 +1047,16 @@ for i in range(1, 5):
 
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
-                  [Input('map_{}'.format(i), 'clickData'),
-                   Input('county_{}'.format(i), 'value'),  # <----------- this would be the only selector needed
-                   Input('click_store', 'children'),
+                  [Input('county_{}'.format(i), 'value'),
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children')],
                   [State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children'),
-                   State('time_{}'.format(i), 'children'),
-                   State('county_time_{}'.format(i), 'children')])
-    def makeSeries(single_click,
+                   State('click_sync', 'children')])
+    def makeSeries(
                    single_county,
-                   clicks, signal, choice, choice_store,  key,
-                   sync, cl_time, co_time):
+                   signal, choice, choice_store,  key,
+                   sync):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
@@ -1078,29 +1064,31 @@ for i in range(1, 5):
         '''
         #  Check if we are syncing clicks, prevent update if needed
         print("Rendering Time Series #" + key)
-        clicks = json.loads(clicks)
-        print(clicks[0][0])
-        index = clicks[1]
+        # clicks = json.loads(clicks)
+        # print(clicks[0][0])
+        # index = clicks[1]
+        gridid = singl_county
         choice_store = json.loads(choice_store)
 
         if 'On' in sync:
-            clicks = clicks[0]
-            click = clicks[index]
+            # clicks = clicks[0]
+            # click = clicks[index]
+            pass
         if 'Off' in sync:
-            if index > 3:
-                index = index - 4
-            if str(index+1) == key or choice_store[int(key)-1] != choice:
+            # if index > 3:
+            #     index = index - 4
+            # if str(index+1) == key or choice_store[int(key)-1] != choice:
 
-                clicks = clicks[0]
-                # click = single_click
-                if cl_time > co_time:
-                    print("The click was most recent")
-                    click = single_click
-                else:
-                    click = gridToPoint(single_county)
-            else:
-                print("Skipping Time series #" + key)
-                raise PreventUpdate
+            #     clicks = clicks[0]
+            #     # click = single_click
+            #     if cl_time > co_time:
+            #         print("The click was most recent")
+            #         click = single_click
+            #     else:
+            #         click = gridToPoint(single_county)
+            # else:
+            print("Skipping Time series #" + key)
+            raise PreventUpdate
 
         # Create signal for the global_store
         signal = json.loads(signal)
@@ -1128,11 +1116,12 @@ for i in range(1, 5):
             reverse = not reverse
 
         # Find array position and county
+        # gridid = grid[y, x]
+        click = gridToPoint(gridid)
         lon = click['points'][0]['lon']
         lat = click['points'][0]['lat']
         x = londict[lon]
         y = latdict[lat]
-        gridid = grid[y, x]
         county = counties_df['place'][counties_df.grid == gridid].unique()
         print("Click: " + county)
 
