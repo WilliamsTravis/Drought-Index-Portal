@@ -854,7 +854,7 @@ for i in range(1, 5):
         return(countytime)
 
 
-    @app.callback(Output('county_{}'.format(i), 'placeholder'),  # <----------change to value?
+    @app.callback(Output('county_{}'.format(i), 'options'),  # <----------change back to placeholder
                   [Input('click_store', 'children'),
                    Input('county_time_{}'.format(i), 'children'),
                    Input('time_{}'.format(i), 'children'),
@@ -897,7 +897,11 @@ for i in range(1, 5):
                 gridid = grid[y, x]
                 county = counties_df.place[counties_df.grid == gridid] 
         
-        return county # <---------- return gridid
+        options = county_options
+        idx = next((index for (index, d) in enumerate(options) if d['value'] == county_choice), None)
+        options[idx]['label'] = county
+        
+        return options # <---------- return county
 
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
                   [Input('signal', 'children'),
