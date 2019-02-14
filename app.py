@@ -135,10 +135,9 @@ counties_df = pd.read_csv("data/counties.csv")
 counties_df = counties_df[['grid', 'county', 'state']]
 counties_df['place'] = (counties_df['county'] +
                         ' County, ' + counties_df['state'])
-all_counties = counties_df['place'].unique()
-dfs = [counties_df[counties_df.place == p] for p in all_counties]
-df = [df.iloc[0] for df in dfs]
-county_options = [{'label': d['place'], 'value': d['grid']} for d in df]
+c_df = pd.read_csv('data/unique_counties.csv')
+rows = [r for idx, r in c_df.iterrows()]
+county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
 
 # For when EDDI before 1980 is selected
 with np.load("data/NA_overlay.npz") as data:
@@ -277,7 +276,7 @@ def divMaker(id_num, index='noaa'):
                                     'float': 'left'}),
                     html.Div([dcc.Dropdown(id='county_{}'.format(id_num),
                                            options=county_options,
-                                           placeholder='County Options',
+                                           placeholder='Moffat County, CO',
                                            value=grid[50, 50])],
                              style={'width': '30%',
                                     'float': 'left'})],
@@ -437,7 +436,8 @@ app.layout = html.Div([
                               children=[
                                       html.H3(id='month_range',
                                               children=['Month Range']),
-                                      html.Div([
+                                      html.Div(id='month_slider_holder',
+                                               children=[
                                                dcc.RangeSlider(id='month',
                                                                value=[1, 12],
                                                                min=1, max=12,
@@ -625,7 +625,17 @@ def submitSignal(click, function, colorscale, reverse, year_range,
 
 
 # Allow users to select a month range if the year slider is set to one year
-@app.callback(Output('month_slider', 'children'),
+@app.callback(Output('month_slider', 'style'),
+              [Input('year_slider', 'value')])
+def monthStyle(year_range):
+    if year_range[0] == year_range[1]:
+          style={}  
+    else:
+          style={'display': 'none'}   
+    return style
+
+
+@app.callback(Output('month_slider_holder', 'children'),
               [Input('year_slider', 'value')])
 def monthSlider(year_range):
     if year_range[0] == year_range[1]:
@@ -635,29 +645,19 @@ def monthSlider(year_range):
         else:
             month2 = 12
             marks = monthmarks
-        children = [
-            html.H3(id='month_range',
-                    children=['Month Range']),
-            html.Div([
-                dcc.RangeSlider(id='month',
-                                value=[1, month2],
-                                min=1, max=month2,
-                                updatemode='drag',
-                                marks=marks)],
-                style={'width': '35%'})]
+        slider = dcc.RangeSlider(id='month',
+                                 value=[1, month2],
+                                 min=1, max=month2,
+                                 updatemode='drag',
+                                 marks=marks)
     else:
-        children=[
-            html.H3(id='month_range',
-                    children=['Month Range']),
-            html.Div([
-                dcc.RangeSlider(id='month',
-                                value=[1, month2],
-                                min=1, max=month2,
-                                updatemode='drag',
-                                marks=marks)],
-                style={'display': 'none'})]
-    return children
 
+        slider = dcc.RangeSlider(id='month',
+                                 value=[1, 12],
+                                 min=1, max=12,
+                                 updatemode='drag',
+                                 marks=monthmarks)
+    return [slider]
 
 @app.callback(Output('options', 'style'),
               [Input('toggle_options', 'n_clicks')])
@@ -844,12 +844,52 @@ for i in range(1, 5):
     def clickTime(click):
         clicktime = time.time()
         return(clicktime)
+        
 
     @app.callback(Output('county_time_{}'.format(i), 'children'),
                   [Input('county_{}'.format(i), 'value')])
-    def clickTime(county):
+    def countyTime(county):
         countytime = time.time()
         return(countytime)
+
+    @app.callback(Output('county_{}'.format(i), 'placeholder'),
+                  [Input('click_store', 'children'),
+                   Input('county_time_{}'.format(i), 'children'),
+                   Input('time_{}'.format(i), 'children'),
+                   Input('county_{}'.format(i), 'value'),
+                   Input('map_{}'.format(i), 'clickData')],
+                  [State('click_sync', 'children')])
+    def countyLabel(click_store, county_time, click_time,
+                    county_choice, click_choice, sync):
+        print(sync)
+        click_store = json.loads(click_store)
+        if 'On' in sync:
+            clicks = click_store[0]
+            index = click_store[1]
+            choice = clicks[index]
+            if type(choice) is dict:
+                lon = choice['points'][0]['lon']
+                lat = choice['points'][0]['lat']
+                x = londict[lon]
+                y = latdict[lat]
+                gridid = grid[y, x]
+                county = counties_df.place[counties_df.grid == gridid] 
+            else:
+                county = counties_df.place[counties_df.grid == choice] 
+        else:
+            # which time is greater
+            if county_time > click_time:
+                gridid = county_choice
+                county = counties_df.place[counties_df.grid == gridid] 
+            else:
+                lon = click_choice['points'][0]['lon']
+                lat = click_choice['points'][0]['lat']
+                x = londict[lon]
+                y = latdict[lat]
+                gridid = grid[y, x]
+                county = counties_df.place[counties_df.grid == gridid] 
+        
+        return county
 
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
                   [Input('signal', 'children'),
@@ -1013,27 +1053,25 @@ for i in range(1, 5):
                    Input('county_{}'.format(i), 'value'),
                    Input('click_store', 'children'),
                    Input('signal', 'children'),
-                   Input('choice_{}'.format(i), 'value')],
+                   Input('choice_{}'.format(i), 'value'),
+                   Input('choice_store', 'children')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
-                   State('choice_store', 'children'),
                    State('time_{}'.format(i), 'children'),
-                   State('county_time_{}'.format(i), 'children')
-                   ])
+                   State('county_time_{}'.format(i), 'children')])
     def makeSeries(single_click,
                    single_county,
-                   clicks, signal, choice,  key,
-                   sync, choice_store,
-                   cl_time, co_time):
+                   clicks, signal, choice, choice_store,  key,
+                   sync, cl_time, co_time):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
          synced click process is too slow...what can be done?
         '''
         #  Check if we are syncing clicks, prevent update if needed
-
         print("Rendering Time Series #" + key)
         clicks = json.loads(clicks)
+        print(clicks[0][0])
         index = clicks[1]
         choice_store = json.loads(choice_store)
 
@@ -1041,10 +1079,6 @@ for i in range(1, 5):
             clicks = clicks[0]
             click = clicks[index]
         if 'Off' in sync:
-            print("Breaking Point...")
-            print("CLICK TIME: " + str(cl_time))
-            print("COUNTY TIME: " + str(co_time))
-            print("SELECTION INDEX: " + str(index))
             if index > 3:
                 index = index - 4
             if str(index+1) == key or choice_store[int(key)-1] != choice:
