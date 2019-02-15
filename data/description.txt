@@ -9,7 +9,6 @@ Date: 1-22-2019
 
 ====================
 
- A Rainfall Index
 	
 * The Palmer Drought Severity Index (PDSI)
 

@@ -71,7 +71,8 @@ cache4 = functions.Cacher(4)
 
 # In[] Drought and Climate Indices (looking to include any raster time series)
 # Index Paths (for npz files)
-indices = [{'label': 'Rainfall Index', 'value': 'noaa'},
+indices = [
+           # {'label': 'Rainfall Index', 'value': 'noaa'},
            {'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'PDSI-Self Calibrated', 'value': 'pdsisc'},
            {'label': 'Palmer Z Index', 'value': 'pdsiz'},
@@ -89,7 +90,8 @@ indices = [{'label': 'Rainfall Index', 'value': 'noaa'},
            {'label': 'EDDI-6', 'value': 'eddi6'}]
 
 # Index dropdown labels
-indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
+indexnames = {
+              # 'noaa': 'NOAA CPC-Derived Rainfall Index',
               'pdsi': 'Palmer Drought Severity Index',
               'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
               'pdsiz': 'Palmer Z Index',
@@ -128,7 +130,6 @@ function_names = {'mean_perc': 'Average Percentiles',
                   'omax': 'Maximum Original Value',
                   'omin': 'Minimum Original Value',
                   'ocv': 'Coefficient of Variation for Original Values'}
-
 
 # Set up initial signal and raster to scatterplot conversion
 # A source grid for scatterplot maps - will need more for optional resolution
@@ -530,7 +531,7 @@ app.layout = html.Div([
                                      value='Default'),
                         html.H4("Reverse"),
                         dcc.RadioItems(id='reverse',
-                                       options=[{'label': 'Yes', 
+                                       options=[{'label': 'Yes',
                                                  'value': 'yes'},
                                                 {'label': 'No',
                                                  'value': 'no'}],
@@ -655,9 +656,9 @@ def submitSignal(click, function, colorscale, reverse, year_range,
               [Input('year_slider', 'value')])
 def monthStyle(year_range):
     if year_range[0] == year_range[1]:
-          style={}  
+          style={}
     else:
-          style={'display': 'none'}   
+          style={'display': 'none'}
     return style
 
 # If users select the most recent, adjust available months
@@ -855,9 +856,9 @@ def clickPicker(click1, click2, click3, click4,
         click = {'points': [{'lon': click['points'][0]['lon'],
                              'lat': click['points'][0]['lat']}]}
         return click
-    
+
     clicks = [rebuild(c) for c in clicks]
-    
+
     print("Click Picker: " + json.dumps(clicks))
 
     # A list of times for each click/ county choice
@@ -890,7 +891,7 @@ for i in range(1, 5):
     def clickTime(click):
         clicktime = time.time()
         return(clicktime)
-        
+
 
     @app.callback(Output('county_time_{}'.format(i), 'children'),
                   [Input('county_{}'.format(i), 'value')])
@@ -910,7 +911,7 @@ for i in range(1, 5):
         # creating an infinite loop, we are temporarily changing
         # the options each time such that the value stays the same,
         # but the one label to that value is the synced county name
-        
+
         recent_sync = json.loads(recent_sync)
         index = str(recent_sync[1])
         if 'On' in sync:  # Try making dictionaries for all of these, too long
@@ -1049,7 +1050,7 @@ for i in range(1, 5):
             df['data'] = df['data'] * 100
             amin = amin * 100
             amax = amax * 100
-        elif 'Original' in labels[function]: 
+        elif 'Original' in labels[function]:
             dmin = index_ranges['min'][index_ranges['index'] == choice]
             dmax = index_ranges['max'][index_ranges['index'] == choice]
             yaxis = dict(range=[dmin, dmax],
