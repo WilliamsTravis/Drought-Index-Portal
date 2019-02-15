@@ -1097,7 +1097,8 @@ for i in range(1, 5):
 
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
-                  [Input('map_{}'.format(i), 'clickData'),
+                  [Input('submit', 'n_clicks'),
+                   Input('map_{}'.format(i), 'clickData'),
                    Input('county_{}'.format(i), 'value'),
                    Input('click_store', 'children'),
                    Input('signal', 'children'),
@@ -1107,7 +1108,7 @@ for i in range(1, 5):
                    State('click_sync', 'children'),
                    State('time_{}'.format(i), 'children'),
                    State('county_time_{}'.format(i), 'children')])
-    def makeSeries(single_click, single_county, sycned_location,
+    def makeSeries(submit, single_click, single_county, sycned_location,
                    signal, choice,choice_store,
                    key, sync, cl_time, co_time):
         '''
