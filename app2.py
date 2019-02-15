@@ -1162,7 +1162,7 @@ for i in range(1, 5):
                 if which == 0:
                     click = single_click
                 else:
-                    click = gridToPoint(single_county)
+                    click = gridToPoint(grid, single_county)
             else:
                 raise PreventUpdate
 
