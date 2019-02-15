@@ -143,6 +143,7 @@ c_df = pd.read_csv('data/unique_counties.csv')
 rows = [r for idx, r in c_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
 options_pos = {county_options[i]['label']: i for i in range(len(county_options))}
+just_counties = [d['label'] for d in county_options]
 
 # For when EDDI before 1980 is selected
 with np.load("data/NA_overlay.npz") as data:
@@ -154,7 +155,7 @@ for i in range(na.shape[0]):
     na[i] = na[i]*i
 
 # Default click before the first click for any map
-default_click = {'points': [{'lon': -107.75, 'lat': 40.5}]}
+default_click = {'points': [{'lon': -105.75, 'lat': 40.0}]}
 
 # Default for click store (includes an index for most recent click)
 default_clicks = [list(np.repeat(default_click, 4)), 0]
@@ -307,17 +308,15 @@ def gridToPoint(gridid):
     y, x = np.where(grid == gridid)
     lon = londict_rev[int(x[0])]
     lat = latdict_rev[int(y[0])]
-    county = counties_df.place[counties_df.grid == gridid].item()
-    point = {'points': [{'lon': lon, 'lat': lat,
-                         'county': county}]}
+    point = {'points': [{'lon': lon, 'lat': lat}]}
     return point
 
 def pointToGrid(point):
     lon = point['points'][0]['lon']
     lat = point['points'][0]['lat']
-    x = londict[int(lon)]
-    y = latdict[int(lat)]
-    gridid = grid[y, x]
+    x = londict[lon]
+    y = latdict[lat]
+    gridid = grid.copy()[y, x]
     return gridid
 
 # In[]: Create App Layout
@@ -861,7 +860,6 @@ def clickPicker(click1, click2, click3, click4,
     # Select the singular point
     point = clicks[index]
 
-    # print("Synced Click: " + str(type(point)))
     return json.dumps([point, index + 1])
 
 
@@ -892,23 +890,31 @@ for i in range(1, 5):
         # creating an infinite loop, we are temporarily changing
         # the options each time such that the value stays the same,
         # but the one label to that value is the synced county name
+        
+        recent_sync = json.loads(recent_sync)
         index = str(recent_sync[1])
         print(index, key)
-        if key == index:
+        if 'On' in sync:
             options = county_options.copy()
-            recent_sync = json.loads(recent_sync)
             recent_point = recent_sync[0]
             recent_grid = pointToGrid(recent_point)
             synced_county = counties_df.place[counties_df.grid == recent_grid].item()
             current_county = counties_df.place[counties_df.grid == current_grid].item()
-            just_counties = [d['label'] for d in county_options]
-            print("CURRENT COUNTY TYPE: " + str(type(current_county)))
             current_idx = options_pos[current_county]
             options[current_idx]['label'] = synced_county
         else:
-            raise PreventUpdate
-
+            if key == index:
+                options = county_options.copy()
+                recent_point = recent_sync[0]
+                recent_grid = pointToGrid(recent_point)
+                synced_county = counties_df.place[counties_df.grid == recent_grid].item()
+                current_county = counties_df.place[counties_df.grid == current_grid].item()
+                current_idx = options_pos[current_county]
+                options[current_idx]['label'] = synced_county
+            else:
+                raise PreventUpdate
         return options
+
 
 
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
@@ -932,7 +938,7 @@ for i in range(1, 5):
                    State('signal', 'children')])
     def makeGraph(trigger, key, choice, signal):
 
-        print("Rendering Map #{}".format(int(key)))
+        # print("Rendering Map #{}".format(int(key)))
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
@@ -952,7 +958,7 @@ for i in range(1, 5):
         m2 = month_range[1]
 
         # Get data - check which cache first
-        print(json.dumps([signal, choice]))
+        # print(json.dumps([signal, choice]))
         [[array, arrays, dates],
          colorscale, dmax, dmin, reverse] = chooseCache(key, signal, choice)
 
@@ -1096,7 +1102,7 @@ for i in range(1, 5):
         '''
 
         #  Check if we are syncing clicks, prevent update if needed
-        print("Rendering Time Series #" + key)
+        # print("Rendering Time Series #" + key)
         choice_store = json.loads(choice_store)
 
         # Create signal for the global_store
@@ -1152,7 +1158,7 @@ for i in range(1, 5):
         y = latdict[lat]
         gridid = grid[y, x]
         county = counties_df['place'][counties_df.grid == gridid].unique()
-        print("Click: " + county)
+        # print("Click: " + county)
 
         # There are often more than one county, sometimes none in this df
         if len(county) == 0:
