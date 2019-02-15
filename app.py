@@ -832,56 +832,6 @@ for i in range(1, 5):
         countytime = time.time()
         return(countytime)
 
-
-    # @app.callback(Output('county_{}'.format(i), 'options'),  # <----------change back to placeholder
-    #               [Input('click_store', 'children'),
-    #                Input('county_time_{}'.format(i), 'children'),
-    #                Input('time_{}'.format(i), 'children'),
-    #                Input('county_{}'.format(i), 'value'),
-    #                Input('map_{}'.format(i), 'clickData')],
-    #               [State('click_sync', 'children')])
-    # def countyLabel(click_store, county_time, click_time,
-    #                 county_choice, click_choice, sync):
-    #     '''
-    #     Here, to change the value after a selection, we might need
-    #     to filter all of the selection through this...outputting 
-    #     'value'. If this changes the value, and the value changes 
-    #     the map, voila?
-    #     '''
-    #     print(sync)
-    #     click_store = json.loads(click_store)
-    #     if 'On' in sync:
-    #         clicks = click_store[0]
-    #         index = click_store[1]
-    #         choice = clicks[index]
-    #         if type(choice) is dict:
-    #             lon = choice['points'][0]['lon']
-    #             lat = choice['points'][0]['lat']
-    #             x = londict[lon]
-    #             y = latdict[lat]
-    #             gridid = grid[y, x]
-    #             county = counties_df.place[counties_df.grid == gridid] 
-    #         else:
-    #             county = counties_df.place[counties_df.grid == choice] 
-    #     else:
-    #         # which time is greater
-    #         if county_time > click_time:
-    #             gridid = county_choice
-    #             county = counties_df.place[counties_df.grid == gridid] 
-    #         else:
-    #             lon = click_choice['points'][0]['lon']
-    #             lat = click_choice['points'][0]['lat']
-    #             x = londict[lon]
-    #             y = latdict[lat]
-    #             gridid = grid[y, x]
-    #             county = counties_df.place[counties_df.grid == gridid] 
-        
-    #     options = county_options
-    #     idx = next((index for (index, d) in enumerate(options) if d['value'] == county_choice), None)
-    #     options[idx]['label'] = county
-        
-    #     return options # <---------- return county
-
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
                   [Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
@@ -1069,12 +1019,6 @@ for i in range(1, 5):
                 index = index - 4
             if str(index+1) == key or choice_store[int(key)-1] != choice:
                 click = single_click
-                # clicks = clicks[0]
-                # if cl_time > co_time:
-                #     print("The click was most recent")
-                #     click = single_click
-                # else:
-                #     click = gridToPoint(single_county)
             else:
                 print("Skipping Time series #" + key)
                 raise PreventUpdate
@@ -1130,6 +1074,8 @@ for i in range(1, 5):
             yaxis = dict(title='Percentiles',
                          range=[0, 100])
             timeseries = timeseries * 100
+            dmin = dmin * 100
+            dmax = dmax * 100
         elif 'Original' in labels[function]:    
             yaxis = dict(range=[dmin, dmax],
                          title='Index')
@@ -1146,8 +1092,8 @@ for i in range(1, 5):
                             colorscale=colorscale,
                             reversescale=reverse,
                             autocolorscale=False,
-                            cmin=dmin*100,
-                            cmax=dmax*100,
+                            cmin=dmin,
+                            cmax=dmax,
                             line=dict(width=0.2, color="#000000")),
             )]
 
