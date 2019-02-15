@@ -176,6 +176,8 @@ point_dict = {gridid: gridToPoint(grid, gridid) for
 grid_dict = {json.dumps(y): x for x, y in point_dict.items()}
 county_dict = {r['grid']: r['place'] for idx, r in counties_df.iterrows()}
 
+# Get Max/Min data frame for time series colorscale
+index_ranges = pd.read_csv('data/index_ranges.csv')
 
 # For when EDDI before 1980 is selected
 with np.load("data/NA_overlay.npz") as data:
@@ -1047,7 +1049,9 @@ for i in range(1, 5):
             df['data'] = df['data'] * 100
             amin = amin * 100
             amax = amax * 100
-        elif 'Original' in labels[function]:    
+        elif 'Original' in labels[function]: 
+            dmin = index_ranges['min'][index_ranges['index'] == choice]
+            dmax = index_ranges['max'][index_ranges['index'] == choice]
             yaxis = dict(range=[dmin, dmax],
                          title='Index')
         else:

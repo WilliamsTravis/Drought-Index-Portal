@@ -34,6 +34,7 @@ import xarray as xr
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
     sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
+                     'C:/Users/User/github/Ubuntu-Practice-Machine',
                      'C:/Users/travi/github/Ubuntu-Practice-Machine'])
     data_path = 'f:/'
 else:
