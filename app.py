@@ -274,13 +274,14 @@ def divMaker(id_num, index='noaa'):
                                            options=indices, value=index)],
                              style={'width': '30%',
                                     'float': 'left'}),
-                    html.Div([dcc.Dropdown(id='county_{}'.format(id_num),
-                                           options=county_options,
-                                           placeholder='Moffat County, CO',
-                                           clearable=False,
-                                           value=grid[50, 50])],
-                             style={'width': '30%',
-                                    'float': 'left'})],
+                    # html.Div([dcc.Dropdown(id='county_{}'.format(id_num),
+                    #                        options=county_options,
+                    #                        placeholder='Moffat County, CO',
+                    #                        clearable=False,
+                    #                        value=grid[50, 50])],
+                    #          style={'width': '30%',
+                    #                 'float': 'left'})
+                                ],
                     className='row'),
                  dcc.Graph(id='map_{}'.format(id_num),
                            config={'staticPlot': False}),
@@ -534,10 +535,6 @@ app.layout = html.Div([
         html.Div(id='time_2', style={'display': 'none'}),
         html.Div(id='time_3', style={'display': 'none'}),
         html.Div(id='time_4', style={'display': 'none'}),
-        html.Div(id='county_time_1', style={'display': 'none'}),
-        html.Div(id='county_time_2', style={'display': 'none'}),
-        html.Div(id='county_time_3', style={'display': 'none'}),
-        html.Div(id='county_time_4', style={'display': 'none'}),
         html.Div(id='cache_check_1', style={'display': 'none'}),
         html.Div(id='cache_check_2', style={'display': 'none'}),
         html.Div(id='cache_check_3', style={'display': 'none'}),
@@ -792,38 +789,20 @@ def choiceStore(choice1, choice2, choice3, choice4):
                Input('map_2', 'clickData'),
                Input('map_3', 'clickData'),
                Input('map_4', 'clickData'),
-               Input('county_1', 'value'),
-               Input('county_2', 'value'),
-               Input('county_3', 'value'),
-               Input('county_4', 'value'),
                Input('time_1', 'children'),
                Input('time_2', 'children'),
                Input('time_3', 'children'),
-               Input('time_4', 'children'),
-               Input('county_time_1', 'children'),
-               Input('county_time_2', 'children'),
-               Input('county_time_3', 'children'),
-               Input('county_time_4', 'children')
-               ])
+               Input('time_4', 'children')])
 def clickPicker(click1, click2, click3, click4,
-                county1, county2, county3, county4,
-                time1, time2, time3, time4,
-                ctime1, ctime2, ctime3, ctime4):
+                time1, time2, time3, time4):
 
-    counties = [county1, county2, county3, county4]
-    counties = [gridToPoint(c) for c in counties]
 
     # A list of individual clicks
     new_clicks = [click1, click2, click3, click4]
     clicks = [c if c is not None else default_click for c in new_clicks]
 
     # A list of times for each click/ county choice
-    times = [time1, time2, time3, time4,
-             ctime1, ctime2, ctime3, ctime4]
-
-    # Merge clicks and county selections
-    for c in counties:
-        clicks.append(c)
+    times = [time1, time2, time3, time4]
 
     # The index position of the last click
     index = times.index(max(times))
@@ -854,54 +833,54 @@ for i in range(1, 5):
         return(countytime)
 
 
-    @app.callback(Output('county_{}'.format(i), 'options'),  # <----------change back to placeholder
-                  [Input('click_store', 'children'),
-                   Input('county_time_{}'.format(i), 'children'),
-                   Input('time_{}'.format(i), 'children'),
-                   Input('county_{}'.format(i), 'value'),
-                   Input('map_{}'.format(i), 'clickData')],
-                  [State('click_sync', 'children')])
-    def countyLabel(click_store, county_time, click_time,
-                    county_choice, click_choice, sync):
-        '''
-        Here, to change the value after a selection, we might need
-        to filter all of the selection through this...outputting 
-        'value'. If this changes the value, and the value changes 
-        the map, voila?
-        '''
-        print(sync)
-        click_store = json.loads(click_store)
-        if 'On' in sync:
-            clicks = click_store[0]
-            index = click_store[1]
-            choice = clicks[index]
-            if type(choice) is dict:
-                lon = choice['points'][0]['lon']
-                lat = choice['points'][0]['lat']
-                x = londict[lon]
-                y = latdict[lat]
-                gridid = grid[y, x]
-                county = counties_df.place[counties_df.grid == gridid] 
-            else:
-                county = counties_df.place[counties_df.grid == choice] 
-        else:
-            # which time is greater
-            if county_time > click_time:
-                gridid = county_choice
-                county = counties_df.place[counties_df.grid == gridid] 
-            else:
-                lon = click_choice['points'][0]['lon']
-                lat = click_choice['points'][0]['lat']
-                x = londict[lon]
-                y = latdict[lat]
-                gridid = grid[y, x]
-                county = counties_df.place[counties_df.grid == gridid] 
+    # @app.callback(Output('county_{}'.format(i), 'options'),  # <----------change back to placeholder
+    #               [Input('click_store', 'children'),
+    #                Input('county_time_{}'.format(i), 'children'),
+    #                Input('time_{}'.format(i), 'children'),
+    #                Input('county_{}'.format(i), 'value'),
+    #                Input('map_{}'.format(i), 'clickData')],
+    #               [State('click_sync', 'children')])
+    # def countyLabel(click_store, county_time, click_time,
+    #                 county_choice, click_choice, sync):
+    #     '''
+    #     Here, to change the value after a selection, we might need
+    #     to filter all of the selection through this...outputting 
+    #     'value'. If this changes the value, and the value changes 
+    #     the map, voila?
+    #     '''
+    #     print(sync)
+    #     click_store = json.loads(click_store)
+    #     if 'On' in sync:
+    #         clicks = click_store[0]
+    #         index = click_store[1]
+    #         choice = clicks[index]
+    #         if type(choice) is dict:
+    #             lon = choice['points'][0]['lon']
+    #             lat = choice['points'][0]['lat']
+    #             x = londict[lon]
+    #             y = latdict[lat]
+    #             gridid = grid[y, x]
+    #             county = counties_df.place[counties_df.grid == gridid] 
+    #         else:
+    #             county = counties_df.place[counties_df.grid == choice] 
+    #     else:
+    #         # which time is greater
+    #         if county_time > click_time:
+    #             gridid = county_choice
+    #             county = counties_df.place[counties_df.grid == gridid] 
+    #         else:
+    #             lon = click_choice['points'][0]['lon']
+    #             lat = click_choice['points'][0]['lat']
+    #             x = londict[lon]
+    #             y = latdict[lat]
+    #             gridid = grid[y, x]
+    #             county = counties_df.place[counties_df.grid == gridid] 
         
-        options = county_options
-        idx = next((index for (index, d) in enumerate(options) if d['value'] == county_choice), None)
-        options[idx]['label'] = county
+    #     options = county_options
+    #     idx = next((index for (index, d) in enumerate(options) if d['value'] == county_choice), None)
+    #     options[idx]['label'] = county
         
-        return options # <---------- return county
+    #     return options # <---------- return county
 
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
                   [Input('signal', 'children'),
@@ -1062,19 +1041,14 @@ for i in range(1, 5):
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
                   [Input('map_{}'.format(i), 'clickData'),
-                   Input('county_{}'.format(i), 'value'),  # <----------- this would be the only selector needed
                    Input('click_store', 'children'),
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children')],
                   [State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children'),
-                   State('time_{}'.format(i), 'children'),
-                   State('county_time_{}'.format(i), 'children')])
-    def makeSeries(single_click,
-                   single_county,
-                   clicks, signal, choice, choice_store,  key,
-                   sync, cl_time, co_time):
+                   State('click_sync', 'children')])
+    def makeSeries(single_click, clicks, signal, choice, choice_store,  key,
+                   sync):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
@@ -1094,14 +1068,13 @@ for i in range(1, 5):
             if index > 3:
                 index = index - 4
             if str(index+1) == key or choice_store[int(key)-1] != choice:
-
-                clicks = clicks[0]
-                # click = single_click
-                if cl_time > co_time:
-                    print("The click was most recent")
-                    click = single_click
-                else:
-                    click = gridToPoint(single_county)
+                click = single_click
+                # clicks = clicks[0]
+                # if cl_time > co_time:
+                #     print("The click was most recent")
+                #     click = single_click
+                # else:
+                #     click = gridToPoint(single_county)
             else:
                 print("Skipping Time series #" + key)
                 raise PreventUpdate
