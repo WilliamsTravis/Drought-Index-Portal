@@ -898,9 +898,9 @@ for i in range(1, 5):
 
     @app.callback(Output('county_{}'.format(i), 'options'),
                   [Input('click_store', 'children'),
-                    Input('county_{}'.format(i), 'value'),
-                    Input('click_sync', 'children')],
-                  [State('key_{}'.format(i), 'children')])
+                   Input('county_{}'.format(i), 'value')],
+                  [State('click_sync', 'children'),
+                   State('key_{}'.format(i), 'children')])
     def dropOne(recent_sync, current_grid, sync, key):
 
         # As a work around to updating synced dropdown labels
