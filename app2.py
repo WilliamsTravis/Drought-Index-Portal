@@ -129,6 +129,35 @@ function_names = {'mean_perc': 'Average Percentiles',
                   'omin': 'Minimum Original Value',
                   'ocv': 'Coefficient of Variation for Original Values'}
 
+
+# Set up initial signal and raster to scatterplot conversion
+# A source grid for scatterplot maps - will need more for optional resolution
+source = xr.open_dataarray(os.path.join(data_path,
+                                        "data/droughtindices/source_array.nc"))
+
+# This converts array coordinates into array positions
+londict, latdict, res = functions.coordinateDictionaries(source)
+londict_rev = {value: key for key, value in londict.items()}
+latdict_rev = {value: key for key, value in latdict.items()}
+
+
+# Some more support functions
+def pointToGrid(point):
+    lon = point['points'][0]['lon']
+    lat = point['points'][0]['lat']
+    x = londict[lon]
+    y = latdict[lat]
+    gridid = grid.copy()[y, x]
+    return gridid
+
+# Let's say we also a list of gridids
+def gridToPoint(grid, gridid):
+    y, x = np.where(grid == gridid)
+    lon = londict_rev[int(x[0])]
+    lat = latdict_rev[int(y[0])]
+    point = {'points': [{'lon': lon, 'lat': lat}]}
+    return point
+
 # For the county names - need to get a more complete data set
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
@@ -136,14 +165,17 @@ counties_df = pd.read_csv("data/counties.csv")
 counties_df = counties_df[['grid', 'county', 'state']]
 counties_df['place'] = (counties_df['county'] +
                         ' County, ' + counties_df['state'])
-# rows = [r for idx, r in counties_df.iterrows()]
-# just_values = [r['grid'] for r in rows]
-# just_counties = [r['place'] for r in rows]
 c_df = pd.read_csv('data/unique_counties.csv')
 rows = [r for idx, r in c_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
-options_pos = {county_options[i]['label']: i for i in range(len(county_options))}
+options_pos = {county_options[i]['label']: i for
+               i in range(len(county_options))}
 just_counties = [d['label'] for d in county_options]
+point_dict = {gridid: gridToPoint(grid, gridid) for
+              gridid in grid[~np.isnan(grid)]}
+grid_dict = {json.dumps(y): x for x, y in point_dict.items()}
+county_dict = {r['grid']: r['place'] for idx, r in counties_df.iterrows()}
+
 
 # For when EDDI before 1980 is selected
 with np.load("data/NA_overlay.npz") as data:
@@ -155,11 +187,14 @@ for i in range(na.shape[0]):
     na[i] = na[i]*i
 
 # Default click before the first click for any map
-default_click = {'points': [{'lon': -105.75, 'lat': 40.0}]}
+default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
+                             'marker.color': 0, 'pointIndex': 0,
+                             'pointNumber': 0, 'text': 'Boulder County, CO'}]}
 
 # Default for click store (includes an index for most recent click)
-default_clicks = [list(np.repeat(default_click, 4)), 0]
+default_clicks = [list(np.repeat(default_click.copy(), 4)), 0]
 default_clicks = json.dumps(default_clicks)
+
 
 # In[] The map
 # Mapbox Access
@@ -215,7 +250,9 @@ color_options = [{'label': c, 'value': c} for c in colorscales]
 color_options[-2]['label'] = 'RdWhBu (NOAA PSD Scale)'
 
 # Year Marks for Slider
-with xr.open_dataset(os.path.join(data_path, 'data/droughtindices/netcdfs/spi1.nc')) as data:
+with xr.open_dataset(
+        os.path.join(data_path,
+                     'data/droughtindices/netcdfs/spi1.nc')) as data:
     sample_nc = data
     data.close()
 max_date = sample_nc.time.data[-1]
@@ -230,15 +267,63 @@ for y in yearmarks:
     if y % 5 != 0:
         yearmarks[y] = ""
 
-# Set up initial signal and raster to scatterplot conversion
-# A source grid for scatterplot maps - will need more for optional resolution
-source = xr.open_dataarray(os.path.join(data_path,
-                                        "data/droughtindices/source_array.nc"))
 
-# This converts array coordinates into array positions
-londict, latdict, res = functions.coordinateDictionaries(source)
-londict_rev = {value: key for key, value in londict.items()}
-latdict_rev = {value: key for key, value in latdict.items()}
+# Create a Div maker
+def divMaker(id_num, index='noaa'):
+    div = html.Div([
+                html.Div([
+                    html.Div([dcc.Dropdown(id='choice_{}'.format(id_num),
+                                           options=indices, value=index)],
+                             style={'width': '30%',
+                                    'float': 'left'}),
+                    html.Div([dcc.Dropdown(id='county_{}'.format(id_num),
+                                           options=county_options,
+                                           clearable=False,
+                                           value=24098.0)],
+                             style={'width': '30%',
+                                    'float': 'left'})],
+                    className='row'),
+                 dcc.Graph(id='map_{}'.format(id_num),
+                           config={'staticPlot': False}),
+                 html.Div([dcc.Graph(id='series_{}'.format(id_num))]),
+
+              ], className='six columns')
+    return div
+
+
+def makeMap(signal, choice):
+    '''
+    To choose which function to return from Index_Maps
+    '''
+    gc.collect()
+
+    [time_range, function, colorscale, reverse] = signal
+
+    maps = Index_Maps(time_range, colorscale, reverse, choice)
+
+    if function == "mean_original":
+        data = maps.meanOriginal()
+    if function == "omax":
+        data = maps.maxOriginal()
+    if function == "omin":
+        data = maps.minOriginal()
+    if function == "mean_perc":
+        data = maps.meanPercentile()
+    if function == "max":
+        data = maps.maxPercentile()
+    if function == "min":
+        data = maps.minPercentile()
+    if function == "ocv":
+        data = maps.coefficientVariation()
+    return data
+
+
+# For making outlines...move to css, maybe
+def outLine(color, width):
+    string = ('-{1}px -{1}px 0 {0}, {1}px -{1}px 0 {0}, ' +
+              '-{1}px {1}px 0 {0}, {1}px {1}px 0 {0}').format(color, width)
+    return string
+
 
 # Map Layout:
 # Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
@@ -272,52 +357,6 @@ layout = dict(
     )
 )
 
-# In[]:
-# Move all of these to functions, and clean functions up
-# Create a Div maker
-def divMaker(id_num, index='noaa'):
-    div = html.Div([
-                html.Div([
-                    html.Div([dcc.Dropdown(id='choice_{}'.format(id_num),
-                                           options=indices, value=index)],
-                             style={'width': '30%',
-                                    'float': 'left'}),
-                    html.Div([dcc.Dropdown(id='county_{}'.format(id_num),
-                                           options=county_options,
-                                           # placeholder='Moffat County, CO',
-                                           clearable=False,
-                                           value=24098.0)],
-                             style={'width': '30%',
-                                    'float': 'left'})],
-                    className='row'),
-                 dcc.Graph(id='map_{}'.format(id_num),
-                           config={'staticPlot': False}),
-                 html.Div([dcc.Graph(id='series_{}'.format(id_num))]),
-
-              ], className='six columns')
-    return div
-
-# For making outlines...move to css, maybe
-def outLine(color, width):
-    string = ('-{1}px -{1}px 0 {0}, {1}px -{1}px 0 {0}, ' +
-              '-{1}px {1}px 0 {0}, {1}px {1}px 0 {0}').format(color, width)
-    return string
-
-# Let's say we also a list of gridids
-def gridToPoint(gridid):
-    y, x = np.where(grid == gridid)
-    lon = londict_rev[int(x[0])]
-    lat = latdict_rev[int(y[0])]
-    point = {'points': [{'lon': lon, 'lat': lat}]}
-    return point
-
-def pointToGrid(point):
-    lon = point['points'][0]['lon']
-    lat = point['points'][0]['lat']
-    x = londict[lon]
-    y = latdict[lat]
-    gridid = grid.copy()[y, x]
-    return gridid
 
 # In[]: Create App Layout
 app.layout = html.Div([
@@ -413,15 +452,13 @@ app.layout = html.Div([
                                     'border-radius': '4px'}),
                 html.Button(id="click_sync",
                             children="Location Syncing: On",
-                            title=("Toggle this on and off to sync the " +
-                                    "location of the time series between each" +
-                                    "map"),
+                            title=("Toggle on and off to sync the location " +
+                                   "of the time series between each map"),
                             style={'background-color': '#c7d4ea',
                                    'border-radius': '4px',
                                    'margin-bottom': '30'})],
                 style={'margin-bottom': '30',
-                       'text-align': 'center',
-                       }),
+                       'text-align': 'center'}),
         html.Div([html.Div([dcc.Markdown(id='description')],
                             style={'text-align':'center',
                                    'width':'70%',
@@ -562,33 +599,6 @@ app.layout = html.Div([
 
 
 # In[]: App callbacks
-def makeMap(signal, choice):
-    '''
-    To choose which function to return from Index_Maps
-    '''
-    gc.collect()
-
-    [time_range, function, colorscale, reverse] = signal
-
-    maps = Index_Maps(time_range, colorscale, reverse, choice)
-
-    if function == "mean_original":
-        data = maps.meanOriginal()
-    if function == "omax":
-        data = maps.maxOriginal()
-    if function == "omin":
-        data = maps.minOriginal()
-    if function == "mean_perc":
-        data = maps.meanPercentile()
-    if function == "max":
-        data = maps.maxPercentile()
-    if function == "min":
-        data = maps.minPercentile()
-    if function == "ocv":
-        data = maps.coefficientVariation()
-    return data
-
-
 @cache1.memoize  # To be replaced with something more efficient
 def retrieve_data1(signal, choice):
     return makeMap(signal, choice)
@@ -832,12 +842,20 @@ def clickPicker(click1, click2, click3, click4,
                 ctime1, ctime2, ctime3, ctime4):
 
     counties = [county1, county2, county3, county4]
-    counties = [gridToPoint(c) for c in counties]
+    counties = [gridToPoint(grid, c) for c in counties]
 
     # A list of individual clicks
     new_clicks = [click1, click2, click3, click4]
 
-    clicks = [c if c is not None else default_click for c in new_clicks]
+    clicks = [c if c is not None else default_click.copy() for c in new_clicks]
+
+    def rebuild(click):
+        click = {'points': [{'lon': click['points'][0]['lon'],
+                             'lat': click['points'][0]['lat']}]}
+        return click
+    
+    clicks = [rebuild(c) for c in clicks]
+    
     print("Click Picker: " + json.dumps(clicks))
 
     # A list of times for each click/ county choice
@@ -880,8 +898,8 @@ for i in range(1, 5):
 
     @app.callback(Output('county_{}'.format(i), 'options'),
                   [Input('click_store', 'children'),
-                   Input('county_{}'.format(i), 'value'),
-                   Input('click_sync', 'children')],
+                    Input('county_{}'.format(i), 'value'),
+                    Input('click_sync', 'children')],
                   [State('key_{}'.format(i), 'children')])
     def dropOne(recent_sync, current_grid, sync, key):
 
@@ -893,28 +911,32 @@ for i in range(1, 5):
         
         recent_sync = json.loads(recent_sync)
         index = str(recent_sync[1])
-        print(index, key)
-        if 'On' in sync:
+        if 'On' in sync:  # Try making dictionaries for all of these, too long
             options = county_options.copy()
             recent_point = recent_sync[0]
-            recent_grid = pointToGrid(recent_point)
-            synced_county = counties_df.place[counties_df.grid == recent_grid].item()
-            current_county = counties_df.place[counties_df.grid == current_grid].item()
-            current_idx = options_pos[current_county]
+            recent_grid = pointToGrid(recent_point)  #dict
+            # recent_grid = grid_dict[json.dumps(recent_point)]
+            # synced_county = counties_df.place[counties_df.grid == recent_grid].item()  # dict
+            # current_county = counties_df.place[counties_df.grid == current_grid].item()  # dict
+            synced_county = county_dict[recent_grid]
+            current_county = county_dict[current_grid]
+            current_idx = options_pos[current_county]  # good
             options[current_idx]['label'] = synced_county
         else:
             if key == index:
                 options = county_options.copy()
                 recent_point = recent_sync[0]
-                recent_grid = pointToGrid(recent_point)
-                synced_county = counties_df.place[counties_df.grid == recent_grid].item()
-                current_county = counties_df.place[counties_df.grid == current_grid].item()
+                recent_grid = pointToGrid(recent_point)  #dict
+                # recent_grid = grid_dict[json.dumps(recent_point)]
+                # synced_county = counties_df.place[counties_df.grid == recent_grid].item()  # dict
+                # current_county = counties_df.place[counties_df.grid == current_grid].item()  # dict
+                synced_county = county_dict[recent_grid]
+                current_county = county_dict[current_grid]
                 current_idx = options_pos[current_county]
                 options[current_idx]['label'] = synced_county
             else:
                 raise PreventUpdate
         return options
-
 
 
     @app.callback(Output('cache_check_{}'.format(i), 'children'),
@@ -1085,16 +1107,9 @@ for i in range(1, 5):
                    State('click_sync', 'children'),
                    State('time_{}'.format(i), 'children'),
                    State('county_time_{}'.format(i), 'children')])
-    def makeSeries(single_click,
-                   single_county,
-                   sycned_location,
-                   signal,
-                   choice,
-                   choice_store,
-                   key,
-                   sync,
-                   cl_time,
-                   co_time):
+    def makeSeries(single_click, single_county, sycned_location,
+                   signal, choice,choice_store,
+                   key, sync, cl_time, co_time):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
@@ -1144,7 +1159,7 @@ for i in range(1, 5):
                 location_choices = [single_click,
                                     single_county]
                 which = times.index(max(times))
-                if which ==0:
+                if which == 0:
                     click = single_click
                 else:
                     click = gridToPoint(single_county)
@@ -1177,6 +1192,8 @@ for i in range(1, 5):
             yaxis = dict(title='Percentiles',
                          range=[0, 100])
             timeseries = timeseries * 100
+            dmin = dmin * 100
+            dmax = dmax * 100
         elif 'Original' in labels[function]:
             yaxis = dict(range=[dmin, dmax],
                          title='Index')
@@ -1193,8 +1210,8 @@ for i in range(1, 5):
                             colorscale=colorscale,
                             reversescale=reverse,
                             autocolorscale=False,
-                            cmin=dmin*100,
-                            cmax=dmax*100,
+                            cmin=dmin,
+                            cmax=dmax,
                             line=dict(width=0.2, color="#000000")),
             )]
 
