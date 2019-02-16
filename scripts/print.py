@@ -1,3 +1,8 @@
-print("ANYTHING AT ALL: 02-16-2019")
-print("UPDATE: 14:18")
-print("UPDATEL 14:38")
+import sys
+import datetime
+today = datetime.datetime.now()
+print("Job ran: ")
+print(str(today))
+
+print("Python Version:")
+print(sys.version)

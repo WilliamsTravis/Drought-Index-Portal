@@ -68,6 +68,8 @@ mask = readRaster(os.path.join(data_path, 'data/droughtindices/prfgrid.tif'),
 # In[] Today's date, month, and year
 todays_date = dt.datetime.today()
 today = np.datetime64(todays_date)
+print("Running Get_EDDI.py:")
+print(str(today))
 
 # In[] Index options
 indices = ['eddi1', 'eddi2', 'eddi3', 'eddi6']

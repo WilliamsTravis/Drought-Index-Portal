@@ -83,7 +83,8 @@ def im(array):
 # Starting today
 todays_date = dt.datetime.today()
 today = np.datetime64(todays_date)
-
+print("Running Get_WWDT.py:")
+print(str(today))
 ############ Get and Build Data Sets ########################################
 for index in indices:
     # Default attributes.
