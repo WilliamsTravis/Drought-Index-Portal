@@ -84,7 +84,7 @@ def im(array):
 todays_date = dt.datetime.today()
 today = np.datetime64(todays_date)
 print("Running Get_WWDT.py:")
-print(str(today))
+print(str(today) + '\n')
 ############ Get and Build Data Sets ########################################
 for index in indices:
     # Default attributes.
@@ -101,7 +101,7 @@ for index in indices:
     nc_path = os.path.join(data_path,
                              'data/droughtindices/netcdfs/',
                              index_map[index] + '.nc')
-    print(nc_path + " exists, adding new data...")
+    print(nc_path + " exists, checking for missing data...")
     wwdt_index_url = wwdt_url + '/' + index
 
     if os.path.exists(nc_path):
@@ -146,7 +146,7 @@ for index in indices:
 
         # Download new files
         if len(needed_dates) > 0:
-            print_statement = '{} missing file(s) since {}, adding data now...'
+            print_statement = '{} missing file(s) since {}...\n'
             print(print_statement.format(len(needed_dates), needed_dates[0]))
             for d in pb(needed_dates, redirect_stdout=True):
                 # build paths
@@ -190,23 +190,41 @@ for index in indices:
 
                 # And append it to the old list
                 nc_index_list.append(new)
+                
+            nc_index_arrays = xr.concat(nc_index_list, dim='time')
+            index_nc = xr.Dataset(data_vars={'value': nc_index_arrays},
+                                  attrs=new_attrs)
+    
+            # We need the key 'value' to point to the data
+            nc_path = os.path.join(data_path,
+                                   'data/droughtindices/netcdfs/',
+                                    index_map[index] + '.nc')
+    
+            # This will update attributes regardless of missing data
+            index_nc.attrs = new_attrs
+    
+            # Now save
+            index_nc.to_netcdf(nc_path)
+            
+            # Now recreate the entire percentile data set
+            print('Reranking percentiles...')
+            pc_nc = index_nc.copy()
+        
+            # let's rank this according to the 1948 to present time period
+            percentiles = percentileArrays(pc_nc.value.data)
+            pc_nc.value.data = percentiles
+            pc_nc.attrs['long_name'] = 'Monthly percentile values since 1948'
+            pc_nc.attrs['standard_name'] = 'percentile'
+            pc_path = os.path.join(data_path,
+                                   'data/droughtindices/netcdfs/percentiles',
+                                    index_map[index] + '.nc')
+            os.remove(pc_path)
+            pc_nc.to_netcdf(pc_path)
+
         else:
-            print('No missing files.')
+            print('No missing files, moving on...\n')
+            
 
-        nc_index_arrays = xr.concat(nc_index_list, dim='time')
-        index_nc = xr.Dataset(data_vars={'value': nc_index_arrays},
-                              attrs=new_attrs)
-
-        # We need the key 'value' to point to the data
-        nc_path = os.path.join(data_path,
-                               'data/droughtindices/netcdfs/',
-                                index_map[index] + '.nc')
-
-        # This will update attributes regardless of missing data
-        index_nc.attrs = new_attrs
-
-        # Now save
-        index_nc.to_netcdf(nc_path)
 
     else:
         ############## If we need to start over #######################
@@ -277,17 +295,19 @@ for index in indices:
                                 index_map[index] + '.nc')
         index_nc.to_netcdf(nc_path)
 
-    # Now recreate the entire percentile data set
-    print('Reranking percentiles...')
-    pc_nc = index_nc.copy()
-
-    # let's rank this according to the 1948 to present time period
-    percentiles = percentileArrays(pc_nc.value.data)
-    pc_nc.value.data = percentiles
-    pc_nc.attrs['long_name'] = 'Monthly percentile values since 1948'
-    pc_nc.attrs['standard_name'] = 'percentile'
-    pc_path = os.path.join(data_path,
-                           'data/droughtindices/netcdfs/percentiles',
-                            index_map[index] + '.nc')
-    os.remove(pc_path)
-    pc_nc.to_netcdf(pc_path)
+        # Now recreate the entire percentile data set
+        print('Reranking percentiles...')
+        pc_nc = index_nc.copy()
+    
+        # let's rank this according to the 1948 to present time period
+        percentiles = percentileArrays(pc_nc.value.data)
+        pc_nc.value.data = percentiles
+        pc_nc.attrs['long_name'] = 'Monthly percentile values since 1948'
+        pc_nc.attrs['standard_name'] = 'percentile'
+        pc_path = os.path.join(data_path,
+                               'data/droughtindices/netcdfs/percentiles',
+                                index_map[index] + '.nc')
+        os.remove(pc_path)
+        pc_nc.to_netcdf(pc_path)
+        
+print("Update Complete.")

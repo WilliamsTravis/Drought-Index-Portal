@@ -69,7 +69,7 @@ mask = readRaster(os.path.join(data_path, 'data/droughtindices/prfgrid.tif'),
 todays_date = dt.datetime.today()
 today = np.datetime64(todays_date)
 print("Running Get_EDDI.py:")
-print(str(today))
+print(str(today) + '\n')
 
 # In[] Index options
 indices = ['eddi1', 'eddi2', 'eddi3', 'eddi6']
@@ -151,7 +151,7 @@ for index in indices:
         new_file = False
         
     except:  # There is a quicker qay to do this surely
-        print(original_path + " not detected, building new dataset...")
+        print(original_path + " not detected, building new dataset...\n")
         lons = np.linspace(-130.0, -55.25, 300, dtype=np.float32)
         lats = np.linspace(50.0, 20.25, 120, dtype=np.float32)
         old = [xr.DataArray(data=mask,  # It may also be possible to append
@@ -205,7 +205,7 @@ for index in indices:
         print_statement = '{} missing file(s) since {}, adding data now...'
         print(print_statement.format(len(needed_dates), needed_dates[0]))
     else:
-        print('No missing files.')
+        print('No missing files.\n')
 
     # Loop through these dates, build the query and download data
     for date in tqdm(needed_dates, position=0):
@@ -266,3 +266,4 @@ for index in indices:
 # Close connection with FTP server
 ftp.quit()
 
+print("Update Complete.")
