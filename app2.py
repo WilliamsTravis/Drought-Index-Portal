@@ -158,21 +158,41 @@ def gridToPoint(grid, gridid):
 # For the county names - need to get a more complete data set
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
-counties_df = pd.read_csv("data/counties.csv")
-counties_df = counties_df[['grid', 'county', 'state']]
-counties_df['place'] = (counties_df['county'] +
-                        ' County, ' + counties_df['state'])
+
+
+
+
+# County Data Frame
+# counties_df = pd.read_csv("data/counties.csv")
+# counties_df = counties_df[['grid', 'county', 'state']]
+# counties_df['place'] = (counties_df['county'] +
+#                         ' County, ' + counties_df['state'])
+# #  This will append a gradient value to each cell entry for labeling
+# # Only need to do this once
+# gradient = mask.copy()
+# for i in range(gradient.shape[0]):
+#     for j in range(gradient.shape[1]):
+#         gradient[i, j] = i*j
+# gradient = gradient * mask
+# gradient_dict = dict(zip(list(grid.flatten()), list(gradient.flatten())))
+# counties_df['gradient'] = counties_df['grid'].apply(lambda x: gradient_dict[x])
+# counties_df.to_csv("data/counties2.csv", index=False)
+
+counties_df = pd.read_csv("data/counties2.csv")
 c_df = pd.read_csv('data/unique_counties.csv')
 rows = [r for idx, r in c_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
 options_pos = {county_options[i]['label']: i for
                i in range(len(county_options))}
 just_counties = [d['label'] for d in county_options]
+
+# This is to associate grid ids with points, only once
 # point_dict = {gridid: gridToPoint(grid, gridid) for  # Takes too long
 #               gridid in grid[~np.isnan(grid)]}
 # np.save('data/point_dict.npy', point_dict)
 point_dict = np.load('data/point_dict.npy').item()        
 grid_dict = {json.dumps(y): x for x, y in point_dict.items()}
+
 # county_dict = {r['grid']: r['place'] for idx, r in counties_df.iterrows()}
 # np.save('data/county_dict.npy', county_dict)
 county_dict = np.load('data/county_dict.npy').item()
@@ -1153,9 +1173,9 @@ for i in range(1, 5):
                                     list(np.unique(counties)))]
             # Use grid id to print NW and SW most counties as a range
             NW = county_df['place'][
-                    county_df['grid'] == max(county_df['grid'])].item()
+                    county_df['gradient'] == min(county_df['gradient'])].item()
             SE = county_df['place'][
-                    county_df['grid'] == min(county_df['grid'])].item()
+                    county_df['gradient'] == max(county_df['gradient'])].item()
             if NW != SE:
                 county = NW + " to " + SE
             else:
