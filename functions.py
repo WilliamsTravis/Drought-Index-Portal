@@ -63,7 +63,7 @@ def calculateCV(indexlist):
     return covs
 
 class Cacher:
-    def __init__(self,key):
+    def __init__(self, key):
         self.cache={}
         self.key=key
     def memoize(self, function):
@@ -73,6 +73,8 @@ class Cacher:
             key = json.dumps(arg)
             if key not in self.cache.keys():
                 print("Generating/replacing dataset...")
+                if self.cache:
+                    del self.cache[list(self.cache.keys())[0]]
                 self.cache.clear()
                 gc.collect()
                 self.cache[key] = function(*args)

@@ -25,6 +25,7 @@ import psutil
 import time
 import warnings
 import xarray as xr
+from cachetools import cachedmethod, LRUCache
 
 # Where should this go?
 # f = getframeinfo(currentframe()).filename
@@ -64,6 +65,7 @@ app.config['suppress_callback_exceptions'] = True
 
 # Create four simple caches, each holds one large array, one for each map
 cache1 = functions.Cacher(1)
+# cache1 = {}
 
 # For testing
 source_signal = [[[2000, 2017], [1, 12]], "mean_perc", "BrGn", "no", "pdsi"]
@@ -407,6 +409,7 @@ app.layout = html.Div([
 
 
 # In[] Application Callbacks
+# @cachedmethod(cache1)
 @cache1.memoize  # To be replaced with something more efficient
 def retrieve_data(signal, choice):
     return makeMap(signal, choice)
@@ -728,6 +731,7 @@ def makeSeries(submit, choice, click, select, county, signal,
 
     times = [cl_time, co_time, sl_time]
     location_choices = [click,  county, select]
+    print(location_choices)
     which = times.index(max(times))
     print("WHICH: " + str(which))
 
@@ -737,7 +741,6 @@ def makeSeries(submit, choice, click, select, county, signal,
         click = gridToPoint(grid, county)
     else:
         click = select
-
 
     # Find array position and county
     if which == 0 or which == 1:
