@@ -68,7 +68,13 @@ mask = readRaster(os.path.join(data_path, 'data/droughtindices/prfgrid.tif'),
 # In[] Today's date, month, and year
 todays_date = dt.datetime.today()
 today = np.datetime64(todays_date)
-print("Running Get_EDDI.py:")
+print("##")
+print("#####")
+print("############")
+print("#######################")
+print("#######################################")
+print("####################################################")
+print("\nRunning Get_EDDI.py:")
 print(str(today) + '\n')
 
 # In[] Index options
@@ -123,7 +129,7 @@ def getEDDI(scale, date, save_folder, write=False):
 ftp = ftplib.FTP('ftp.cdc.noaa.gov', 'anonymous', 'anonymous@cdc.noaa.gov')
 for index in indices:
     ftp.cwd('/Projects/EDDI/CONUS_archive/data/')  # sample
-    print(index)
+    print('\n' + index)
     original_path = os.path.join(data_path,
                                  "data/droughtindices/netcdfs/",
                                  index + '.nc')
@@ -267,3 +273,9 @@ for index in indices:
 ftp.quit()
 
 print("Update Complete.")
+print("####################################################")
+print("#######################################")
+print("#######################")
+print("############")
+print("#####")
+print("##")

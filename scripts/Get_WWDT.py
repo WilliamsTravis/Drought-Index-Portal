@@ -83,7 +83,13 @@ def im(array):
 # Starting today
 todays_date = dt.datetime.today()
 today = np.datetime64(todays_date)
-print("Running Get_WWDT.py:")
+print("##")
+print("#####")
+print("############")
+print("#######################")
+print("#######################################")
+print("####################################################")
+print("\nRunning Get_WWDT.py:")
 print(str(today) + '\n')
 ############ Get and Build Data Sets ########################################
 for index in indices:
@@ -311,3 +317,10 @@ for index in indices:
         pc_nc.to_netcdf(pc_path)
         
 print("Update Complete.")
+print("####################################################")
+print("#######################################")
+print("#######################")
+print("############")
+print("#####")
+print("##")
+                              

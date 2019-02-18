@@ -20,17 +20,18 @@ import numpy as np
 import json
 import scipy
 from scipy.stats import rankdata
-from sys import platform
+import sys
 import xarray as xr
 
 # Check if windows or linux
-if platform == 'win32':
+if sys.platform == 'win32':
     data_path = 'f:/'
-#     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
+    sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
+                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
 else:
+    home_path = '/root/Sync'
     data_path = '/root/Sync'
-#     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
-
+    os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 
 def calculateCV(indexlist):
     '''
@@ -133,8 +134,7 @@ class Index_Maps():
 
     # Reduce memory by preallocating attribute slots
     __slots__ = ('year1', 'year2', 'month1', 'month2', 'function',
-                 'colorscale', 'reverse', 'choice', 'mask',
-                 'RdWhBu', 'RdWhBu2', 'RdYlGnBu')
+                 'colorscale', 'reverse', 'choice', 'mask')
 
     # Create Initial Values
     def __init__(self, time_range=[[2000, 2017], [1, 12]],
@@ -152,37 +152,74 @@ class Index_Maps():
         self.choice = choice
         grid = np.load(os.path.join(data_path, "data/prfgrid.npz"))["grid"]
         self.mask = grid * 0 + 1
-        self.RdWhBu = [[0.00, 'rgb(115,0,0)'],
-                       [0.10, 'rgb(230,0,0)'],
-                       [0.20, 'rgb(255,170,0)'],
-                       [0.30, 'rgb(252,211,127)'],
-                       [0.40, 'rgb(255, 255, 0)'],
-                       [0.45, 'rgb(255, 255, 255)'],
-                       [0.55, 'rgb(255, 255, 255)'],
-                       [0.60, 'rgb(143, 238, 252)'],
-                       [0.70, 'rgb(12,164,235)'],
-                       [0.80, 'rgb(0,125,255)'],
-                       [0.90, 'rgb(10,55,166)'],
-                       [1.00, 'rgb(5,16,110)']]
-        self.RdWhBu2 = [[0.00, 'rgb(115,0,0)'],
-                        [0.02, 'rgb(230,0,0)'],
-                        [0.05, 'rgb(255,170,0)'],
-                        [0.10, 'rgb(252,211,127)'],
-                        [0.20, 'rgb(255, 255, 0)'],
-                        [0.30, 'rgb(255, 255, 255)'],
-                        [0.70, 'rgb(255, 255, 255)'],
-                        [0.80, 'rgb(143, 238, 252)'],
-                        [0.90, 'rgb(12,164,235)'],
-                        [0.95, 'rgb(0,125,255)'],
-                        [0.98, 'rgb(10,55,166)'],
-                        [1.00, 'rgb(5,16,110)']]
-        self.RdYlGnBu = [[0.00, 'rgb(124, 36, 36)'],
-                         [0.25, 'rgb(255, 255, 48)'],
-                         [0.5, 'rgb(76, 145, 33)'],
-                         [0.85, 'rgb(0, 92, 221)'],
-                         [1.00, 'rgb(0, 46, 110)']]
 
+    def setColor(self, default='percentile'):
+        '''
+        This is tricky because the color can be a string pointing to
+        a predefined plotly color scale, or an actual color scale, which is
+        a list.        
+        '''
+        options = {'Blackbody': 'Blackbody', 'Bluered': 'Bluered',
+                   'Blues': 'Blues', 'Default': 'Default', 'Earth': 'Earth',
+                   'Electric': 'Electric', 'Greens': 'Greens',
+                   'Greys': 'Greys', 'Hot': 'Hot', 'Jet': 'Jet',
+                   'Picnic': 'Picnic', 'Portland': 'Portland',
+                   'Rainbow': 'Rainbow', 'RdBu': 'RdBu',  'Viridis': 'Viridis',
+                   'Reds': 'Reds', 'RdWhBu': [[0.00, 'rgb(115,0,0)'],
+                                              [0.10, 'rgb(230,0,0)'],
+                                              [0.20, 'rgb(255,170,0)'],
+                                              [0.30, 'rgb(252,211,127)'],
+                                              [0.40, 'rgb(255, 255, 0)'],
+                                              [0.45, 'rgb(255, 255, 255)'],
+                                              [0.55, 'rgb(255, 255, 255)'],
+                                              [0.60, 'rgb(143, 238, 252)'],
+                                              [0.70, 'rgb(12,164,235)'],
+                                              [0.80, 'rgb(0,125,255)'],
+                                              [0.90, 'rgb(10,55,166)'],
+                                              [1.00, 'rgb(5,16,110)']],
+                   'RdWhBu (NOAA PSD Scale)':  [[0.00, 'rgb(115,0,0)'],
+                                                [0.02, 'rgb(230,0,0)'],
+                                                [0.05, 'rgb(255,170,0)'],
+                                                [0.10, 'rgb(252,211,127)'],
+                                                [0.20, 'rgb(255, 255, 0)'],
+                                                [0.30, 'rgb(255, 255, 255)'],
+                                                [0.70, 'rgb(255, 255, 255)'],
+                                                [0.80, 'rgb(143, 238, 252)'],
+                                                [0.90, 'rgb(12,164,235)'],
+                                                [0.95, 'rgb(0,125,255)'],
+                                                [0.98, 'rgb(10,55,166)'],
+                                                [1.00, 'rgb(5,16,110)']],
+                   'RdYlGnBu':  [[0.00, 'rgb(124, 36, 36)'],
+                                  [0.25, 'rgb(255, 255, 48)'],
+                                  [0.5, 'rgb(76, 145, 33)'],
+                                  [0.85, 'rgb(0, 92, 221)'],
+                                   [1.00, 'rgb(0, 46, 110)']],                   
+                   'BrGn':  [[0.00, 'rgb(91, 74, 35)'],
+                              # [0.10,],
+                              [0.20,'rgb(223,193,124)'],
+                              # [0.30,],
+                              [0.40, 'rgb(246,232,194)'],
+                              [0.45, 'rgb(245,245,245)'],
+                              [0.55, 'rgb(245,245,245)'],
+                              [0.60, 'rgb(198,234,229)'],
+                              [0.70, 'rgb(127,204,192)'],
+                              [0.80, 'rgb(52,150,142)'],
+                              # [0.90, ],
+                              [1.00, 'rgb(1,102,94)']],
+                 }
 
+        if self.colorscale == 'Default':
+            if default == 'percentile':
+                scale = options['RdWhBu']
+            elif default == 'original':
+                scale = options['BrGn']
+            elif default == 'cv':
+                scale = options['Portland'] 
+        else:
+            scale = options[self.colorscale]
+
+        return scale
+        
     def getOriginal(self):
         '''
         Retrieve Original Timeseries
@@ -191,7 +228,9 @@ class Index_Maps():
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/",
                                   self.choice + '.nc')
-        indexlist = xr.open_dataset(array_path)
+        with xr.open_dataset(array_path) as data:
+            indexlist = data
+            data.close()
 
         # Get total Min and Max Values for colors
         values = indexlist.value.data
@@ -219,7 +258,9 @@ class Index_Maps():
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/percentiles",
                                   self.choice + '.nc')
-        indexlist = xr.open_dataset(array_path)
+        with xr.open_dataset(array_path) as data:
+            indexlist = data
+            data.close()
 
         # Get total Min and Max Values for colors
         dmax = 1
@@ -281,12 +322,10 @@ class Index_Maps():
         dates = arrays.time.data
         arrays = arrays.value.data
         
-        # Colors - Default is a custom style
-        if self.colorscale == 'Default':
-            colorscale = self.RdYlGnBu
-        else:
-            colorscale = self.colorscale
+        # Get color scale        
+        colorscale = self.setColor(default='original')
 
+        # EDDI has a reversed scale
         if 'eddi' in self.choice:
             reverse = True
         else:
@@ -313,11 +352,8 @@ class Index_Maps():
         dates = arrays.time.data
         arrays = arrays.value.data
         
-        # Colors - Default is a custom style
-        if self.colorscale == 'Default':
-            colorscale = self.RdYlGnBu
-        else:
-            colorscale = self.colorscale
+        # Get color scale        
+        colorscale = self.setColor(default='original')
 
         if 'eddi' in self.choice:
             reverse = True
@@ -345,11 +381,9 @@ class Index_Maps():
         dates = arrays.time.data
         arrays = arrays.value.data
         
-        # Colors - Default is a custom style
-        if self.colorscale == 'Default':
-            colorscale = self.RdYlGnBu
-        else:
-            colorscale = self.colorscale
+        # Get color scale        
+        colorscale = self.setColor(default='original')
+
 
         if 'eddi' in self.choice:
             reverse = True
@@ -377,11 +411,8 @@ class Index_Maps():
         dates = arrays.time.data
         arrays = arrays.value.data
 
-        # Colors - Default is USDM style, sort of
-        if self.colorscale == 'Default':
-            colorscale = self.RdWhBu
-        else:
-            colorscale = self.colorscale
+        # Get color scale        
+        colorscale = self.setColor(default='percentile')
 
         if 'eddi' in self.choice:
             reverse = True
@@ -409,11 +440,8 @@ class Index_Maps():
         dates = arrays.time.data
         arrays = arrays.value.data
 
-        # Colors - Default is USDM style, sort of
-        if self.colorscale == 'Default':
-            colorscale = self.RdWhBu
-        else:
-            colorscale = self.colorscale
+        # Get color scale        
+        colorscale = self.setColor(default='percentile')
 
         if 'eddi' in self.choice:
             reverse = True
@@ -441,11 +469,8 @@ class Index_Maps():
         dates = arrays.time.data
         arrays = arrays.value.data
 
-        # Colors - Default is USDM style, sort of
-        if self.colorscale == 'Default':
-            colorscale = self.RdWhBu
-        else:
-            colorscale = self.colorscale
+        # Get color scale        
+        colorscale = self.setColor(default='percentile')
 
         if 'eddi' in self.choice:
             reverse = True
@@ -472,11 +497,8 @@ class Index_Maps():
         dates = arrays.time.data
         arrays = arrays.value.data
 
-        # Colors - Default is USDM style, sort of
-        if self.colorscale == 'Default':
-            colorscale = 'Portland'
-        else:
-            colorscale = self.colorscale
+        # Get color scale        
+        colorscale = self.setColor(default='cv')
 
         # The colorscale will always mean the same thing
         reverse = False
@@ -498,8 +520,9 @@ def percentileArrays(arrays):
         pct = rankdata(lst)/len(lst)
         return pct
 
+    mask = arrays[0] * 0 + 1
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
-
+    pcts = pcts*mask
     return pcts
 
 
@@ -551,3 +574,36 @@ def standardize(indexlist):
                                    mins, maxes) for i in range(len(indexlist))]
     return(standardizedlist)
 
+
+def makeMap(signal, choice):
+    '''
+    To choose which function to return from Index_Maps
+    '''
+    gc.collect()
+
+    [time_range, function, colorscale, reverse] = signal
+
+    maps = Index_Maps(time_range, colorscale, reverse, choice)
+
+    if function == "mean_original":
+        data = maps.meanOriginal()
+    if function == "omax":
+        data = maps.maxOriginal()
+    if function == "omin":
+        data = maps.minOriginal()
+    if function == "mean_perc":
+        data = maps.meanPercentile()
+    if function == "max":
+        data = maps.maxPercentile()
+    if function == "min":
+        data = maps.minPercentile()
+    if function == "ocv":
+        data = maps.coefficientVariation()
+    return data
+
+
+# For making outlines...move to css, maybe
+def outLine(color, width):
+    string = ('-{1}px -{1}px 0 {0}, {1}px -{1}px 0 {0}, ' +
+              '-{1}px {1}px 0 {0}, {1}px {1}px 0 {0}').format(color, width)
+    return string

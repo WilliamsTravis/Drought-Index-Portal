@@ -135,7 +135,7 @@ class Index_Maps():
     # Reduce memory by preallocating attribute slots
     __slots__ = ('year1', 'year2', 'month1', 'month2', 'function',
                  'colorscale', 'reverse', 'choice', 'mask',
-                 'RdWhBu', 'RdWhBu2', 'RdYlGnBu')
+                 'RdWhBu', 'RdWhBu2', 'RdYlGnBu', 'BrGn')
 
     # Create Initial Values
     def __init__(self, time_range=[[2000, 2017], [1, 12]],
@@ -182,7 +182,14 @@ class Index_Maps():
                          [0.5, 'rgb(76, 145, 33)'],
                          [0.85, 'rgb(0, 92, 221)'],
                          [1.00, 'rgb(0, 46, 110)']]
-
+        self.BrGn =  [[0.00, 'rgb(91, 74, 35)'],  # Darkest Brown
+                      [0.2, 'rgb(223,193,124)'],  # Darker brown
+                      [0.35, 'rgb(246,232,194)'], # Light brown
+                      [0.4, 'rgb(245,245,245)'],  # Whitish grey
+                      [0.6, 'rgb(245,245,245)'],  # Whitish grey
+                      [0.65, 'rgb(198,234,229)'], # Light Green
+                      [0.80, 'rgb(127,204,192)'], # Darker Green
+                      [1.00, 'rgb(1,102,94)']]    # Darkest Green
 
     def getOriginal(self):
         '''
@@ -284,7 +291,7 @@ class Index_Maps():
         
         # Colors - Default is a custom style
         if self.colorscale == 'Default':
-            colorscale = self.RdYlGnBu
+            colorscale = self.BrGn
         else:
             colorscale = self.colorscale
 
@@ -316,7 +323,7 @@ class Index_Maps():
         
         # Colors - Default is a custom style
         if self.colorscale == 'Default':
-            colorscale = self.RdYlGnBu
+            colorscale = self.BrGn
         else:
             colorscale = self.colorscale
 
@@ -348,7 +355,7 @@ class Index_Maps():
         
         # Colors - Default is a custom style
         if self.colorscale == 'Default':
-            colorscale = self.RdYlGnBu
+            colorscale = self.BrGn
         else:
             colorscale = self.colorscale
 
