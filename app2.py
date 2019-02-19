@@ -1209,6 +1209,8 @@ for i in range(1, 5):
         elif 'Original' in labels[function]:
             yaxis = dict(range=[dmin, dmax],
                          title='Index')
+            dmin = np.nanmin(array)
+            dmax = np.nanmax(array)
         else:
             yaxis = dict(title='C.V.')
 
