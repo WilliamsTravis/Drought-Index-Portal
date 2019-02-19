@@ -16,6 +16,7 @@ from dateutil.relativedelta import relativedelta
 import gc
 from osgeo import gdal
 import os
+import matplotlib.pyplot as plt
 import numpy as np
 import json
 import scipy
@@ -32,6 +33,10 @@ else:
     home_path = '/root/Sync'
     data_path = '/root/Sync'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
+
+# For quick array imaging
+def im(array):
+    plt.imshow(array)
 
 def calculateCV(indexlist):
     '''
