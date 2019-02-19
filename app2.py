@@ -1233,7 +1233,7 @@ for i in range(1, 5):
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
-        layout_copy['title'] = ("Time Series - Individual Observations" +
+        layout_copy['title'] = (indexnames[choice] +
                                 "<Br>" + county)
         layout_copy['plot_bgcolor'] = "white"
         layout_copy['paper_bgcolor'] = "white"
