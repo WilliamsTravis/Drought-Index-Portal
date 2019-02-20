@@ -14,19 +14,22 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 import dash_core_components as dcc
 import dash_html_components as html
-import json
 from flask_caching import Cache
+import gc
+import json
+import numpy as np
 import os
 import pandas as pd
 import psutil
+import redis
 import sys
 import time
 import xarray as xr
 
 # Check if we are working in Windows or Linux
 if sys.platform == 'win32':
-    home_path = 'z:/Sync'
-    data_path = 'd:/'
+    home_path = 'C:/users/user/github'
+    data_path = 'f:/'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 else:
     home_path = '/root/Sync'
@@ -34,11 +37,9 @@ else:
     data_path = '/root'
 
 sys.path.insert(0, os.path.join(home_path,
-                                'Ubuntu-Practice-Machine', 'scripts'))
-sys.path.insert(0, os.path.join(home_path,
                                 'Ubuntu-Practice-Machine'))
-from Index_Map import Index_Maps
-from functions import calculateCV
+
+from functions import Index_Maps, calculateCV
 
 # In[] These are three optional signals to build data with
 signal1 = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', 'no', 'pdsi', 1]
@@ -120,27 +121,49 @@ server = app.server
 
 # cache = Cache(config={'CACHE_TYPE': 'memcached',
 #                       'CACHE_MEMCACHED_SERVERS': ['127.0.0.1:8000']})
-# cache = Cache(config={'CACHE_TYPE': 'filesystem',
-#                       'CACHE_DIR': 'cache-directory'})
-# cache.init_app(server)
+cache1 = Cache(config={'CACHE_TYPE': 'filesystem',
+                      'CACHE_DIR': 'cache-directory'})
+# cache1 = Cache(config={'CACHE_TYPE': 'redis'})
+cache1.init_app(server)
 
+# class Cacher:
+#     def __init__(self):
+#         self.cache={}
+#     def memoize(self, function):
+#         def cacher(x):
+#             key = json.dumps(x)
+#             if key not in self.cache.keys():
+#                 print("Generating/replacing dataset...")
+#                 self.cache = {}
+#                 self.cache[key] = function(x)
+#             else:
+#                 print("Returning existing dataset...")
+#             return self.cache[key]
+#         return cacher
 
-class Cacher:
-    def __init__(self):
-        self.cache={}
-    def memoize(self, function):
-        def cacher(x):
-            key = json.dumps(x)
-            if key not in self.cache.keys():
-                print("Generating/replacing dataset...")
-                self.cache = {}
-                self.cache[key] = function(x)
-            else:
-                print("Returning existing dataset...")
-            return self.cache[key]
-        return cacher
+# cache1
+# class Cacher:
+#     def __init__(self, key):
+#         self.cache={}
+#         self.key=key
+#     def memoize(self, function):
+#         def cacher(*args):
+#             # print("Cache Key: " + str(self.key))
+#             arg = [a for a in args]
+#             key = json.dumps(arg)
+#             if key not in self.cache.keys():
+#                 print("Generating/replacing dataset...")
+#                 if self.cache:
+#                     del self.cache[list(self.cache.keys())[0]]
+#                 self.cache.clear()
+#                 gc.collect()
+#                 self.cache[key] = function(*args)
+#             else:
+#                 print("Returning existing dataset...")
+#             return self.cache[key]
+#         return cacher
 
-cache1 = Cacher()
+# cache1 = Cacher(1)
 
 
 # In[] Layout
@@ -164,7 +187,7 @@ app.layout = html.Div([
 
 
 # In[] Functions
-@cache1.memoize
+@cache1.memoize(timeout=60)
 def makeMap1(signal):
     '''
     To choose which function to return from Index_Maps

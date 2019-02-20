@@ -34,8 +34,8 @@ then
     pip3.6 install gunicorn
     sudo pip3.6 install virtualenv
     sudo apt-get install gcc  # might be needed for some python packages
-    # virtualenv venv
-    # source /venv/bin/activate
+    # virtualenv venv   # Not working exactly
+    # source /venv/bin/activate  # There has to be a way
     pip3.6 install dash dash_core_components dash_html_components dash_table_experiments
     pip3.6 install flask_caching netcdf4 numpy pandas psutil scipy tqdm xarray
     pip3.6 install beautifulsoup4 matplotlib

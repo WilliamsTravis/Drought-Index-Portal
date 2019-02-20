@@ -30,7 +30,7 @@ warnings.filterwarnings("ignore")
 # Work for Windows and Linux
 if platform == 'win32':
     home_path = 'c:/users/user/github'
-    data_path = 'd:/'
+    data_path = 'f:/'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
     startyear = 1948
 else:

@@ -158,21 +158,41 @@ def gridToPoint(grid, gridid):
 # For the county names - need to get a more complete data set
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
-counties_df = pd.read_csv("data/counties.csv")
-counties_df = counties_df[['grid', 'county', 'state']]
-counties_df['place'] = (counties_df['county'] +
-                        ' County, ' + counties_df['state'])
+
+
+
+
+# County Data Frame
+# counties_df = pd.read_csv("data/counties.csv")
+# counties_df = counties_df[['grid', 'county', 'state']]
+# counties_df['place'] = (counties_df['county'] +
+#                         ' County, ' + counties_df['state'])
+# #  This will append a gradient value to each cell entry for labeling
+# # Only need to do this once
+# gradient = mask.copy()
+# for i in range(gradient.shape[0]):
+#     for j in range(gradient.shape[1]):
+#         gradient[i, j] = i*j
+# gradient = gradient * mask
+# gradient_dict = dict(zip(list(grid.flatten()), list(gradient.flatten())))
+# counties_df['gradient'] = counties_df['grid'].apply(lambda x: gradient_dict[x])
+# counties_df.to_csv("data/counties2.csv", index=False)
+
+counties_df = pd.read_csv("data/counties2.csv")
 c_df = pd.read_csv('data/unique_counties.csv')
 rows = [r for idx, r in c_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
 options_pos = {county_options[i]['label']: i for
                i in range(len(county_options))}
 just_counties = [d['label'] for d in county_options]
+
+# This is to associate grid ids with points, only once
 # point_dict = {gridid: gridToPoint(grid, gridid) for  # Takes too long
 #               gridid in grid[~np.isnan(grid)]}
 # np.save('data/point_dict.npy', point_dict)
 point_dict = np.load('data/point_dict.npy').item()        
 grid_dict = {json.dumps(y): x for x, y in point_dict.items()}
+
 # county_dict = {r['grid']: r['place'] for idx, r in counties_df.iterrows()}
 # np.save('data/county_dict.npy', county_dict)
 county_dict = np.load('data/county_dict.npy').item()
@@ -217,8 +237,8 @@ maptypes = [{'label': 'Light', 'value': 'light'},
 
 colorscales = ['Default', 'Blackbody', 'Bluered', 'Blues', 'Earth', 'Electric',
                'Greens', 'Greys', 'Hot', 'Jet', 'Picnic', 'Portland',
-               'Rainbow', 'RdBu', 'Reds', 'Viridis', 'RdWhBu', 'RdWhBu (NOAA PSD Scale)',
-               'RdYlGnBu', 'BrGn']
+               'Rainbow', 'RdBu', 'Reds', 'Viridis', 'RdWhBu',
+               'RdWhBu (NOAA PSD Scale)', 'RdYlGnBu', 'BrGn']
 color_options = [{'label': c, 'value': c} for c in colorscales]
 
 
@@ -607,7 +627,8 @@ def monthSlider(year_range):
     if year_range[0] == year_range[1]:
         if year_range[1] == max_year:
             month2 = max_month
-            marks = {key: value for key, value in monthmarks.items() if key <= month2}
+            marks = {key: value for key, value in monthmarks.items() if
+                     key <= month2}
         else:
             month2 = 12
             marks = monthmarks
@@ -759,70 +780,6 @@ def choiceStore(choice1, choice2, choice3, choice4):
     return (json.dumps([choice1, choice2, choice3, choice4]))
 
 
-# Determine which selection occurred most recently
-@app.callback(Output('click_store', 'children'),
-              [Input('map_1', 'clickData'),
-               Input('map_2', 'clickData'),
-               Input('map_3', 'clickData'),
-               Input('map_4', 'clickData'),
-               Input('county_1', 'value'),
-               Input('county_2', 'value'),
-               Input('county_3', 'value'),
-               Input('county_4', 'value'),
-               Input('time_1', 'children'),
-               Input('time_2', 'children'),
-               Input('time_3', 'children'),
-               Input('time_4', 'children'),
-               Input('county_time_1', 'children'),
-               Input('county_time_2', 'children'),
-               Input('county_time_3', 'children'),
-               Input('county_time_4', 'children')
-               ])
-def clickPicker(click1, click2, click3, click4,
-                county1, county2, county3, county4,
-                time1, time2, time3, time4,
-                ctime1, ctime2, ctime3, ctime4):
-
-    counties = [county1, county2, county3, county4]
-    counties = [gridToPoint(grid, c) for c in counties]
-
-    # A list of individual clicks
-    new_clicks = [click1, click2, click3, click4]
-
-    clicks = [c if c is not None else default_click.copy() for c in new_clicks]
-
-    def rebuild(click):
-        click = {'points': [{'lon': click['points'][0]['lon'],
-                             'lat': click['points'][0]['lat']}]}
-        return click
-
-    clicks = [rebuild(c) for c in clicks]
-
-    print("Click Picker: " + json.dumps(clicks))
-
-    # A list of times for each click/ county choice
-    times = [time1, time2, time3, time4,
-             ctime1, ctime2, ctime3, ctime4]
-
-    # Merge clicks and county selections
-    for c in counties:
-        clicks.append(c)
-
-    # The index position of the last click
-    index = times.index(max(times))
-
-    # if there are any clicks with a None value? 
-    if not any(c is not None for c in clicks):  # Sorry, this is what worked :(
-        clicks = list(np.repeat(default_click, 8))
-    else:
-        clicks = clicks
-
-    # Select the singular point
-    point = clicks[index]
-
-    return json.dumps([point, index + 1])
-
-
 # In[] Any callback with four parts goes here
 for i in range(1, 5):
     @app.callback(Output('time_{}'.format(i), 'children'),
@@ -845,39 +802,106 @@ for i in range(1, 5):
         return(selected_time)
 
     @app.callback(Output('county_{}'.format(i), 'options'),
-                  [Input('click_store', 'children'),
-                   Input('county_{}'.format(i), 'value')],
-                  [State('click_sync', 'children'),
-                   State('key_{}'.format(i), 'children')])
-    def dropOne(recent_sync, current_grid, sync, key):
+                  [Input('time_1', 'children'),
+                   Input('time_2', 'children'),
+                   Input('time_3', 'children'),
+                   Input('time_4', 'children'),
+                   Input('county_time_1', 'children'),
+                   Input('county_time_2', 'children'),
+                   Input('county_time_3', 'children'),
+                   Input('county_time_4', 'children'),
+                   Input('selection_time_1', 'children'),
+                   Input('selection_time_2', 'children'),
+                   Input('selection_time_3', 'children'),
+                   Input('selection_time_4', 'children'),
+                   Input('signal', 'children'),
+                   Input('choice_{}'.format(i), 'value'),
+                   Input('choice_store', 'children')],
+                  [State('key_{}'.format(i), 'children'),
+                   State('click_sync', 'children'),
+                   State('map_1', 'clickData'),
+                   State('map_2', 'clickData'),
+                   State('map_3', 'clickData'),
+                   State('map_4', 'clickData'),
+                   State('county_1', 'value'),
+                   State('county_2', 'value'),
+                   State('county_3', 'value'),
+                   State('county_4', 'value'),
+                   State('map_1', 'selectedData'),
+                   State('map_2', 'selectedData'),
+                   State('map_3', 'selectedData'),
+                   State('map_4', 'selectedData')])
+    def dropOne(cl_time1, cl_time2, cl_time3, cl_time4,
+                co_time1, co_time2, co_time3, co_time4,
+                sl_time1, sl_time2, sl_time3, sl_time4,
+                signal, choice, choice_store, key, sync,
+                cl1, cl2, cl3, cl4, co1, co2, co3, co4,
+                sl1, sl2, sl3, sl4):
+        '''
+        As a work around to updating synced dropdown labels
+        and because we can't change the dropdown value with out
+        creating an infinite loop, we are temporarily changing
+        the options each time such that the value stays the same,
+        but the one label to that value is the synced county name
+        Selecting the right selection, do this first to prevent update
+        if not syncing
+        '''
 
-        # As a work around to updating synced dropdown labels
-        # and because we can't change the dropdown value with out
-        # creating an infinite loop, we are temporarily changing
-        # the options each time such that the value stays the same,
-        # but the one label to that value is the synced county name
+        # List of all selections
+        sels = [cl1, cl2, cl3, cl4, co1, co2, co3, co4, sl1, sl2, sl3, sl4]
+        sels = [default_click if s is None else s for s in sels]
+        
+        # List of all selection times
+        times = [cl_time1, cl_time2, cl_time3, cl_time4,
+                 co_time1, co_time2, co_time3, co_time4,
+                 sl_time1, sl_time2, sl_time3, sl_time4]
 
-        recent_sync = json.loads(recent_sync)
-        index = str(recent_sync[1])
-        if 'On' in sync:  # Try making dictionaries for all of these, too long
-            options = county_options.copy()
-            recent_point = recent_sync[0]
-            recent_grid = pointToGrid(recent_point)
-            synced_county = county_dict[recent_grid]
-            current_county = county_dict[current_grid]
-            current_idx = options_pos[current_county]
-            options[current_idx]['label'] = synced_county
-        else:
-            if key == index:
-                options = county_options.copy()
-                recent_point = recent_sync[0]
-                recent_grid = pointToGrid(recent_point)
-                synced_county = county_dict[recent_grid]
-                current_county = county_dict[current_grid]
-                current_idx = options_pos[current_county]
-                options[current_idx]['label'] = synced_county
-            else:
+        # Index position of most recent selection
+        sel_idx = times.index(max(times))
+
+        # Find the current county value
+        idx = int(key) - 1  # Graph ID
+        co_sels = [co1, co2, co3, co4]
+        sel = co_sels[idx]
+        current_county = county_dict[sel]
+
+        # Get the appropriate selection
+        if 'On' not in sync:
+            if sel_idx not in idx + np.array([0, 4, 8]):  # Associated sels
                 raise PreventUpdate
+            else:
+                idxs = [idx, idx + 4, idx + 8]
+                key_sels = list(np.array(sels)[idxs])
+                key_times = list(np.array(times)[idxs])
+                sel_idx = key_times.index(max(key_times))
+                click = key_sels[sel_idx]
+
+        else:
+            # Get the most recent selection and continue
+            click = sels[sel_idx]
+        
+        # Is it a grid id, single point or a list of points
+        if type(click) is int:
+            click = gridToPoint(grid, click)
+
+        if type(click) is dict and len(click['points']) > 1:
+            county = 'Multiple Counties'
+        else:
+            lon = click['points'][0]['lon']
+            lat = click['points'][0]['lat']
+            x = londict[lon]
+            y = latdict[lat]
+            gridid = grid[y, x]
+            counties = counties_df['place'][counties_df.grid == gridid]
+            county = counties.unique()
+
+        options = county_options.copy()
+
+        # if 'On' in sync:  # Try making dictionaries for all of these, too long
+        print(current_county)
+        current_idx = options_pos[current_county]
+        options[current_idx]['label'] = county
+
         return options
 
 
@@ -1037,24 +1061,80 @@ for i in range(1, 5):
 
     @app.callback(Output('series_{}'.format(i), 'figure'),
                   [Input('submit', 'n_clicks'),
-                   Input('map_{}'.format(i), 'clickData'),
-                   Input('county_{}'.format(i), 'value'),
-                   Input('click_store', 'children'),
+                   Input('time_1', 'children'),
+                   Input('time_2', 'children'),
+                   Input('time_3', 'children'),
+                   Input('time_4', 'children'),
+                   Input('county_time_1', 'children'),
+                   Input('county_time_2', 'children'),
+                   Input('county_time_3', 'children'),
+                   Input('county_time_4', 'children'),
+                   Input('selection_time_1', 'children'),
+                   Input('selection_time_2', 'children'),
+                   Input('selection_time_3', 'children'),
+                   Input('selection_time_4', 'children'),
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
-                   State('time_{}'.format(i), 'children'),
-                   State('county_time_{}'.format(i), 'children')])
-    def makeSeries(submit, single_click, single_county, sycned_location,
-                   signal, choice,choice_store,
-                   key, sync, cl_time, co_time):
+                   State('map_1', 'clickData'),
+                   State('map_2', 'clickData'),
+                   State('map_3', 'clickData'),
+                   State('map_4', 'clickData'),
+                   State('county_1', 'value'),
+                   State('county_2', 'value'),
+                   State('county_3', 'value'),
+                   State('county_4', 'value'),
+                   State('map_1', 'selectedData'),
+                   State('map_2', 'selectedData'),
+                   State('map_3', 'selectedData'),
+                   State('map_4', 'selectedData'),
+                   ])
+    def makeSeries(submit,
+                   cl_time1, cl_time2, cl_time3, cl_time4,
+                   co_time1, co_time2, co_time3, co_time4,
+                   sl_time1, sl_time2, sl_time3, sl_time4,
+                   signal, choice, choice_store,
+                   key, sync,
+                   cl1, cl2, cl3, cl4, co1, co2, co3, co4,
+                   sl1, sl2, sl3, sl4
+                   ):
         '''
         Each callback is called even if this isn't synced...It would require
          a whole new set of callbacks to avoid the lag from that. Also, the
          synced click process is too slow...what can be done?
         '''
+
+        # Selecting the right selection, do this first to prevent update
+        # if not syncing
+        # List of all selections
+        sels = [cl1, cl2, cl3, cl4, co1, co2, co3, co4, sl1, sl2, sl3, sl4]
+        sels = [default_click if s is None else s for s in sels]
+        
+        # List of all selection times
+        times = [cl_time1, cl_time2, cl_time3, cl_time4,
+                 co_time1, co_time2, co_time3, co_time4,
+                 sl_time1, sl_time2, sl_time3, sl_time4]
+
+        # Index position of most recent selection
+        sel_idx = times.index(max(times))
+
+        # Get the appropriate selection
+        if 'On' not in sync:
+            idx = int(key) - 1  # Graph ID
+            if sel_idx not in idx + np.array([0, 4, 8]):  # Associated sels
+                raise PreventUpdate
+            else:
+                idxs = [idx, idx + 4, idx + 8]
+                key_sels = list(np.array(sels)[idxs])
+                key_times = list(np.array(times)[idxs])
+                sel_idx = key_times.index(max(key_times))
+                click = key_sels[sel_idx]
+
+        else:
+            # Get the most recent selection and continue
+            click = sels[sel_idx] 
 
         #  Check if we are syncing clicks, prevent update if needed
         # print("Rendering Time Series #" + key)
@@ -1077,46 +1157,46 @@ for i in range(1, 5):
         if reverse_override == 'yes':
             reverse = not reverse
 
-        # Now, to sync locations or not
-        sync_data = json.loads(sycned_location)
-        if 'On' in sync:
-            click = sync_data[0]
+        # Is it a grid id, single point or a list of points
+        if type(click) is int:
+            click = gridToPoint(grid, click)
 
-        if 'Off' in sync:
-            index = sync_data[1]
-            if index > 4:
-                index = index - 4
-            if key == str(index):
-                times = [cl_time, co_time]
-                location_choices = [single_click,
-                                    single_county]
-                which = times.index(max(times))
-                if which == 0:
-                    click = single_click
-                else:
-                    click = gridToPoint(grid, single_county)
+        if type(click) is dict and len(click['points']) > 1:
+            selections = click['points']
+            ys = np.array([latdict[d['lat']] for d in selections])
+            xs = np.array([londict[d['lon']] for d in selections])
+            timeseries = np.array([round(np.nanmean(a[ys, xs]), 4) for
+                                   a in arrays])
+            counties = np.array([d['text'][:d['text'].index(':')] for
+                                   d in selections])
+            county_df = counties_df[counties_df['place'].isin(
+                                    list(np.unique(counties)))]
+            # Use grid id to print NW and SW most counties as a range
+            NW = county_df['place'][
+                    county_df['gradient'] == min(county_df['gradient'])].item()
+            SE = county_df['place'][
+                    county_df['gradient'] == max(county_df['gradient'])].item()
+            if NW != SE:
+                county = NW + " to " + SE
             else:
-                raise PreventUpdate
-
-        # Find array position and county
-        lon = click['points'][0]['lon']
-        lat = click['points'][0]['lat']
-        x = londict[lon]
-        y = latdict[lat]
-        gridid = grid[y, x]
-        county = counties_df['place'][counties_df.grid == gridid].unique()
-        # print("Click: " + county)
-
-        # There are often more than one county, sometimes none in this df
-        if len(county) == 0:
-            county = ""
+                county = NW
         else:
-            county = county[0]
+            lon = click['points'][0]['lon']
+            lat = click['points'][0]['lat']
+            x = londict[lon]
+            y = latdict[lat]
+            gridid = grid[y, x]
+            counties = counties_df['place'][counties_df.grid == gridid]
+            county = counties.unique()
+            if len(county) == 0:
+                county = ""
+            else:
+                county = county[0]
+            timeseries = np.array([round(a[y, x], 4) for a in arrays])
 
         # Get time series
         dates = [pd.to_datetime(str(d)) for d in dates]
         dates = [d.strftime('%Y-%m') for d in dates]
-        timeseries = np.array([round(a[y, x], 4) for a in arrays])
 
         # The y-axis depends on the chosen function
         labels = {d['value']: d['label'] for d in function_options}
@@ -1153,7 +1233,7 @@ for i in range(1, 5):
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
-        layout_copy['title'] = ("Time Series - Individual Observations" +
+        layout_copy['title'] = (indexnames[choice] +
                                 "<Br>" + county)
         layout_copy['plot_bgcolor'] = "white"
         layout_copy['paper_bgcolor'] = "white"

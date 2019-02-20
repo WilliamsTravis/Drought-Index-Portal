@@ -311,7 +311,7 @@ app.layout = html.Div([
                              children=['Study Period Year Range']),
                      html.Div([dcc.RangeSlider(
                                  id='year_slider',
-                                 value=[1985, 2012],
+                                 value=[2012, 2012],
                                  min=1948,
                                  max=max_year,
                                  updatemode='drag',
@@ -327,7 +327,7 @@ app.layout = html.Div([
                                       html.Div(id='month_slider_holder',
                                                children=[
                                                dcc.RangeSlider(id='month',
-                                                               value=[1, 12],
+                                                               value=[7, 7],
                                                                min=1, max=12,
                                                                updatemode='drag',
                                                                marks=monthmarks)],

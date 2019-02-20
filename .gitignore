@@ -1,4 +1,4 @@
-/cache-directory
+/data/cache
 
 /env
 *.log

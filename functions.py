@@ -196,18 +196,21 @@ class Index_Maps():
                                   [0.5, 'rgb(76, 145, 33)'],
                                   [0.85, 'rgb(0, 92, 221)'],
                                    [1.00, 'rgb(0, 46, 110)']],                   
-                   'BrGn':  [[0.00, 'rgb(91, 74, 35)'],
-                              # [0.10,],
-                              [0.20,'rgb(223,193,124)'],
-                              # [0.30,],
-                              [0.40, 'rgb(246,232,194)'],
-                              [0.45, 'rgb(245,245,245)'],
-                              [0.55, 'rgb(245,245,245)'],
-                              [0.60, 'rgb(198,234,229)'],
-                              [0.70, 'rgb(127,204,192)'],
-                              [0.80, 'rgb(52,150,142)'],
-                              # [0.90, ],
-                              [1.00, 'rgb(1,102,94)']],
+
+                   'BrGn':  [[0.00, 'rgb(91, 74, 35)'],  #darkest brown
+                             [0.10, 'rgb(122, 99, 47)'], # almost darkest brown
+                             [0.15, 'rgb(155, 129, 69)'], # medium brown 
+                             [0.25, 'rgb(178, 150, 87)'],  # almost meduim brown
+                             [0.30, 'rgb(223,193,124)'],  # light brown
+                             [0.40, 'rgb(237, 208, 142)'],  #lighter brown
+                             [0.45, 'rgb(245,245,245)'],  # white
+                             [0.55, 'rgb(245,245,245)'],  # white
+                             [0.60, 'rgb(198,234,229)'],  #lighter green
+                             [0.70, 'rgb(127,204,192)'],  # light green
+                             [0.75, 'rgb(62, 165, 157)'],  # almost medium green
+                             [0.85, 'rgb(52,150,142)'],  # medium green
+                             [0.90, 'rgb(1,102,94)'],  # almost darkest green
+                             [1.00, 'rgb(0, 73, 68)']], # darkest green
                  }
 
         if self.colorscale == 'Default':
