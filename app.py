@@ -886,27 +886,10 @@ for i in range(1, 5):
         return options
 
 
-    # @app.callback(Output('cache_check_{}'.format(i), 'children'),
-    #               [Input('signal', 'children'),
-    #                Input('choice_{}'.format(i), 'value'),
-    #                Input('key_{}'.format(i), 'children')])
-    # def storeData(signal, choice, key):
-    #     signal = json.loads(signal)
-    #     signal.pop(4)
-    #     # retrieve_data(signal, choice)
-    #     print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
-    #                                    psutil.virtual_memory().percent))
-    #     key = json.dumps([signal, choice])
-    #     return key
-
-
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_{}'.format(i), 'value'),
                    Input('signal', 'children')],
-                   # [Input('cache_check_{}'.format(i), 'children')],
-                   [State('key_{}'.format(i), 'children')])
-                  #  State('choice_{}'.format(i), 'value'),
-                  #  State('signal', 'children')])
+                  [State('key_{}'.format(i), 'children')])
     def makeGraph(choice, signal, key):
 
         print("Rendering Map #{}".format(int(key)))
@@ -1194,17 +1177,6 @@ for i in range(1, 5):
         elif 'Original' in labels[function]:
             yaxis = dict(range=[dmin, dmax],
                          title='Index')
-
-            # this colorscheme is tricky. if we use the value range of the time series
-            # the colors for singular values are always white, and when there are only
-            # a few, the represent wet and dry even if they're both dry or both wet.
-
-            # Using the min max of the mean map is too dark, using the min max of the
-            # entire series of all values everywhere is too light.
-
-            # What if we used the entire series, but did not include outlying values
-            # so, find the std above, multiple by 3 above and below, use that as our
-            # range
             sd = np.nanstd(arrays)
             if 'eddi' in choice:
                 sd = sd*-1
