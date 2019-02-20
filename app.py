@@ -18,6 +18,7 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 import dash_core_components as dcc
 import dash_html_components as html
+from flask_caching import Cache
 import gc
 from inspect import currentframe, getframeinfo
 import json
@@ -64,10 +65,10 @@ server = app.server
 app.config['suppress_callback_exceptions'] = True
 
 # Create four simple caches, each holds one large array, one for each map
-cache1 = functions.Cacher(1)
-cache2 = functions.Cacher(2)
-cache3 = functions.Cacher(3)
-cache4 = functions.Cacher(4)
+cache = Cache(config={'CACHE_TYPE': 'filesystem',
+                      'CACHE_DIR': 'data/cache',
+                      'CACHE_THRESHOLD': 4})
+cache.init_app(server)
 
 # In[] Drought and Climate Indices (looking to include any raster time series)
 # Index Paths (for npz files)
@@ -561,35 +562,19 @@ app.layout = html.Div([
 
 
 # In[]: App callbacks
-@cache1.memoize  # To be replaced with something more efficient
-def retrieve_data1(signal, choice):
+@cache.memoize() # To be replaced with something more efficient
+def retrieve_data(signal, choice):
     return makeMap(signal, choice)
 
-
-@cache2.memoize
-def retrieve_data2(signal, choice):
-    return makeMap(signal, choice)
-
-
-@cache3.memoize
-def retrieve_data3(signal, choice):
-    return makeMap(signal, choice)
-
-
-@cache4.memoize
-def retrieve_data4(signal, choice):
-    return makeMap(signal, choice)
-
-
-def chooseCache(key, signal, choice):
-    if key == '1':
-        return retrieve_data1(signal, choice)
-    elif key == '2':
-        return retrieve_data2(signal, choice)
-    elif key == '3':
-        return retrieve_data3(signal, choice)
-    else:
-        return retrieve_data4(signal, choice)
+# def chooseCache(key, signal, choice):
+#     if key == '1':
+#         return retrieve_data1(signal, choice)
+#     elif key == '2':
+#         return retrieve_data2(signal, choice)
+#     elif key == '3':
+#         return retrieve_data3(signal, choice)
+#     else:
+#         return retrieve_data4(signal, choice)
 
 
 # Store data in the cache and hide the signal to activate it in the hidden div
@@ -912,7 +897,7 @@ for i in range(1, 5):
     def storeData(signal, choice, key):
         signal = json.loads(signal)
         signal.pop(4)
-        chooseCache(key, signal, choice)
+        retrieve_data(signal, choice)
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                        psutil.virtual_memory().percent))
         key = json.dumps([signal, choice])
@@ -948,7 +933,7 @@ for i in range(1, 5):
         # Get data - check which cache first
         # print(json.dumps([signal, choice]))
         [[array, arrays, dates],
-         colorscale, dmax, dmin, reverse] = chooseCache(key, signal, choice)
+         colorscale, dmax, dmin, reverse] = retrieve_data(signal, choice)
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
@@ -1150,7 +1135,7 @@ for i in range(1, 5):
 
         # Get data - check which cache first
         [[array, arrays, dates],
-         colorscale, dmax, dmin, reverse] = chooseCache(key, signal, choice)
+         colorscale, dmax, dmin, reverse] = retrieve_data(signal, choice)
 
         # There's a lot of colorscale switching in the default settings...
         # ...so sorry any one who's trying to figure this out, I will fix this
@@ -1209,6 +1194,22 @@ for i in range(1, 5):
         elif 'Original' in labels[function]:
             yaxis = dict(range=[dmin, dmax],
                          title='Index')
+
+            # this colorscheme is tricky. if we use the value range of the time series
+            # the colors for singular values are always white, and when there are only
+            # a few, the represent wet and dry even if they're both dry or both wet.
+
+            # Using the min max of the mean map is too dark, using the min max of the
+            # entire series of all values everywhere is too light.
+
+            # What if we used the entire series, but did not include outlying values
+            # so, find the std above, multiple by 3 above and below, use that as our
+            # range
+            sd = np.nanstd(arrays)
+            if 'eddi' in choice:
+                sd = sd*-1
+            dmin = 3*sd
+            dmax = -3*sd
         else:
             yaxis = dict(title='C.V.')
 
