@@ -160,9 +160,6 @@ def gridToPoint(grid, gridid):
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
 
-
-
-
 # County Data Frame
 # counties_df = pd.read_csv("data/counties.csv")
 # counties_df = counties_df[['grid', 'county', 'state']]
@@ -883,7 +880,6 @@ for i in range(1, 5):
         options = county_options.copy()
 
         # if 'On' in sync:  # Try making dictionaries for all of these, too long
-        print(current_county)
         current_idx = options_pos[current_county]
         options[current_idx]['label'] = county
 
@@ -897,7 +893,7 @@ for i in range(1, 5):
     def storeData(signal, choice, key):
         signal = json.loads(signal)
         signal.pop(4)
-        retrieve_data(signal, choice)
+        # retrieve_data(signal, choice)
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                        psutil.virtual_memory().percent))
         key = json.dumps([signal, choice])
