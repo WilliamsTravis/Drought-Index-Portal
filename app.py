@@ -25,6 +25,7 @@ import json
 import pandas as pd
 import numpy as np
 import psutil
+# import redis
 import time
 import warnings
 import xarray as xr
@@ -68,6 +69,10 @@ app.config['suppress_callback_exceptions'] = True
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
                       'CACHE_THRESHOLD': 4})
+
+#cache = Cache(config={'CACHE_TYPE': 'redis',
+ #                     'CACHE_REDIS_URL': os.environ.get('localhost:6379')})
+
 cache.init_app(server)
 
 # In[] Drought and Climate Indices (looking to include any raster time series)
@@ -188,7 +193,7 @@ just_counties = [d['label'] for d in county_options]
 # point_dict = {gridid: gridToPoint(grid, gridid) for  # Takes too long
 #               gridid in grid[~np.isnan(grid)]}
 # np.save('data/point_dict.npy', point_dict)
-point_dict = np.load('data/point_dict.npy').item()        
+point_dict = np.load('data/point_dict.npy').item()
 grid_dict = {json.dumps(y): x for x, y in point_dict.items()}
 
 # county_dict = {r['grid']: r['place'] for idx, r in counties_df.iterrows()}
