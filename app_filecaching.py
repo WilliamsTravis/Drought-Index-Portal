@@ -1194,6 +1194,22 @@ for i in range(1, 5):
         elif 'Original' in labels[function]:
             yaxis = dict(range=[dmin, dmax],
                          title='Index')
+
+            # this colorscheme is tricky. if we use the value range of the time series
+            # the colors for singular values are always white, and when there are only
+            # a few, the represent wet and dry even if they're both dry or both wet.
+
+            # Using the min max of the mean map is too dark, using the min max of the
+            # entire series of all values everywhere is too light.
+
+            # What if we used the entire series, but did not include outlying values
+            # so, find the std above, multiple by 3 above and below, use that as our
+            # range
+            sd = np.nanstd(arrays)
+            if 'eddi' in choice:
+                sd = sd*-1
+            dmin = 3*sd
+            dmax = -3*sd
         else:
             yaxis = dict(title='C.V.')
 
