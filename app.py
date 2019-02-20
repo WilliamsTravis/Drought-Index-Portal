@@ -548,10 +548,10 @@ app.layout = html.Div([
         html.Div(id='county_time_2', style={'display': 'none'}),
         html.Div(id='county_time_3', style={'display': 'none'}),
         html.Div(id='county_time_4', style={'display': 'none'}),
-        html.Div(id='cache_check_1', style={'display': 'none'}),
-        html.Div(id='cache_check_2', style={'display': 'none'}),
-        html.Div(id='cache_check_3', style={'display': 'none'}),
-        html.Div(id='cache_check_4', style={'display': 'none'}),
+        # html.Div(id='cache_check_1', style={'display': 'none'}),
+        # html.Div(id='cache_check_2', style={'display': 'none'}),
+        # html.Div(id='cache_check_3', style={'display': 'none'}),
+        # html.Div(id='cache_check_4', style={'display': 'none'}),
         html.Div(id='choice_store', style={'display': 'none'}),
 
         # The end!
@@ -886,28 +886,31 @@ for i in range(1, 5):
         return options
 
 
-    @app.callback(Output('cache_check_{}'.format(i), 'children'),
-                  [Input('signal', 'children'),
-                   Input('choice_{}'.format(i), 'value'),
-                   Input('key_{}'.format(i), 'children')])
-    def storeData(signal, choice, key):
-        signal = json.loads(signal)
-        signal.pop(4)
-        # retrieve_data(signal, choice)
-        print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
-                                       psutil.virtual_memory().percent))
-        key = json.dumps([signal, choice])
-        return key
+    # @app.callback(Output('cache_check_{}'.format(i), 'children'),
+    #               [Input('signal', 'children'),
+    #                Input('choice_{}'.format(i), 'value'),
+    #                Input('key_{}'.format(i), 'children')])
+    # def storeData(signal, choice, key):
+    #     signal = json.loads(signal)
+    #     signal.pop(4)
+    #     # retrieve_data(signal, choice)
+    #     print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
+    #                                    psutil.virtual_memory().percent))
+    #     key = json.dumps([signal, choice])
+    #     return key
 
 
     @app.callback(Output("map_{}".format(i), 'figure'),
-                  [Input('cache_check_{}'.format(i), 'children')],
-                  [State('key_{}'.format(i), 'children'),
-                   State('choice_{}'.format(i), 'value'),
-                   State('signal', 'children')])
-    def makeGraph(trigger, key, choice, signal):
+                  [Input('choice_{}'.format(i), 'value'),
+                   Input('signal', 'children')],
+                   # [Input('cache_check_{}'.format(i), 'children')],
+                   [State('key_{}'.format(i), 'children')])
+                  #  State('choice_{}'.format(i), 'value'),
+                  #  State('signal', 'children')])
+    def makeGraph(choice, signal, key):
 
-        # print("Rendering Map #{}".format(int(key)))
+        print("Rendering Map #{}".format(int(key)))
+
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
@@ -926,10 +929,11 @@ for i in range(1, 5):
         m1 = month_range[0]
         m2 = month_range[1]
 
-        # Get data - check which cache first
-        # print(json.dumps([signal, choice]))
+        # Get data
         [[array, arrays, dates],
          colorscale, dmax, dmin, reverse] = retrieve_data(signal, choice)
+        print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
+                                       psutil.virtual_memory().percent))
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
