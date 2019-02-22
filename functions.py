@@ -545,12 +545,100 @@ class Index_Maps():
         arrays = arrays.value.data
 
         # Get color scale        
-        colorscale = self.setColor(default='cv')
+        colorscale = self.setColor(default='percentile')
 
         # The colorscale will always mean the same thing
         reverse = False
 
         return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
+
+
+
+
+
+################################## new function ###########################################################
+    def droughtArea(self, inclusive=False):
+        '''
+        This will take in a time series of arrays and a drought severity category
+        and mask out all cells with values above or below the category thresholds.
+        If inclusive is 'True' it will only mask out all cells that fall above the
+        chosen category.
+
+        For now this requires percentiles.
+        '''
+
+        # arrays = self.getAlbersPercentile()  # Don't have albers percentiles just yet
+        indexlist, dmin, dmax = self.getPercentile()
+        arrays = indexlist.value.data
+
+        # Just use the average value map for now
+        data = indexlist.mean('time')
+        array = data.value.data
+        del data
+
+        # Drought Categories
+        drought_cats = {0: [.20, .30], 1: [.10, .20], 2: [.05, .10], 3: [.02, .05], 4: [.00, .02]}
+
+        # Total number of pixels
+        total_area = np.nansum(self.mask)
+
+        # We want an ndarray for each category, too
+        dm_arrays = {}
+
+        # We want a map for each drought category?
+        for i in range(5):
+            d = drought_cats[i]
+            a = arrays.copy()
+
+            # Filter above or below thresholds
+            if inclusive is False:
+                a[(a < d[0]) | (a > d[1])] = np.nan
+            else:
+                a[a > d[1]] = np.nan
+
+            dm_arrays[i] = a
+
+        # Below will have to be outside after the area is filtered
+        # a1 = a[0]
+        # im(a1)
+        #
+        # # get percent of land 'area' in drought
+        # a2 = a1 * 0 + 1
+        # drought_area = np.nansum(a2)
+        # percent = round(100 * (drought_area / total_area), 4)
+        #
+        # print('DM ' + str(i)  + ': %' + str(percent))
+
+        del arrays
+
+        # It is easier to work with these in this format
+        dates = indexlist.time.data
+
+        # Get color scale
+        colorscale = self.setColor(default='percentile')
+
+        # The colorscale will always mean the same thing
+        reverse = False
+
+        # Return a list of five layers, the signal might need to be adjusted
+        # for inclusive
+        return [[array, dm_arrays, dates], colorscale, dmax, dmin, reverse]
+
+
+
+
+
+
+###########################################################################################################
+
+
+
+
+
+
+
+
+
 
 
 def percentileArrays(arrays):
@@ -646,7 +734,7 @@ def makeMap(signal, choice):
     if function == "ocv":
         data = maps.coefficientVariation()
     if function == "parea":
-        data = maps.meanPercentile()  # This will require some extra doing...
+        data = maps.droughtArea()  # This will require some extra doing...
     return data
 
 

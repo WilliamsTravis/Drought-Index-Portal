@@ -231,7 +231,8 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
 
 # For testing
-source_signal = [[[2000, 2017], [1, 12]], 'mean_perc', 'Viridis', 'no', 'pdsi']
+source_signal = [[[2000, 2017], [1, 12]], 'parea', 'Viridis', 'no']
+source_choice = 'pdsi'
 
 # Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
@@ -490,7 +491,7 @@ app.layout = html.Div([
                              children=['Study Period Year Range']),
                      html.Div([dcc.RangeSlider(
                                  id='year_slider',
-                                 value=[1985, max_year],
+                                 value=[1990, max_year],
                                  min=1948,
                                  max=max_year,
                                  updatemode='drag',
@@ -543,7 +544,7 @@ app.layout = html.Div([
                                                 selected_style=tablet_style)]),                      
                          dcc.Dropdown(id='function_choice',
                                         options=function_options_perc,
-                                        value='pmean')],
+                                        value='parea')],
                          className='three columns'),
 
                 # Customize Color Scales
@@ -1376,40 +1377,57 @@ for i in range(1, 3):
         [[array, arrays, dates],
           colorscale, dmax, dmin, reverse] = retrieve_data(signal, choice)
 
-        # There's a lot of colorscale switching in the default settings...
+        # There's a lot of color scale switching in the default settings...
         # ...so sorry any one who's trying to figure this out, I will fix this
         if reverse_override == 'yes':
             reverse = not reverse
 
         # From the location, whatever it is, we need only need y, x and a label
         # Whether x and y are singular or vectors
-        if location[0] != 'state_mask':
-            y, x, label, sel_idx = location
-            if type(y) is int:
-                timeseries = np.array([round(a[y, x], 4) for a in arrays])
+        def timeSeries(location, arrays):
+            print("LOCATION: " + str(location))
+            if location[0] != 'state_mask':
+                y, x, label, sel_idx = location
+                if type(y) is int:
+                    timeseries = np.array([round(a[y, x], 4) for a in arrays])
+                else:
+                    x = json.loads(x)
+                    y = json.loads(y)
+                    timeseries = np.array([round(np.nanmean(a[y, x]), 4) for
+                                           a in arrays])
             else:
-                x = json.loads(x)
-                y = json.loads(y)
-                timeseries = np.array([round(np.nanmean(a[y, x]), 4) for
-                                       a in arrays])
+                flag, states, label, sel_idx = location
+                if states != 'all':
+                    states = json.loads(states)
+                    state_mask = state_arrays.copy()
+                    state_mask[~np.isin(state_mask, states)] = np.nan
+                    state_mask = state_mask * 0 + 1
+                else:
+                    state_mask = mask
+                arrays = arrays*state_mask
+                timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
+
+            return [timeseries, label]
+
+
+        # If the function is parea, we plot five overlapping timeseries
+        if function != 'parea':
+            timeseries, label = timeSeries(location, arrays)
+            bar_type = 'bar'
         else:
-            flag, states, label, sel_idx = location
-            if states != 'all':
-                states = json.loads(states)
-                state_mask = state_arrays.copy()
-                state_mask[~np.isin(state_mask, states)] = np.nan
-                state_mask = state_mask * 0 + 1
-            else:
-                state_mask = mask
-            arrays = arrays*state_mask
-            timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
+            dm_arrays = arrays.copy()
+            bar_type = 'overlay'
+            ts_series = {}
+            for i in range(5):  # 5 drought categories
+                ts_series[i] = timeSeries(location, dm_arrays[i])
+
 
         # Format dates
         dates = [pd.to_datetime(str(d)) for d in dates]
         dates = [d.strftime('%Y-%m') for d in dates]
 
         # The y-axis depends on the chosen function
-        if 'p' in function:
+        if 'p' in function and function != 'parea':
             yaxis = dict(title='Percentiles',
                           range=[0, 100])
             timeseries = timeseries * 100
@@ -1423,6 +1441,13 @@ for i in range(1, 3):
                 sd = sd*-1
             dmin = 3*sd
             dmax = -3*sd
+        elif function == 'parea':
+            yaxis = dict(title='Percent Area',
+                          range=[0, 100])
+            for i in range(5):
+                ts_series[i][0] = ts_series[i][0] * 100
+            dmin = dmin * 100
+            dmax = dmax * 100
         else:
             yaxis = dict(title='C.V.')
 
@@ -1431,19 +1456,34 @@ for i in range(1, 3):
         del arrays
 
         # Build the data dictionaries that plotly reads
-        data = [
-            dict(
-                type='bar',
-                x=dates,
-                y=timeseries,
-                marker=dict(color=timeseries,
-                            colorscale=colorscale,
-                            reversescale=reverse,
-                            autocolorscale=False,
-                            cmin=dmin,
-                            cmax=dmax,
-                            line=dict(width=0.2, color="#000000")),
-            )]
+        if function != 'parea':
+            data = [
+                dict(
+                    type='bar',
+                    x=dates,
+                    y=timeseries,
+                    marker=dict(color=timeseries,
+                                colorscale=colorscale,
+                                reversescale=reverse,
+                                autocolorscale=False,
+                                cmin=dmin,
+                                cmax=dmax,
+                                line=dict(width=0.2, color="#000000")),
+                )]
+        else:
+############################# Construction Zone #########################################
+            label = ts_series[0][1] # these are all too consistent
+            ts = [ts_series[i][0] for i in range(5)]
+            colors = ['#ffff00', '#fcd37f', '#ffaa00', '#e60000', '#730000']
+            widths = np.linspace(.1, 1, 5)
+            data = []
+            for i in range(5):
+                trace = dict(type='bar', x=dates, y=ts[i],
+                             marker=dict(color=colors[i], line=dict(width=widths[i],
+                                                                    color="#000000")))
+                data.append(trace)
+#########################################################################################
+
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
@@ -1453,9 +1493,11 @@ for i in range(1, 3):
         layout_copy['paper_bgcolor'] = "white"
         layout_copy['height'] = 250
         layout_copy['yaxis'] = yaxis
-        layout_copy['hovermode'] = 'closest',
+        layout_copy['hovermode'] = 'closest'
+        layout_copy['barmode'] = bar_type
         layout_copy['titlefont']['color'] = '#636363'
         layout_copy['font']['color'] = '#636363'
+
         figure = dict(data=data, layout=layout_copy)
 
         return figure
