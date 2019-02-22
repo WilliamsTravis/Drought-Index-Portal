@@ -165,29 +165,20 @@ def gridToPoint(grid, gridid):
 grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 mask = grid*0+1
 
-# County Data Frame
-# counties_df = pd.read_csv("data/counties.csv")
-# counties_df = counties_df[['grid', 'county', 'state']]
-# counties_df['place'] = (counties_df['county'] +
-#                         ' County, ' + counties_df['state'])
-# #  This will append a gradient value to each cell entry for labeling
-# # Only need to do this once
-# gradient = mask.copy()
-# for i in range(gradient.shape[0]):
-#     for j in range(gradient.shape[1]):
-#         gradient[i, j] = i*j
-# gradient = gradient * mask
-# gradient_dict = dict(zip(list(grid.flatten()), list(gradient.flatten())))
-# counties_df['gradient'] = counties_df['grid'].apply(lambda x: gradient_dict[x])
-# counties_df.to_csv("data/counties2.csv", index=False)
-
-counties_df = pd.read_csv("data/counties2.csv")
+# County Data Frame and options
+counties_df = pd.read_csv('data/counties3.csv')
 c_df = pd.read_csv('data/unique_counties.csv')
 rows = [r for idx, r in c_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
 options_pos = {county_options[i]['label']: i for
                i in range(len(county_options))}
 just_counties = [d['label'] for d in county_options]
+
+# State options
+states_df = counties_df[['STATE_NAME', 'FIPS State']].drop_duplicates()
+rows = [r for idx, r in states_df.iterrows()]
+state_options = [{'label': r['STATE_NAME'], 'value': r['FIPS State']} for
+                  r in rows]
 
 # This is to associate grid ids with points, only once
 # point_dict = {gridid: gridToPoint(grid, gridid) for  # Takes too long
@@ -311,7 +302,14 @@ def divMaker(id_num, index='noaa'):
                                            clearable=False,
                                            value=24098.0)],
                              style={'width': '30%',
-                                    'float': 'left'})],
+                                    'float': 'left'}),
+                    html.Div([dcc.Dropdown(id='state_{}'.format(id_num),
+                                            options=state_options,
+                                            clearable=False,
+                                            value=8)],
+                              style={'width': '30%',
+                                      'float': 'left'})
+                    ],
                     className='row'),
                  dcc.Graph(id='map_{}'.format(id_num),
                            config={'staticPlot': False}),
@@ -553,10 +551,10 @@ app.layout = html.Div([
         html.Div(id='county_time_2', style={'display': 'none'}),
         html.Div(id='county_time_3', style={'display': 'none'}),
         html.Div(id='county_time_4', style={'display': 'none'}),
-        # html.Div(id='cache_check_1', style={'display': 'none'}),
-        # html.Div(id='cache_check_2', style={'display': 'none'}),
-        # html.Div(id='cache_check_3', style={'display': 'none'}),
-        # html.Div(id='cache_check_4', style={'display': 'none'}),
+        html.Div(id='state_time_1', style={'display': 'none'}),
+        html.Div(id='state_time_2', style={'display': 'none'}),
+        html.Div(id='state_time_3', style={'display': 'none'}),
+        html.Div(id='state_time_4', style={'display': 'none'}),
         html.Div(id='choice_store', style={'display': 'none'}),
 
         # The end!
@@ -840,8 +838,8 @@ for i in range(1, 5):
         
         # List of all selection times
         times = [cl_time1, cl_time2, cl_time3, cl_time4,
-                 co_time1, co_time2, co_time3, co_time4,
-                 sl_time1, sl_time2, sl_time3, sl_time4]
+                  co_time1, co_time2, co_time3, co_time4,
+                  sl_time1, sl_time2, sl_time3, sl_time4]
 
         # Index position of most recent selection
         sel_idx = times.index(max(times))
@@ -902,7 +900,6 @@ for i in range(1, 5):
         # Clear memory space...what's the best way to do this?
         gc.collect()
 
-
         # Create signal for the global_store
         signal = json.loads(signal)
 
@@ -954,8 +951,8 @@ for i in range(1, 5):
         grid2[np.isnan(grid2)] = 0
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, counties_df, how='inner')
-        pdf['data'] = pdf['data'].astype(float).round(3)
-        pdf['printdata'] = pdf['place'] + ":<br>     " + pdf['data'].apply(str)
+        pdf['data'] = pdf['data'].astype(float) # .round(3)
+        pdf['printdata'] = pdf['place'] + ":<br>     " + pdf['data'].apply(lambda x: x*100).round(3).apply(str)
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
@@ -1090,6 +1087,8 @@ for i in range(1, 5):
                  co_time1, co_time2, co_time3, co_time4,
                  sl_time1, sl_time2, sl_time3, sl_time4]
 
+        print(times)
+        print(sels)
         # Index position of most recent selection
         sel_idx = times.index(max(times))
 

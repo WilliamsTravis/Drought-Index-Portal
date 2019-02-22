@@ -41,7 +41,7 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
     data_path = '/root/Sync'
 
-from functions import Index_Maps, readRaster, percentileArrays
+from functions import Index_Maps, readRaster, percentileArrays, im
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 
 # In[] set up
@@ -75,10 +75,6 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'eddi2': 'Evaporative Demand Drought Index - 2 month',
              'eddi3': 'Evaporative Demand Drought Index - 3 month',
              'eddi6': 'Evaporative Demand Drought Index - 6 month'}
-
-# For quick array imaging
-def im(array):
-    plt.imshow(array)
 
 # Starting today
 todays_date = dt.datetime.today()

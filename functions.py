@@ -14,9 +14,10 @@ import dash_html_components as html
 import datetime as dt
 from dateutil.relativedelta import relativedelta
 import gc
+import matplotlib.pyplot as plt
+import numpy as np
 from osgeo import gdal
 import os
-import numpy as np
 import json
 import scipy
 from scipy.stats import rankdata
@@ -33,6 +34,10 @@ else:
     data_path = '/root/Sync'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 
+grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
+
+
+######## Functions ############################################################
 def calculateCV(indexlist):
     '''
      A single array showing the distribution of coefficients of variation
@@ -62,27 +67,6 @@ def calculateCV(indexlist):
 
     return covs
 
-class Cacher:
-    def __init__(self, key):
-        self.cache={}
-        self.key=key
-    def memoize(self, function):
-        def cacher(*args):
-            # print("Cache Key: " + str(self.key))
-            arg = [a for a in args]
-            key = json.dumps(arg)
-            if key not in self.cache.keys():
-                print("Generating/replacing dataset...")
-                if self.cache:
-                    del self.cache[list(self.cache.keys())[0]]
-                self.cache.clear()
-                gc.collect()
-                self.cache[key] = function(*args)
-            else:
-                print("Returning existing dataset...")
-            return self.cache[key]
-        return cacher
-
 
 def coordinateDictionaries(source):
     '''
@@ -104,6 +88,34 @@ def coordinateDictionaries(source):
     latdict = dict(zip(lats, ys))
 
     return londict, latdict, res
+
+def im(array):
+    '''
+    This just plots an array as an image
+    '''
+    plt.imshow(array)
+
+######### Classes #############################################################
+class Cacher:
+    def __init__(self, key):
+        self.cache={}
+        self.key=key
+    def memoize(self, function):
+        def cacher(*args):
+            # print("Cache Key: " + str(self.key))
+            arg = [a for a in args]
+            key = json.dumps(arg)
+            if key not in self.cache.keys():
+                print("Generating/replacing dataset...")
+                if self.cache:
+                    del self.cache[list(self.cache.keys())[0]]
+                self.cache.clear()
+                gc.collect()
+                self.cache[key] = function(*args)
+            else:
+                print("Returning existing dataset...")
+            return self.cache[key]
+        return cacher
 
 
 class Index_Maps():
@@ -167,18 +179,19 @@ class Index_Maps():
                    'Greys': 'Greys', 'Hot': 'Hot', 'Jet': 'Jet',
                    'Picnic': 'Picnic', 'Portland': 'Portland',
                    'Rainbow': 'Rainbow', 'RdBu': 'RdBu',  'Viridis': 'Viridis',
-                   'Reds': 'Reds', 'RdWhBu': [[0.00, 'rgb(115,0,0)'],
-                                              [0.10, 'rgb(230,0,0)'],
-                                              [0.20, 'rgb(255,170,0)'],
-                                              [0.30, 'rgb(252,211,127)'],
-                                              [0.40, 'rgb(255, 255, 0)'],
-                                              [0.45, 'rgb(255, 255, 255)'],
-                                              [0.55, 'rgb(255, 255, 255)'],
-                                              [0.60, 'rgb(143, 238, 252)'],
-                                              [0.70, 'rgb(12,164,235)'],
-                                              [0.80, 'rgb(0,125,255)'],
-                                              [0.90, 'rgb(10,55,166)'],
-                                              [1.00, 'rgb(5,16,110)']],
+                   'Reds': 'Reds', 
+                   'RdWhBu': [[0.00, 'rgb(115,0,0)'],
+                              [0.10, 'rgb(230,0,0)'],
+                              [0.20, 'rgb(255,170,0)'],
+                              [0.30, 'rgb(252,211,127)'],
+                              [0.40, 'rgb(255, 255, 0)'],
+                              [0.45, 'rgb(255, 255, 255)'],
+                              [0.55, 'rgb(255, 255, 255)'],
+                              [0.60, 'rgb(143, 238, 252)'],
+                              [0.70, 'rgb(12,164,235)'],
+                              [0.80, 'rgb(0,125,255)'],
+                              [0.90, 'rgb(10,55,166)'],
+                              [1.00, 'rgb(5,16,110)']],
                    'RdWhBu (NOAA PSD Scale)':  [[0.00, 'rgb(115,0,0)'],
                                                 [0.02, 'rgb(230,0,0)'],
                                                 [0.05, 'rgb(255,170,0)'],
@@ -196,7 +209,6 @@ class Index_Maps():
                                   [0.5, 'rgb(76, 145, 33)'],
                                   [0.85, 'rgb(0, 92, 221)'],
                                    [1.00, 'rgb(0, 46, 110)']],                   
-
                    'BrGn':  [[0.00, 'rgb(91, 74, 35)'],  #darkest brown
                              [0.10, 'rgb(122, 99, 47)'], # almost darkest brown
                              [0.15, 'rgb(155, 129, 69)'], # medium brown 
@@ -211,7 +223,7 @@ class Index_Maps():
                              [0.85, 'rgb(52,150,142)'],  # medium green
                              [0.90, 'rgb(1,102,94)'],  # almost darkest green
                              [1.00, 'rgb(0, 73, 68)']], # darkest green
-                 }
+                   }
 
         if self.colorscale == 'Default':
             if default == 'percentile':
@@ -224,7 +236,7 @@ class Index_Maps():
             scale = options[self.colorscale]
 
         return scale
-        
+
     def getOriginal(self):
         '''
         Retrieve Original Timeseries
@@ -235,6 +247,7 @@ class Index_Maps():
                                   self.choice + '.nc')
         with xr.open_dataset(array_path) as data:
             indexlist = data
+            indexlist = indexlist * self.mask
             data.close()
 
         # Get total Min and Max Values for colors
@@ -265,6 +278,35 @@ class Index_Maps():
                                   self.choice + '.nc')
         with xr.open_dataset(array_path) as data:
             indexlist = data
+            indexlist = indexlist * self.mask
+            data.close()
+
+        # Get total Min and Max Values for colors
+        dmax = 1
+        dmin = 0
+
+        # filter by date
+        d1 = dt.datetime(self.year1, self.month1, 1)
+        d2 = dt.datetime(self.year2, self.month2, 1)
+        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)  # last day
+        arrays = indexlist.sel(time=slice(d1, d2))
+        del indexlist
+
+        return [arrays, dmin, dmax]
+
+    def getAlbersPercentile(self):
+        '''
+        Retrieve Percentiles of Original Timeseries in North American
+        Albers Equal Area Conic.
+        '''
+        # Get time series of values
+        array_path = os.path.join(
+                            data_path,
+                            "data/droughtindices/netcdfs/percentiles/albers",
+                            self.choice + '.nc')
+        with xr.open_dataset(array_path) as data:
+            indexlist = data
+            indexlist =  indexlist * self.mask
             data.close()
 
         # Get total Min and Max Values for colors
@@ -554,7 +596,6 @@ def readRaster(rasterpath, band, navalue=-9999):
     array[array==navalue] = np.nan
     return(array, geometry, arrayref)
 
-
 def standardize(indexlist):
     '''
     Min/max standardization
@@ -590,20 +631,22 @@ def makeMap(signal, choice):
 
     maps = Index_Maps(time_range, colorscale, reverse, choice)
 
-    if function == "mean_original":
+    if function == "omean":
         data = maps.meanOriginal()
     if function == "omax":
         data = maps.maxOriginal()
     if function == "omin":
         data = maps.minOriginal()
-    if function == "mean_perc":
+    if function == "pmean":
         data = maps.meanPercentile()
-    if function == "max":
+    if function == "pmax":
         data = maps.maxPercentile()
-    if function == "min":
+    if function == "pmin":
         data = maps.minPercentile()
     if function == "ocv":
         data = maps.coefficientVariation()
+    if function == "parea":
+        data = maps.meanPercentile()  # This will require some extra doing...
     return data
 
 
