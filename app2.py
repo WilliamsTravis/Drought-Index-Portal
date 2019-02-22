@@ -71,12 +71,11 @@ cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_THRESHOLD': 4})
 
 #cache = Cache(config={'CACHE_TYPE': 'redis',
- #                     'CACHE_REDIS_URL': os.environ.get('localhost:6379')})
+#                      'CACHE_REDIS_URL': os.environ.get('localhost:6379')})
 
 cache.init_app(server)
 
 # In[] Drought and Climate Indices (looking to include any raster time series)
-
 # Drought Severity Categories in percentile space
 drought_cats = {0: [20, 30], 1: [10, 20], 2: [5, 10], 3: [2, 5], 4: [0, 2]}
 
@@ -207,8 +206,6 @@ county_dict = np.load('data/county_dict.npy').item()
 index_ranges = pd.read_csv('data/index_ranges.csv')
 
 ###############################################################################
-
-
 # For when EDDI before 1980 is selected
 with np.load("data/NA_overlay.npz") as data:
     na = data.f.arr_0
@@ -472,24 +469,18 @@ app.layout = html.Div([
                                    "of the time series between each map"),
                             style={'background-color': '#c7d4ea',
                                    'border-radius': '2px',
-                                   'margin-bottom': '30'}),
-                # Submission Button
-                html.Button(id='submit',
-                            children='Submit Options',
-                            type='button',
-                            style = {'background-color': '#C7D4EA',
-                                      'border-radius': '2px',
-                                      'font-family': 'Times New Roman',}),
-            ],style={'margin-bottom': '30',
-                     'text-align': 'center'}),
+                                   'margin-bottom': '30'})],
+                style={'margin-bottom': '30',
+                       'text-align': 'center'}),
 
-        html.Div([html.Div([dcc.Markdown(id='description')],
-                            style={'text-align':'center',
-                                   'width':'70%',
-                                   'margin':'0px auto'})],
-                   style={'text-align':'center',
-                          'margin': '0 auto',
-                          'width': '100%'}),
+        html.Div([
+            html.Div([dcc.Markdown(id='description')],
+                     style={'text-align':'center',
+                            'width':'70%',
+                            'margin':'0px auto'})],
+            style={'text-align':'center',
+                   'margin': '0 auto',
+                   'width': '100%'}),
 
         # Year Slider
         html.Div(id='options',
@@ -571,18 +562,32 @@ app.layout = html.Div([
                         dcc.Dropdown(id='colors',
                                      options=color_options,
                                      value='Default')],
-                         className='two columns'),
+                         className='three columns'),
                 ],
                className='row',
-               style={'margin-bottom': '50',
-                      'margin-top': '0'}),
+               style={
+                      'margin-bottom': '50',
+                      'margin-top': '0',
+                      # 'margin': '0 auto',
+                      # 'text-align': 'center'
+               }),
         ]),
+
+        # Break
+        html.Br(style={'line-height': '500%'}),
+
+        # Submission Button
+        html.Div([
+            html.Button(id='submit',
+                        children='Submit Options',
+                        type='button',
+                        style={'background-color': '#C7D4EA',
+                               'border-radius': '2px',
+                               'font-family': 'Times New Roman',})],
+            style={'text-align': 'center'}),
 
         # Break line
         html.Hr(),
-
-        # Break
-        html.Br(style={'line-height': '150%'}),
 
         # Four by Four Map Layout
         # Row 1
@@ -590,8 +595,8 @@ app.layout = html.Div([
                  className='row'),
 
         # Row 2
-        html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],
-                 className='row'),
+        # html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],
+        #          className='row'),
 
         # Signals
         html.Div(id='signal', style={'display': 'none'}),
@@ -857,7 +862,6 @@ def locationPicker(cl_time1, cl_time2,
                    # loc_time3, loc_time4,
                    sl_time1, sl_time2,
                    # sl_time3, sl_time4,
-                   # signal, choice, choice_store, key, sync,
                    cl1, cl2,
                    # cl3, cl4,
                    loc1, loc2,
@@ -872,7 +876,10 @@ def locationPicker(cl_time1, cl_time2,
     selection to be used across all elements if syncing is on. 
     
     It would be best if the selection as in a standard format. Perhaps just
-    x, y coords and a label. 
+    x, y coords and a label.
+
+    Also, to help unsync, I'm adding an index position of the click to the location
+    object.
         
     '''
     times = [cl_time1, cl_time2,
@@ -891,7 +898,8 @@ def locationPicker(cl_time1, cl_time2,
             # sl3, sl4
             ]
     sels = [default_click if s is None else s for s in sels]
-    location = sels[times.index(max(times))]
+    idx = times.index(max(times))
+    location = sels[idx]
 
     # Several types here:
     print('LOCATION: ' + str(location))
@@ -901,7 +909,7 @@ def locationPicker(cl_time1, cl_time2,
     if type(location) is int and len(str(location)) >= 3:
         county = counties_df['place'][counties_df.grid == location].item()
         y, x = np.where(grid == location)
-        location = [int(y), int(x), county]
+        location = [int(y), int(x), county, idx]
 
     # elif type(location) is int and len(str(location)) <=2:  Does this happen with multi?
 
@@ -910,29 +918,24 @@ def locationPicker(cl_time1, cl_time2,
         print('location is a list: ' + str(location))
         # Empty, default to CONUS
         if len(location) == 0:
-            location = ['state_mask', 'all', 'Contiguous United States']
+            location = ['state_mask', 'all', 'Contiguous United States', idx]
 
         elif len(location) == 1 and location[0] == 'all':
-            location = ['state_mask', 'all', 'Contiguous United States']
+            location = ['state_mask', 'all', 'Contiguous United States', idx]
 
         # Single or multiple, not all or empty, state or list of states
         elif len(location) >= 1:
-            # if 'all' in location:
-            #     location.pop(location.index('all'))
-            # state_mask = state_arrays.copy()
-            # state_mask[~np.isin(state_mask, location)] = np.nan
-            # state_mask = state_mask * 0 + 1
-
             # So let's return the mask, a flag, and the state names
             state = list(states_df['STUSAB'][
                          states_df['FIPS State'].isin(location)])
             if len(state) < 4:
-                state = [states_df['STATE_NAME'][states_df['STUSAB'] == s].item() for s in state]
+                state = [states_df['STATE_NAME'][states_df['STUSAB'] == s].item() for
+                         s in state]
             states = ", ".join(state)
-            location = ['state_mask', str(location), states]
+            location = ['state_mask', str(location), states, idx]
 
     elif type(location) is str:
-        location = ['state_mask', 'all', 'Contiguous United States']
+        location = ['state_mask', 'all', 'Contiguous United States', idx]
 
     # 4: Location is a point object
     elif type(location) is dict:
@@ -948,7 +951,7 @@ def locationPicker(cl_time1, cl_time2,
                 label = ""
             else:
                 label = county[0]
-            location = [y, x, label]
+            location = [y, x, label, idx]
 
         elif len(location['points']) > 1:
             selections = location['points']
@@ -968,9 +971,9 @@ def locationPicker(cl_time1, cl_time2,
                 label = NW + " to " + SE
             else:
                 label = NW
-            location = [str(y), str(x), label]
+            location = [str(y), str(x), label, idx]
     else:
-        location = [50, 50, 'No Selection Found']
+        location = [50, 50, 'No Selection Found', idx]
 
     return location
 
@@ -978,10 +981,11 @@ def locationPicker(cl_time1, cl_time2,
 @app.callback(Output('choice_store', 'children'),
               [Input('choice_1', 'value'),
                Input('choice_2', 'value'),
-               Input('choice_3', 'value'),
-               Input('choice_4', 'value')])
-def choiceStore(choice1, choice2, choice3, choice4):
-    return (json.dumps([choice1, choice2, choice3, choice4]))
+               # Input('choice_3', 'value'),
+               # Input('choice_4', 'value')
+               ])
+def choiceStore(choice1, choice2): # choice3, choice4):
+    return (json.dumps([choice1, choice2])) # choice3, choice4]))
 
 # Store data in the cache and hide the signal to activate it in the hidden div
 @app.callback(Output('signal', 'children'),
@@ -1049,7 +1053,16 @@ for i in range(1, 3):
             multi = True
         return multi
 
-    # @app.callback(Output('county_{}'.format(i), 'options'),
+    @app.callback(Output('location_{}'.format(i), 'placeholder'),
+                  [Input('location_tab_{}'.format(i), 'value')])
+    def displayLocation(tab_choice):
+        if tab_choice == 'county':
+            placeholder = 'Boulder County, CO'
+        else:
+            placeholder = 'Contiguous United States'
+        return placeholder
+
+    # @app.callback(Output('county_a{}'.format(i), 'options'),
     #               [Input('time_1', 'children'),
     #                 Input('time_2', 'children'),
     #                 Input('time_3', 'children'),
@@ -1155,10 +1168,17 @@ for i in range(1, 3):
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_{}'.format(i), 'value'),
                    Input('signal', 'children'),
-                   Input('update_map_{}'.format(i), 'n_clicks')],
+                   Input('update_map_1', 'n_clicks'),
+                   Input('update_map_2', 'n_clicks')],
                   [State('location_store', 'children'),
-                   State('key_{}'.format(i), 'children')])
-    def makeGraph(choice, signal, click, location, key):
+                   State('key_{}'.format(i), 'children'),
+                   State('click_sync', 'children')])
+    def makeGraph(choice, signal, click1, click2, location, key, sync):
+        if 'On' not in sync:
+            sel_idx = location[3]
+            idx = int(key) - 1  # Graph ID
+            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
+                raise PreventUpdate
 
         print("Rendering Map #{}".format(int(key)))
 
@@ -1193,7 +1213,7 @@ for i in range(1, 3):
         #Filter by state
         if location:
             if location[0] == 'state_mask':
-                flag, states, label = location
+                flag, states, label, sel_idx = location
                 if states != 'all':
                     states = json.loads(states)
                     state_mask = state_arrays.copy()
@@ -1251,7 +1271,6 @@ for i in range(1, 3):
             date_print = "{}, {}".format(monthmarks[m1], y1)
 
         # The y-axis depends on the chosen function
-        labels = {d['value']: d['label'] for d in function_options}
         if 'p' in function:
             yaxis = dict(title='Percentiles',
                           range=[0, 100])
@@ -1314,23 +1333,22 @@ for i in range(1, 3):
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children'),
-                   Input('location_store', 'children')],
-                  [State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children')])
+                   Input('location_store', 'children'),
+                   Input('click_sync', 'children')],
+                  [State('key_{}'.format(i), 'children')])
     def makeSeries(submit, signal, choice, choice_store, location,
-                   key, sync):
+                   sync, key):
         '''
         Each callback is called even if this isn't synced...It would require
           a whole new set of callbacks to avoid the lag from that. Also, the
           synced click process is too slow...what can be done?
         '''
-
-
-        # # Get the appropriate selection
-        # if 'On' not in sync:
-        #     idx = int(key) - 1  # Graph ID
-        #     if sel_idx not in idx + np.array([0, 4, 8, 12]):  # Associated sels
-        #         raise PreventUpdate
+        # Get the appropriate selection
+        sel_idx = location[3]
+        if 'On' not in sync:
+            idx = int(key) - 1  # Graph ID
+            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
+                raise PreventUpdate
         #     else:
         #         idxs = [idx, idx + 4, idx + 8, idx + 12]
         #         key_sels = list(np.array(sels)[idxs])
@@ -1366,7 +1384,7 @@ for i in range(1, 3):
         # From the location, whatever it is, we need only need y, x and a label
         # Whether x and y are singular or vectors
         if location[0] != 'state_mask':
-            y, x, label = location
+            y, x, label, sel_idx = location
             if type(y) is int:
                 timeseries = np.array([round(a[y, x], 4) for a in arrays])
             else:
@@ -1375,7 +1393,7 @@ for i in range(1, 3):
                 timeseries = np.array([round(np.nanmean(a[y, x]), 4) for
                                        a in arrays])
         else:
-            flag, states, label = location
+            flag, states, label, sel_idx = location
             if states != 'all':
                 states = json.loads(states)
                 state_mask = state_arrays.copy()
@@ -1391,7 +1409,6 @@ for i in range(1, 3):
         dates = [d.strftime('%Y-%m') for d in dates]
 
         # The y-axis depends on the chosen function
-        labels = {d['value']: d['label'] for d in function_options}
         if 'p' in function:
             yaxis = dict(title='Percentiles',
                           range=[0, 100])
