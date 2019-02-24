@@ -278,6 +278,7 @@ class Index_Maps():
                                   "data/droughtindices/netcdfs/percentiles",
                                   self.choice + '.nc')
         indexlist, dmin, dmax = self.getData(array_path)
+        indexlist = indexlist * 100
         gc.collect()
         return [indexlist, dmin, dmax]
 

@@ -1241,8 +1241,8 @@ for i in range(1, 3):
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, counties_df, how='inner')
         pdf['data'] = pdf['data'].astype(float)
-        pdf['printdata'] = (pdf['place'] + ":<br>     " +
-                        pdf['data'].apply(lambda x: x*100).round(3).apply(str))
+        pdf['printdata'] = (pdf['place'] + ":<br>    " +
+                            pdf['data'].round(3).apply(str))
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
@@ -1265,9 +1265,6 @@ for i in range(1, 3):
         if 'p' in function:
             yaxis = dict(title='Percentiles',
                           range=[0, 100])
-            df['data'] = df['data'] * 100
-            amin = amin * 100
-            amax = amax * 100
         elif 'o' in function and 'cv' not in function:
             dmin = index_ranges['min'][index_ranges['index'] == choice]
             dmax = index_ranges['max'][index_ranges['index'] == choice]
@@ -1402,9 +1399,6 @@ for i in range(1, 3):
         if 'p' in function and function != 'parea':
             yaxis = dict(title='Percentiles',
                          range=[0, 100])
-            timeseries = timeseries * 100
-            dmin = dmin * 100
-            dmax = dmax * 100
         elif 'o' in function and 'cv' not in function:
             yaxis = dict(range=[dmin, dmax],
                           title='Index')
@@ -1416,10 +1410,6 @@ for i in range(1, 3):
         elif function == 'parea':
             yaxis = dict(title='Percent Area',
                           range=[0, 100])
-            for i in range(5):
-                ts_series[i][0] = ts_series[i][0] * 100
-            dmin = dmin * 100
-            dmax = dmax * 100
         else:
             yaxis = dict(title='C.V.')
 
@@ -1470,7 +1460,7 @@ for i in range(1, 3):
         layout_copy['yaxis'] = yaxis
         # layout_copy['xaxis'] = dict(tickvals=xs,
         #                             ticktext=dates)
-        layout_copy['hovermode'] = 'closest'
+        layout_copy['hovermode'] = 'compare'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
                                      y=-.5, markers=dict(size=8),
