@@ -102,7 +102,6 @@ class Cacher:
         self.key=key
     def memoize(self, function):
         def cacher(*args):
-            # print("Cache Key: " + str(self.key))
             arg = [a for a in args]
             key = json.dumps(arg)
             if key not in self.cache.keys():
@@ -117,7 +116,7 @@ class Cacher:
             return self.cache[key]
         return cacher
 
-
+# Main Functions for app
 class Index_Maps():
     '''
     This class creates a singular map as a function of some timeseries of
@@ -137,6 +136,7 @@ class Index_Maps():
                                   'spi2', 'spi3', 'spi6', 'spei1', 'spei2',
                                   'spei3', 'spei6', 'eddi1', 'eddi2', 'eddi3',
                                   'eddi6'
+
         Each function returns:
 
             array      = Singular 2D Numpy array of function output
@@ -148,11 +148,11 @@ class Index_Maps():
 
     # Reduce memory by preallocating attribute slots
     __slots__ = ('year1', 'year2', 'month1', 'month2', 'function',
-                 'colorscale', 'reverse', 'choice', 'mask')
+                 'colorscale', 'reverse', 'choice', 'grid', 'mask')
 
     # Create Initial Values
     def __init__(self, time_range=[[2000, 2017], [1, 12]],
-                 colorscale='Viridis', reverse='no', choice='pdsi'): 
+                 colorscale='Viridis',reverse='no', choice='pdsi'): 
         self.year1 = time_range[0][0]
         self.year2 = time_range[0][1]
         if self.year1 == self.year2:
@@ -164,8 +164,9 @@ class Index_Maps():
         self.colorscale = colorscale
         self.reverse = reverse
         self.choice = choice
-        grid = np.load(os.path.join(data_path, "data/prfgrid.npz"))["grid"]
-        self.mask = grid * 0 + 1
+        self.grid = np.load(os.path.join(data_path,
+                                         "data/prfgrid.npz"))["grid"]
+        self.mask = self.grid * 0 + 1
 
     def setColor(self, default='percentile'):
         '''
@@ -234,93 +235,65 @@ class Index_Maps():
                 scale = options['Portland'] 
         else:
             scale = options[self.colorscale]
-
+        print("SCALE :" + json.dumps(scale))
         return scale
 
+    def getData(self, array_path):
+        '''
+        The challenge is to read as little as possible into memory without
+        slowing the app down.
+        '''        
+        # Get time series of values
+        # filter by date and location
+        print(array_path)
+        d1 = dt.datetime(self.year1, self.month1, 1)
+        d2 = dt.datetime(self.year2, self.month2, 1)
+        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)  # last day
+        
+        with xr.open_dataset(array_path) as data:
+            limits = [abs(np.nanmin(data.value.data)),
+                      abs(np.nanmax(data.value.data))]
+            dmax = max(limits)  # Makes an even graph
+            dmin = dmax*-1
+            data = data.sel(time=slice(d1, d2)) * self.mask
+            indexlist = data
+            del data
+
+        return [indexlist, dmax, dmin]
+        
     def getOriginal(self):
         '''
         Retrieve Original Timeseries
         '''
-        # Get time series of values
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/",
                                   self.choice + '.nc')
-        with xr.open_dataset(array_path) as data:
-            indexlist = data
-            indexlist = indexlist * self.mask
-            data.close()
-
-        # Get total Min and Max Values for colors
-        values = indexlist.value.data
-        values[values == 0] = np.nan
-        limits = [abs(np.nanmin(values)), abs(np.nanmax(values))]
-        dmax = max(limits)
-        dmin = dmax*-1
-        del values
-
-        # filter by date
-        d1 = dt.datetime(self.year1, self.month1, 1)
-        d2 = dt.datetime(self.year2, self.month2, 1)
-        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)  # last day
-        arrays = indexlist.sel(time=slice(d1, d2))
-        del indexlist
-
-        return [arrays, dmin, dmax]
-
+        indexlist, dmin, dmax = self.getData(array_path)
+        gc.collect()
+        return [indexlist, dmin, dmax]
 
     def getPercentile(self):
         '''
         Retrieve Percentiles of Original Timeseries
         '''
-        # Get time series of values
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/percentiles",
                                   self.choice + '.nc')
-        with xr.open_dataset(array_path) as data:
-            indexlist = data
-            indexlist = indexlist * self.mask
-            data.close()
+        indexlist, dmin, dmax = self.getData(array_path)
+        gc.collect()
+        return [indexlist, dmin, dmax]
 
-        # Get total Min and Max Values for colors
-        dmax = 1
-        dmin = 0
-
-        # filter by date
-        d1 = dt.datetime(self.year1, self.month1, 1)
-        d2 = dt.datetime(self.year2, self.month2, 1)
-        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)  # last day
-        arrays = indexlist.sel(time=slice(d1, d2))
-        del indexlist
-
-        return [arrays, dmin, dmax]
-
-    def getAlbersPercentile(self):
+    def getAlbers(self):
         '''
         Retrieve Percentiles of Original Timeseries in North American
         Albers Equal Area Conic.
         '''
-        # Get time series of values
-        array_path = os.path.join(
-                            data_path,
-                            "data/droughtindices/netcdfs/percentiles/albers",
-                            self.choice + '.nc')
-        with xr.open_dataset(array_path) as data:
-            indexlist = data
-            indexlist =  indexlist * self.mask
-            data.close()
-
-        # Get total Min and Max Values for colors
-        dmax = 1
-        dmin = 0
-
-        # filter by date
-        d1 = dt.datetime(self.year1, self.month1, 1)
-        d2 = dt.datetime(self.year2, self.month2, 1)
-        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)  # last day
-        arrays = indexlist.sel(time=slice(d1, d2))
-        del indexlist
-
-        return [arrays, dmin, dmax]
+        array_path = os.path.join(data_path,
+                                  "data/droughtindices/netcdfs/albers",
+                                  self.choice + '.nc')
+        indexlist, dmin, dmax = self.getData(array_path)
+        gc.collect()
+        return [indexlist, dmin, dmax]
 
     def calculateCV(indexlist):
         '''
@@ -356,18 +329,13 @@ class Index_Maps():
         Calculate mean of original index values
         '''
         # Get time series of values
-        [arrays, dmin, dmax] = self.getOriginal()
+        [indexlist, dmin, dmax] = self.getOriginal()
 
         # Get data
-        data = arrays.mean('time')
-        array = data.value.data
-        del data
-        array[array == 0] = np.nan
-        # array = array*self.mask
-
-        # It is easier to work with these in this format
-        dates = arrays.time.data
-        arrays = arrays.value.data
+        array = indexlist.mean('time').value.data
+        arrays = indexlist.value.data
+        dates = indexlist.time.data
+        del indexlist
         
         # Get color scale        
         colorscale = self.setColor(default='original')
@@ -378,36 +346,31 @@ class Index_Maps():
         else:
             reverse = False
 
-        return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
-
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
     def maxOriginal(self):
         '''
         Calculate max of original index values
         '''
         # Get time series of values
-        [arrays, dmin, dmax] = self.getOriginal()
+        [indexlist, dmin, dmax] = self.getOriginal()
 
         # Get data
-        data = arrays.max('time')
-        array = data.value.data
-        del data
-        array[array == 0] = np.nan
-        # array = array*self.mask
-
-        # It is easier to work with these in this format
-        dates = arrays.time.data
-        arrays = arrays.value.data
+        array = indexlist.max('time').value.data
+        arrays = indexlist.value.data
+        dates = indexlist.time.data
+        del indexlist
         
         # Get color scale        
         colorscale = self.setColor(default='original')
 
+        # EDDI has a reversed scale
         if 'eddi' in self.choice:
             reverse = True
         else:
             reverse = False
 
-        return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
 
     def minOriginal(self):
@@ -415,29 +378,23 @@ class Index_Maps():
         Calculate max of original index values
         '''
         # Get time series of values
-        [arrays, dmin, dmax] = self.getOriginal()
+        [indexlist, dmin, dmax] = self.getOriginal()
 
         # Get data
-        data = arrays.min('time')
-        array = data.value.data
-        del data
-        array[array == 0] = np.nan
-        # array = array*self.mask
-
-        # It is easier to work with these in this format
-        dates = arrays.time.data
-        arrays = arrays.value.data
+        data = indexlist.min('time').value.data
+        arrays = indexlist.value.data
+        dates = indexlist.time.data
+        del indexlist
         
         # Get color scale        
         colorscale = self.setColor(default='original')
 
-
+        # EDDI has a reversed scale
         if 'eddi' in self.choice:
             reverse = True
         else:
             reverse = False
-
-        return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
 
     def meanPercentile(self):
@@ -445,115 +402,94 @@ class Index_Maps():
         Calculate mean of percentiles of original index values
         '''
         # Get time series of values
-        [arrays, dmin, dmax] = self.getPercentile()
+        [indexlist, dmin, dmax] = self.getPercentile()
 
         # Get data
-        data = arrays.mean('time')
-        array = data.value.data
-        del data
-        array[array == 0] = np.nan
-        # array = array*self.mask
+        array = indexlist.mean('time').value.data
+        arrays = indexlist.value.data 
+        dates = indexlist.time.data
+        del indexlist
         
-        # It is easier to work with these in this format
-        dates = arrays.time.data
-        arrays = arrays.value.data
-
         # Get color scale        
         colorscale = self.setColor(default='percentile')
 
+        # EDDI has a reversed scale
         if 'eddi' in self.choice:
             reverse = True
         else:
             reverse = False
-
-        return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
 
     def maxPercentile(self):
         '''
         Calculate mean of percentiles of original index values
         '''
-        # Get time series of values
-        [arrays, dmin, dmax] = self.getPercentile()
+         # Get time series of values
+        [indexlist, dmin, dmax] = self.getPercentile()
 
         # Get data
-        data = arrays.max('time')
-        array = data.value.data
-        del data
-        array[array == 0] = np.nan
-        # array = array*self.mask
+        array = indexlist.max('time').value.data
+        arrays = indexlist.value.data
+        dates = indexlist.time.data
+        del indexlist
         
-        # It is easier to work with these in this format
-        dates = arrays.time.data
-        arrays = arrays.value.data
-
         # Get color scale        
         colorscale = self.setColor(default='percentile')
 
+        # EDDI has a reversed scale
         if 'eddi' in self.choice:
             reverse = True
         else:
             reverse = False
 
-        return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
 
     def minPercentile(self):
         '''
         Calculate mean of percentiles of original index values
         '''
-        # Get time series of values
-        [arrays, dmin, dmax] = self.getPercentile()
+         # Get time series of values
+        [indexlist, dmin, dmax] = self.getPercentile()
 
         # Get data
-        data = arrays.min('time')
-        array = data.value.data
-        del data
-        array[array == 0] = np.nan
-        # array = array*self.mask
+        arrays = indexlist.value.data
+        array = indexlist.max('time').value.data
+        dates = indexlist.time.data
+        del indexlist
         
-        # It is easier to work with these in this format
-        dates = arrays.time.data
-        arrays = arrays.value.data
-
         # Get color scale        
         colorscale = self.setColor(default='percentile')
 
+        # EDDI has a reversed scale
         if 'eddi' in self.choice:
             reverse = True
         else:
             reverse = False
 
-        return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
     def coefficientVariation(self):
         '''
         Calculate mean of percentiles of original index values
         '''
         # Get time series of values
-        [arrays, dmin, dmax] = self.getOriginal()
+        [indexlist, dmin, dmax] = self.getOriginal()
 
         # Get data
-        numpy_arrays = arrays.value.data
-        array = calculateCV(numpy_arrays)
-        del numpy_arrays
-        array[array == 0] = np.nan
-        # array = array*self.mask
-        
-        # It is easier to work with these in this format
-        dates = arrays.time.data
-        arrays = arrays.value.data
+        arrays = indexlist.value.data
+        array = calculateCV(arrays)
+        dates = indexlist.time.data
+        del indexlist
 
         # Get color scale        
-        colorscale = self.setColor(default='percentile')
+        colorscale = self.setColor(default='cv')
 
         # The colorscale will always mean the same thing
         reverse = False
 
-        return [[array, arrays, dates], colorscale, dmax, dmin, reverse]
-
-
-
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
 
 ################################## new function ###########################################################
@@ -577,7 +513,8 @@ class Index_Maps():
         del data
 
         # Drought Categories
-        drought_cats = {0: [.20, .30], 1: [.10, .20], 2: [.05, .10], 3: [.02, .05], 4: [.00, .02]}
+        drought_cats = {0: [.20, .30], 1: [.10, .20], 2: [.05, .10],
+                        3: [.02, .05], 4: [.00, .02]}
 
         # Total number of pixels
         total_area = np.nansum(self.mask)
@@ -622,24 +559,37 @@ class Index_Maps():
 
         # Return a list of five layers, the signal might need to be adjusted
         # for inclusive
-        return [[array, dm_arrays, dates], colorscale, dmax, dmin, reverse]
+        return [array, dm_arrays, dates, colorscale, dmax, dmin, reverse]
 
 
+#########################################################################
+def makeMap(maps, function):
+    '''
+    To choose which function to return from Index_Maps
+    '''
+    gc.collect()
+    if function == "omean":
+        data = maps.meanOriginal()
+    if function == "omax":
+        data = maps.maxOriginal()
+    if function == "omin":
+        data = maps.minOriginal()
+    if function == "pmean":
+        data = maps.meanPercentile()
+    if function == "pmax":
+        data = maps.maxPercentile()
+    if function == "pmin":
+        data = maps.minPercentile()
+    if function == "ocv":
+        data = maps.coefficientVariation()
+    if function == "parea":
+        data = maps.droughtArea()  # This will require some extra doing...
+    return data
 
 
 
 
 ###########################################################################################################
-
-
-
-
-
-
-
-
-
-
 
 def percentileArrays(arrays):
     '''
@@ -708,34 +658,6 @@ def standardize(indexlist):
                                    mins, maxes) for i in range(len(indexlist))]
     return(standardizedlist)
 
-
-def makeMap(signal, choice):
-    '''
-    To choose which function to return from Index_Maps
-    '''
-    gc.collect()
-
-    [time_range, function, colorscale, reverse] = signal
-
-    maps = Index_Maps(time_range, colorscale, reverse, choice)
-
-    if function == "omean":
-        data = maps.meanOriginal()
-    if function == "omax":
-        data = maps.maxOriginal()
-    if function == "omin":
-        data = maps.minOriginal()
-    if function == "pmean":
-        data = maps.meanPercentile()
-    if function == "pmax":
-        data = maps.maxPercentile()
-    if function == "pmin":
-        data = maps.minPercentile()
-    if function == "ocv":
-        data = maps.coefficientVariation()
-    if function == "parea":
-        data = maps.droughtArea()  # This will require some extra doing...
-    return data
 
 
 # For making outlines...move to css, maybe

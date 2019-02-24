@@ -22,8 +22,9 @@ from flask_caching import Cache
 import gc
 from inspect import currentframe, getframeinfo
 import json
-import pandas as pd
 import numpy as np
+import pandas as pd
+from plotly import graph_objs as go
 import psutil
 # import redis
 import time
@@ -35,8 +36,8 @@ f = getframeinfo(currentframe()).filename
 p = os.path.dirname(os.path.abspath(f))
 os.chdir(p)
 
-from functions import Index_Maps, makeMap, outLine, readRaster
-from functions import coordinateDictionaries
+from functions import Index_Maps, outLine, readRaster
+from functions import coordinateDictionaries, makeMap
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -146,7 +147,7 @@ source = xr.open_dataarray(os.path.join(data_path,
 # This converts array coordinates into array positions
 londict, latdict, res = coordinateDictionaries(source)
 
-# Some more support functions
+# Some more support functions <------------------------------------------------ Create class, include coordinateDictionaries, grid, and other conversion functions
 def pointToGrid(point):
     lon = point['points'][0]['lon']
     lat = point['points'][0]['lat']
@@ -207,7 +208,7 @@ index_ranges = pd.read_csv('data/index_ranges.csv')
 
 ###############################################################################
 # For when EDDI before 1980 is selected
-with np.load("data/NA_overlay.npz") as data:
+with np.load("data/NA_overlay.npz") as data:  # <------------------------------ Redo this, it isn't professional in appearance
     na = data.f.arr_0
     data.close()
 
@@ -215,8 +216,8 @@ with np.load("data/NA_overlay.npz") as data:
 for i in range(na.shape[0]):
     na[i] = na[i]*i
 
-# Default click before the first click for any map
-default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
+# Default click before the first click for any map  # <------------------------ Perhaps include the gridid in the click data
+default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,  
                              'marker.color': 0, 'pointIndex': 0,
                              'pointNumber': 0, 'text': 'Boulder County, CO'}]}
 
@@ -231,7 +232,7 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
 
 # For testing
-source_signal = [[[2000, 2017], [1, 12]], 'parea', 'Viridis', 'no']
+source_signal = [[[2000, 2017], [1, 12]], 'Viridis', 'no']
 source_choice = 'pdsi'
 
 # Map types
@@ -254,7 +255,7 @@ with xr.open_dataset(
                      'data/droughtindices/netcdfs/spi1.nc')) as data:
     sample_nc = data
     data.close()
-max_date = sample_nc.time.data[-1]
+max_date = sample_nc.time.data[-1]  # <---------------------------------------- No need for sample_nc
 del sample_nc
 max_year = pd.Timestamp(max_date).year
 max_month = pd.Timestamp(max_date).month
@@ -301,7 +302,7 @@ layout = dict(
 ###############################################################################
 
 # In[]: Create App Layout
-# For css later
+# For css later  <------------------------------------------------------------- Move all styling to css
 tab_height = '25px'
 tab_style = {'height': tab_height, 'padding': '0'}
 tablet_style = {'line-height': tab_height, 'padding': '0'}
@@ -354,8 +355,8 @@ def divMaker(id_num, index='noaa'):
                                                 multi=False,
                                                 value=24098)])],
                                 style={'width': '50%',
-                                        'float': 'left',
-                                        'display': ''}),
+                                       'float': 'left',
+                                       'display': ''}),
                         html.Button(id='update_map_{}'.format(id_num),
                                     children=['Update Map'],
                                     style={'width': '20%',
@@ -373,7 +374,7 @@ def divMaker(id_num, index='noaa'):
               ], className='six columns')
     return div
 
-app.layout = html.Div([
+app.layout = html.Div([   # <-------------------------------------------------- Line all brackets and parens up
              html.Div([
                 # Sponsers
                 html.A(html.Img(
@@ -386,8 +387,8 @@ app.layout = html.Div([
                         'width': '100',
                         'float': 'right',
                         'position': 'static'
-                        },
-                            ),
+                           },
+                                ),
                         href="https://www.colorado.edu/earthlab/",
                         target="_blank"
                         ),
@@ -487,17 +488,17 @@ app.layout = html.Div([
         html.Div(id='options',
                  children=[
                      html.Div([
-                     html.H3(id='date_range',
-                             children=['Study Period Year Range']),
-                     html.Div([dcc.RangeSlider(
-                                 id='year_slider',
-                                 value=[1990, max_year],
-                                 min=1948,
-                                 max=max_year,
-                                 updatemode='drag',
-                                 marks=yearmarks)],
-                              style={'margin-top': '0',
-                                     'margin-bottom': '40'}),
+                             html.H3(id='date_range',
+                                     children=['Study Period Year Range']),
+                             html.Div([dcc.RangeSlider(
+                                                     id='year_slider',
+                                                     value=[1990, max_year],
+                                                     min=1948,
+                                                     max=max_year,
+                                                     updatemode='drag',
+                                                     marks=yearmarks)],
+                                      style={'margin-top': '0',
+                                             'margin-bottom': '40'}),
 
                      # Month Slider
                      html.Div(id='month_slider',
@@ -518,60 +519,57 @@ app.layout = html.Div([
                      style={'margin-bottom': '55'}),
 
             # Options
-            html.Div([
-                # Maptype
-                html.Div([
-                        html.H3("Map Type"),
-                         dcc.Dropdown(
-                                id="map_type",
-                                value="basic",
-                                options=maptypes)],
-                         className='two columns'),
-
-                # Function
-                html.Div([
-                         html.H3("Function"),
-                         dcc.Tabs(id='function_type', value='perc',
-                                  style=tab_style,
-                                  children=[
-                                        dcc.Tab(label='Percentiles',
-                                                value='perc',
-                                                style=tablet_style,
-                                                selected_style=tablet_style),
-                                        dcc.Tab(label='Index Values',
-                                                value='index',
-                                                style=tablet_style,
-                                                selected_style=tablet_style)]),                      
-                         dcc.Dropdown(id='function_choice',
-                                        options=function_options_perc,
-                                        value='parea')],
-                         className='three columns'),
-
-                # Customize Color Scales
-                html.Div([
-                        html.H3('Color Gradient'),
-                        dcc.Tabs(id='reverse', value='no',
-                                 style=tab_style,
-                                 children=[dcc.Tab(value='yes',
-                                                   label='Reversed',
-                                                   style=tab_style,
-                                                   selected_style=tablet_style),
-                                           dcc.Tab(value='no',
-                                                   label="Not Reversed",
-                                                   style=tab_style,
-                                                   selected_style=tablet_style)]),
-                        dcc.Dropdown(id='colors',
-                                     options=color_options,
-                                     value='Default')],
-                         className='three columns'),
-                ],
-               className='row',
-               style={
-                      'margin-bottom': '50',
-                      'margin-top': '0',
-                      # 'margin': '0 auto',
-                      # 'text-align': 'center'
-               }),
+            html.Div(id='options_div', 
+                     children=[
+                        # Maptype
+                        html.Div([
+                                html.H3("Map Type"),
+                                 dcc.Dropdown(
+                                        id="map_type",
+                                        value="basic",
+                                        options=maptypes)],
+                                 className='two columns'),
+        
+                        # Function
+                        html.Div([
+                                 html.H3("Function"),
+                                 dcc.Tabs(id='function_type', value='perc',
+                                          style=tab_style,
+                                          children=[
+                                                dcc.Tab(label='Percentiles',
+                                                        value='perc',
+                                                        style=tablet_style,
+                                                        selected_style=tablet_style),
+                                                dcc.Tab(label='Index Values',
+                                                        value='index',
+                                                        style=tablet_style,
+                                                        selected_style=tablet_style)]),                      
+                                 dcc.Dropdown(id='function_choice',
+                                                options=function_options_perc,
+                                                value='pmean')],
+                                 className='three columns'),
+        
+                        # Customize Color Scales
+                        html.Div([
+                                html.H3('Color Gradient'),
+                                dcc.Tabs(id='reverse', value='no',
+                                         style=tab_style,
+                                         children=[
+                                                 dcc.Tab(value='yes',
+                                                         label='Reversed',
+                                                         style=tab_style,
+                                                         selected_style=tablet_style),
+                                                 dcc.Tab(value='no',
+                                                         label="Not Reversed",
+                                                         style=tab_style,
+                                                         selected_style=tablet_style)]),
+                                dcc.Dropdown(id='colors',
+                                             options=color_options,
+                                             value='Default')],
+                                 className='three columns')],
+                       className='row',
+                       style={'margin-bottom': '50',
+                              'margin-top': '0'}),
         ]),
 
         # Break
@@ -596,7 +594,7 @@ app.layout = html.Div([
                  className='row'),
 
         # Row 2
-        # html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],
+        # html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],  # <----------- Consider only including two until we free more memory/get better machine
         #          className='row'),
 
         # Signals
@@ -629,7 +627,7 @@ app.layout = html.Div([
 
 ################ Options ######################################################
 # Allow users to select a month range if the year slider is set to one year
-@app.callback(Output('month_slider', 'style'),
+@app.callback(Output('month_slider', 'style'),  # <---------------------------- Can we output the entire object with one callback?
               [Input('year_slider', 'value')])
 def monthStyle(year_range):
     if year_range[0] == year_range[1]:
@@ -805,7 +803,8 @@ def functionOptions(function_type):
         return function_options_perc
     else:
         return function_options_orig
-    
+
+
 @app.callback(Output('function_choice', 'value'),
               [Input('function_type', 'value')])
 def functionValue(function_type):
@@ -818,13 +817,22 @@ def functionValue(function_type):
     else:
         return 'omean'
 
-###############################################################################
 
-#################### Testing Callbacks ########################################
 # In[]: App callbacks
 @cache.memoize() # To be replaced with something more efficient
-def retrieve_data(signal, choice):
-    return makeMap(signal, choice)
+def retrieve_data(signal, function, choice):
+    [time_range, colorscale, reverse_override] = signal
+    data = Index_Maps(time_range, colorscale, reverse_override, choice)
+    delivery = makeMap(data, function)
+    return delivery
+
+# @cache2.memoize()
+# def retrieve_data2(maps, function):
+#     # Get the desired output from cached data
+#     print("FUNCTION: " + function)
+#     delivery = makeMap(maps, function)
+#     return delivery
+
 
 @app.callback(Output('location_store', 'children'),
               [Input('time_1', 'children'),
@@ -839,11 +847,6 @@ def retrieve_data(signal, choice):
                Input('selection_time_2', 'children'),
                # Input('selection_time_3', 'children'),
                # Input('selection_time_4', 'children'),
-               # Input('signal', 'children'),
-               # Input('choice_{}'.format(i), 'value'),
-               # Input('choice_store', 'children')],
-              # [State('key_{}'.format(i), 'children'),
-               # State('click_sync', 'children'),
                Input('map_1', 'clickData'),
                Input('map_2', 'clickData'),
                # Input('map_3', 'clickData'),
@@ -902,17 +905,11 @@ def locationPicker(cl_time1, cl_time2,
     idx = times.index(max(times))
     location = sels[idx]
 
-    # Several types here:
-    print('LOCATION: ' + str(location))
-    print('LOCATION TYPE: ' + str(type(location)))
-
-    # 1: Selection is a grid ID
+    # 1: Selection is a grid ID  # <------------------------------------------- Move to function
     if type(location) is int and len(str(location)) >= 3:
         county = counties_df['place'][counties_df.grid == location].item()
         y, x = np.where(grid == location)
         location = [int(y), int(x), county, idx]
-
-    # elif type(location) is int and len(str(location)) <=2:  Does this happen with multi?
 
     # 2: location is a list of states
     elif type(location) is list:
@@ -930,8 +927,8 @@ def locationPicker(cl_time1, cl_time2,
             state = list(states_df['STUSAB'][
                          states_df['FIPS State'].isin(location)])
             if len(state) < 4:
-                state = [states_df['STATE_NAME'][states_df['STUSAB'] == s].item() for
-                         s in state]
+                state = [states_df['STATE_NAME'][
+                         states_df['STUSAB'] == s].item() for s in state]
             states = ", ".join(state)
             location = ['state_mask', str(location), states, idx]
 
@@ -991,22 +988,20 @@ def choiceStore(choice1, choice2): # choice3, choice4):
 # Store data in the cache and hide the signal to activate it in the hidden div
 @app.callback(Output('signal', 'children'),
               [Input('submit', 'n_clicks')],
-              [State('function_choice', 'value'),
-               State('colors', 'value'),
+              [State('colors', 'value'),
                State('reverse', 'value'),
                State('year_slider', 'value'),
-               State('month', 'value'),
-               State('map_type', 'value')])
-def submitSignal(click, function, colorscale, reverse, year_range,
-                 month_range, map_type):
+               State('month', 'value')])
+def submitSignal(click, colorscale, reverse, year_range,
+                 month_range):
     if not month_range:
         month_range = [1, 1]
-    signal = [[year_range, month_range], function,
-                       colorscale, reverse, map_type]
+    print("COLOR: " + str(colorscale))
+    signal = [[year_range, month_range], colorscale, reverse]
     return json.dumps(signal)
 
 
-# In[] Any callback with four parts goes here
+# In[] Any callback with multiple instances goes here
 for i in range(1, 3):
     @app.callback(Output('time_{}'.format(i), 'children'),
                   [Input('map_{}'.format(i), 'clickData')])
@@ -1035,6 +1030,7 @@ for i in range(1, 3):
               options = state_options
         return options
 
+
     @app.callback(Output('location_{}'.format(i), 'value'),
                   [Input('location_tab_{}'.format(i), 'value')])
     def displayLocation(tab_choice):
@@ -1054,6 +1050,7 @@ for i in range(1, 3):
             multi = True
         return multi
 
+
     @app.callback(Output('location_{}'.format(i), 'placeholder'),
                   [Input('location_tab_{}'.format(i), 'value')])
     def displayLocation(tab_choice):
@@ -1063,7 +1060,7 @@ for i in range(1, 3):
             placeholder = 'Contiguous United States'
         return placeholder
 
-    # @app.callback(Output('county_a{}'.format(i), 'options'),
+    # @app.callback(Output('county_a{}'.format(i), 'options'),  # <------------ Dropdown label updates, old version
     #               [Input('time_1', 'children'),
     #                 Input('time_2', 'children'),
     #                 Input('time_3', 'children'),
@@ -1168,17 +1165,20 @@ for i in range(1, 3):
 
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_{}'.format(i), 'value'),
+                   Input('map_type', 'value'),
                    Input('signal', 'children'),
                    Input('update_map_1', 'n_clicks'),
                    Input('update_map_2', 'n_clicks')],
                   [State('location_store', 'children'),
+                   State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def makeGraph(choice, signal, click1, click2, location, key, sync):
+    def makeGraph(choice, map_type, signal, click1, click2,
+                   location, function, key, sync):
         if 'On' not in sync:
             sel_idx = location[3]
-            idx = int(key) - 1  # Graph ID
-            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
+            idx = int(key) - 1
+            if sel_idx not in idx + np.array([0, 2, 4]):  # <------------------[0, 4, 8] for the full panel
                 raise PreventUpdate
 
         print("Rendering Map #{}".format(int(key)))
@@ -1190,26 +1190,11 @@ for i in range(1, 3):
         signal = json.loads(signal)
 
         # Collect and adjust signal
-        [[year_range, month_range], function, colorscale,
-          reverse_override, map_type] = signal
-        signal.pop(4)
+        [[year_range, month_range], colorscale, reverse_override] = signal
 
-        # Split the time range up
-        y1 = year_range[0]
-        y2 = year_range[1]
-        m1 = month_range[0]
-        m2 = month_range[1]
-
-        # Get data, anyway to not return arrays here?
-        [[array, arrays, dates],
-          colorscale, dmax, dmin, reverse] = retrieve_data(signal, choice)
-
-        print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
-                                        psutil.virtual_memory().percent))
-
-        # Individual array min/max
-        amax = np.nanmax(array)
-        amin = np.nanmin(array)
+        # Get/cache data
+        [array, arrays, dates, colorscale,
+         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
         #Filter by state
         if location:
@@ -1222,20 +1207,33 @@ for i in range(1, 3):
                     state_mask = state_mask * 0 + 1
                 else:
                     state_mask = mask
-                array = array*state_mask
+            else:
+                state_mask = mask
+        else:
+            state_mask = mask
+        array = array * state_mask
+
+        # Check on Memory
+        print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
+                                        psutil.virtual_memory().percent))
+
+        # Individual array min/max
+        amax = np.nanmax(array)
+        amin = np.nanmin(array)
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
             reverse = not reverse
 
-
         # Because EDDI only extends back to 1980
         if len(arrays) == 0:
             source.data[0] = na
-            colorscale = [[0.0, 'rgb(50, 50, 50)'],
-                          [1.0, 'rgb(50, 50, 50)']]
         else:
             source.data[0] = array * mask
+
+        # Trying to free up space for more workers
+        del array
+        del arrays
 
         # Now all this
         dfs = xr.DataArray(source, name="data")
@@ -1252,17 +1250,19 @@ for i in range(1, 3):
         grid2[np.isnan(grid2)] = 0
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, counties_df, how='inner')
-        pdf['data'] = pdf['data'].astype(float) # .round(3)
-        pdf['printdata'] = pdf['place'] + ":<br>     " + pdf['data'].apply(lambda x: x*100).round(3).apply(str)
+        pdf['data'] = pdf['data'].astype(float)
+        pdf['printdata'] = (pdf['place'] + ":<br>     " +
+                        pdf['data'].apply(lambda x: x*100).round(3).apply(str))
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
 
-        # Trying to free up space for more workers
-        del array
-        del arrays
-
         # There are several possible date ranges to display
+        y1 = year_range[0]
+        y2 = year_range[1]
+        m1 = month_range[0]
+        m2 = month_range[1]
+
         if y1 != y2:
             date_print = '{} - {}'.format(y1, y2)
         elif y1 == y2 and m1 != m2:
@@ -1307,7 +1307,6 @@ for i in range(1, 3):
                     colorbar=dict(
                         textposition="auto",
                         orientation="h",
-
                         font=dict(size=15,
                                   fontweight='bold')
                     )
@@ -1336,9 +1335,10 @@ for i in range(1, 3):
                    Input('choice_store', 'children'),
                    Input('location_store', 'children'),
                    Input('click_sync', 'children')],
-                  [State('key_{}'.format(i), 'children')])
+                  [State('key_{}'.format(i), 'children'),
+                   State('function_choice', 'value')])
     def makeSeries(submit, signal, choice, choice_store, location,
-                   sync, key):
+                   sync, key, function):
         '''
         Each callback is called even if this isn't synced...It would require
           a whole new set of callbacks to avoid the lag from that. Also, the
@@ -1350,32 +1350,17 @@ for i in range(1, 3):
             idx = int(key) - 1  # Graph ID
             if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
                 raise PreventUpdate
-        #     else:
-        #         idxs = [idx, idx + 4, idx + 8, idx + 12]
-        #         key_sels = list(np.array(sels)[idxs])
-        #         key_times = list(np.array(times)[idxs])
-        #         sel_idx = key_times.index(max(key_times))
-        #         click = key_sels[sel_idx]
-
-        # else:
-        #     # Get the most recent selection and continue
-        #     click = sels[sel_idx] 
-
-        #  Check if we are syncing clicks, prevent update if needed
-        # print("Rendering Time Series #" + key)
-        choice_store = json.loads(choice_store)
 
         # Create signal for the global_store
+        choice_store = json.loads(choice_store)
         signal = json.loads(signal)
 
         # Collect signals
-        [[year_range, month_range], function, colorscale,
-          reverse_override, map_type] = signal
-        signal.pop(4)
+        [[year_range, month_range], colorscale, reverse_override] = signal
 
-        # Get data - check which cache first
-        [[array, arrays, dates],
-          colorscale, dmax, dmin, reverse] = retrieve_data(signal, choice)
+        # Get/cache data
+        [array, arrays, dates, colorscale,
+          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
         # There's a lot of color scale switching in the default settings...
         # ...so sorry any one who's trying to figure this out, I will fix this
@@ -1384,8 +1369,7 @@ for i in range(1, 3):
 
         # From the location, whatever it is, we need only need y, x and a label
         # Whether x and y are singular or vectors
-        def timeSeries(location, arrays):
-            print("LOCATION: " + str(location))
+        def timeSeries(location, arrays):   # <-------------------------------- Move to functions
             if location[0] != 'state_mask':
                 y, x, label, sel_idx = location
                 if type(y) is int:
@@ -1409,7 +1393,6 @@ for i in range(1, 3):
 
             return [timeseries, label]
 
-
         # If the function is parea, we plot five overlapping timeseries
         if function != 'parea':
             timeseries, label = timeSeries(location, arrays)
@@ -1421,7 +1404,6 @@ for i in range(1, 3):
             for i in range(5):  # 5 drought categories
                 ts_series[i] = timeSeries(location, dm_arrays[i])
 
-
         # Format dates
         dates = [pd.to_datetime(str(d)) for d in dates]
         dates = [d.strftime('%Y-%m') for d in dates]
@@ -1429,7 +1411,7 @@ for i in range(1, 3):
         # The y-axis depends on the chosen function
         if 'p' in function and function != 'parea':
             yaxis = dict(title='Percentiles',
-                          range=[0, 100])
+                         range=[0, 100])
             timeseries = timeseries * 100
             dmin = dmin * 100
             dmax = dmax * 100
@@ -1468,22 +1450,25 @@ for i in range(1, 3):
                                 autocolorscale=False,
                                 cmin=dmin,
                                 cmax=dmax,
-                                line=dict(width=0.2, color="#000000")),
-                )]
+                                line=dict(width=0.2, color="#000000")))]
         else:
-############################# Construction Zone #########################################
+############################# Construction Zone ###############################
             label = ts_series[0][1] # these are all too consistent
+            xs = [i for i in range(len(dates))]
             ts = [ts_series[i][0] for i in range(5)]
             colors = ['#ffff00', '#fcd37f', '#ffaa00', '#e60000', '#730000']
-            widths = np.linspace(.1, 1, 5)
+            widths = list(np.linspace(1, .25, 5))
+            cats = ['D0 (dry)', 'D1 (moderate)', 'D2 (severe)',
+                    'D3 (extreme)', 'D4 (exceptional)']
             data = []
             for i in range(5):
-                trace = dict(type='bar', x=dates, y=ts[i],
-                             marker=dict(color=colors[i], line=dict(width=widths[i],
-                                                                    color="#000000")))
+                trace = go.Bar(x=xs, y=ts[i], name=cats[i], width=widths[i],
+                               marker=dict(
+                                        color=colors[i],
+                                        line=dict(width=.2,
+                                                  color="#000000")))
                 data.append(trace)
-#########################################################################################
-
+###############################################################################
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
@@ -1493,8 +1478,13 @@ for i in range(1, 3):
         layout_copy['paper_bgcolor'] = "white"
         layout_copy['height'] = 250
         layout_copy['yaxis'] = yaxis
+        # layout_copy['xaxis'] = dict(tickvals=xs,
+        #                             ticktext=dates)
         layout_copy['hovermode'] = 'closest'
         layout_copy['barmode'] = bar_type
+        layout_copy['legend'] = dict(orientation='h',
+                                     y=-.5, markers=dict(size=8),
+                                     font=dict(size=8))
         layout_copy['titlefont']['color'] = '#636363'
         layout_copy['font']['color'] = '#636363'
 

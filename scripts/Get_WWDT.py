@@ -10,6 +10,14 @@
     rebuild the entire percentile netcdf because that is rank based.
 
 
+    production notes:
+        These don't have the correct crs info yet, however when they do the
+        transformation from epsg 4326 to 102008 is fairly simple:
+            
+            gdalwarp -t_srs epsg:102008 -dstnodata 0 in.nc out.nc
+            
+        except, of course, that its upside down :)
+    
 Created on Fri Feb  10 14:33:38 2019
 
 @author: User
@@ -87,6 +95,7 @@ print("#######################################")
 print("####################################################")
 print("\nRunning Get_WWDT.py:")
 print(str(today) + '\n')
+
 ############ Get and Build Data Sets ########################################
 for index in indices:
     # Default attributes.
@@ -118,7 +127,8 @@ for index in indices:
         t2 = dates[-1]
 
         # Get a list of the dates already in the netcdf file
-        existing_dates = pd.date_range(*(pd.to_datetime([t1, t2]) + pd.offsets.MonthEnd()), freq='M')
+        existing_dates = pd.date_range(*(pd.to_datetime([t1, t2]) +
+                                         pd.offsets.MonthEnd()), freq='M')
 
         # now break the data set into individual months
         nc_index_list = [nc_index.value[i] for i in range(len(nc_index.value))]
@@ -168,13 +178,14 @@ for index in indices:
                 except timeout:
                     logging.error('Socket timed out: %s', url)
 
-                # now transform that file
+                # now transform that file  <----------------------------------- Check this, and warp an albers file as well. 
                 out_path = os.path.join(local_path, 'temp.tif')
                 if os.path.exists(out_path):
                     os.remove(out_path)
 
-                ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4269', xRes=0.25,
-                               yRes=0.25, outputBounds=[-130, 20, -55, 50])
+                ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4269',
+                               xRes=0.25, yRes=0.25,
+                               outputBounds=[-130, 20, -55, 50])
                 del ds
 
                 # Read it in and append the data array to the list
@@ -206,7 +217,7 @@ for index in indices:
             index_nc.attrs = new_attrs
     
             # Now save
-            index_nc.to_netcdf(nc_path)
+            index_nc.to_netcdf(nc_path)  # <----------------------------------- Not quite done
             
             # Now recreate the entire percentile data set
             print('Reranking percentiles...')
@@ -261,8 +272,9 @@ for index in indices:
             if os.path.exists(out_path):
                 os.remove(out_path)
 
-            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4269', xRes=0.25,
-                           yRes=0.25, outputBounds=[-130, 20, -55, 50])
+            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4269',
+                           xRes=0.25, yRes=0.25,
+                           outputBounds=[-130, 20, -55, 50])
             del ds
             base_data = gdal.Open(out_path)
 
