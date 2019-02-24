@@ -379,7 +379,7 @@ class Index_Maps():
         [indexlist, dmin, dmax] = self.getOriginal()
 
         # Get data
-        data = indexlist.min('time').value.data
+        array = indexlist.min('time').value.data
         arrays = indexlist.value.data
         dates = indexlist.time.data
         del indexlist
@@ -452,8 +452,8 @@ class Index_Maps():
         [indexlist, dmin, dmax] = self.getPercentile()
 
         # Get data
-        arrays = indexlist.value.data
         array = indexlist.max('time').value.data
+        arrays = indexlist.value.data
         dates = indexlist.time.data
         del indexlist
         
@@ -476,8 +476,8 @@ class Index_Maps():
         [indexlist, dmin, dmax] = self.getOriginal()
 
         # Get data
-        arrays = indexlist.value.data
         array = calculateCV(arrays)
+        arrays = indexlist.value.data
         dates = indexlist.time.data
         del indexlist
 
