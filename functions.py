@@ -235,7 +235,6 @@ class Index_Maps():
                 scale = options['Portland'] 
         else:
             scale = options[self.colorscale]
-        print("SCALE :" + json.dumps(scale))
         return scale
 
     def getData(self, array_path):
@@ -245,7 +244,6 @@ class Index_Maps():
         '''        
         # Get time series of values
         # filter by date and location
-        print(array_path)
         d1 = dt.datetime(self.year1, self.month1, 1)
         d2 = dt.datetime(self.year2, self.month2, 1)
         d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)  # last day

@@ -69,7 +69,7 @@ app.config['suppress_callback_exceptions'] = True
 # Create four simple caches, each holds one large array, one for each map
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
-                      'CACHE_THRESHOLD': 4})
+                      'CACHE_THRESHOLD': 2})
 
 #cache = Cache(config={'CACHE_TYPE': 'redis',
 #                      'CACHE_REDIS_URL': os.environ.get('localhost:6379')})
@@ -826,14 +826,6 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
-# @cache2.memoize()
-# def retrieve_data2(maps, function):
-#     # Get the desired output from cached data
-#     print("FUNCTION: " + function)
-#     delivery = makeMap(maps, function)
-#     return delivery
-
-
 @app.callback(Output('location_store', 'children'),
               [Input('time_1', 'children'),
                Input('time_2', 'children'),
@@ -882,8 +874,8 @@ def locationPicker(cl_time1, cl_time2,
     It would be best if the selection as in a standard format. Perhaps just
     x, y coords and a label.
 
-    Also, to help unsync, I'm adding an index position of the click to the location
-    object.
+    Also, to help unsync, I'm adding an index position of the click to the
+    location object.
         
     '''
     times = [cl_time1, cl_time2,
@@ -913,7 +905,6 @@ def locationPicker(cl_time1, cl_time2,
 
     # 2: location is a list of states
     elif type(location) is list:
-        print('location is a list: ' + str(location))
         # Empty, default to CONUS
         if len(location) == 0:
             location = ['state_mask', 'all', 'Contiguous United States', idx]
@@ -996,7 +987,6 @@ def submitSignal(click, colorscale, reverse, year_range,
                  month_range):
     if not month_range:
         month_range = [1, 1]
-    print("COLOR: " + str(colorscale))
     signal = [[year_range, month_range], colorscale, reverse]
     return json.dumps(signal)
 
@@ -1360,7 +1350,7 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
         # There's a lot of color scale switching in the default settings...
         # ...so sorry any one who's trying to figure this out, I will fix this
@@ -1421,8 +1411,8 @@ for i in range(1, 3):
             sd = np.nanstd(arrays)
             if 'eddi' in choice:
                 sd = sd*-1
-            dmin = 3*sd
-            dmax = -3*sd
+            dmin = -3*sd
+            dmax = 3*sd
         elif function == 'parea':
             yaxis = dict(title='Percent Area',
                           range=[0, 100])
