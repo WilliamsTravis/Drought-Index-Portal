@@ -39,25 +39,24 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',  # Bimonthly - fix
               'eddi3': 'Evaporative Demand Drought Index - 3 month',
               'eddi6': 'Evaporative Demand Drought Index - 6 month'}
 
-indexpaths = {'noaa': 'D:/data/droughtindices/noaa/nad83',
-              'pdsi': 'D:/data/droughtindices/pdsi/nad83',
-              'pdsisc': 'D:/data/droughtindices/pdsisc/nad83',
-              'pdsiz': 'D:/data/droughtindices/pdsiz/nad83',
-              'spi1': 'D:/data/droughtindices/spi/nad83/1month',
-              'spi2': 'D:/data/droughtindices/spi/nad83/2month',
-              'spi3': 'D:/data/droughtindices/spi/nad83/3month',
-              'spi6': 'D:/data/droughtindices/spi/nad83/6month',
-              'spei1': 'D:/data/droughtindices/spei/nad83/1month',
-              'spei2': 'D:/data/droughtindices/spei/nad83/2month',
-              'spei3': 'D:/data/droughtindices/spei/nad83/3month',
-              'spei6': 'D:/data/droughtindices/spei/nad83/6month',
-              'eddi1': 'D:/data/droughtindices/eddi/nad83/1month',
-              'eddi2': 'D:/data/droughtindices/eddi/nad83/2month',
-              'eddi3': 'D:/data/droughtindices/eddi/nad83/3month',
-              'eddi6': 'D:/data/droughtindices/eddi/nad83/6month'}
+indexpaths = {'noaa': 'f:/data/droughtindices/noaa/nad83',
+              'pdsi': 'f:/data/droughtindices/pdsi/nad83',
+              'pdsisc': 'f:/data/droughtindices/pdsisc/nad83',
+              'pdsiz': 'f:/data/droughtindices/pdsiz/nad83',
+              'spi1': 'f:/data/droughtindices/spi/nad83/1month',
+              'spi2': 'f:/data/droughtindices/spi/nad83/2month',
+              'spi3': 'f:/data/droughtindices/spi/nad83/3month',
+              'spi6': 'f:/data/droughtindices/spi/nad83/6month',
+              'spei1': 'f:/data/droughtindices/spei/nad83/1month',
+              'spei2': 'f:/data/droughtindices/spei/nad83/2month',
+              'spei3': 'f:/data/droughtindices/spei/nad83/3month',
+              'spei6': 'f:/data/droughtindices/spei/nad83/6month',
+              'eddi1': 'f:/data/droughtindices/eddi/nad83/1month',
+              'eddi2': 'f:/data/droughtindices/eddi/nad83/2month',
+              'eddi3': 'f:/data/droughtindices/eddi/nad83/3month',
+              'eddi6': 'f:/data/droughtindices/eddi/nad83/6month'}
 indexpaths = {key: os.path.join(indexpaths[key], 'percentiles') for
               key in indexpaths.keys()}
-
 
 def toNetCDF(index, savepath):
     '''
@@ -93,7 +92,7 @@ def toNetCDF(index, savepath):
     nco = netCDF4.Dataset(os.path.join(savepath, '{}.nc'.format(index)),
                           mode='w', clobber=True, format='NETCDF4_CLASSIC')
     nco.title = title
-    nco.subtitle = "Monthly Index values since {}-{}-1".format(year1, month1)
+    nco.subtitle = "Monthly Index values since {}-{}-01".format(year1, month1)
 
     # create dimensions, variables and attributes:
     nco.createDimension('lon', nlon)
