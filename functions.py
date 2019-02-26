@@ -5,21 +5,17 @@ Created on Tue Jan 22 18:02:17 2019
 
 @author: User
 """
-import copy
-import dash
-from dash.dependencies import Input, Output, State
-from dash.exceptions import PreventUpdate
-import dash_core_components as dcc
-import dash_html_components as html
 import datetime as dt
 from dateutil.relativedelta import relativedelta
 import gc
-import matplotlib.pyplot as plt
-import numpy as np
-from osgeo import gdal
-import os
 import json
-import scipy
+import matplotlib.pyplot as plt
+from netCDF4 import Dataset
+import numpy as np
+import os
+from osgeo import gdal
+from osgeo import osr
+import pandas as pd
 from scipy.stats import rankdata
 import sys
 import xarray as xr
@@ -28,7 +24,8 @@ import xarray as xr
 if sys.platform == 'win32':
     data_path = 'f:/'
     sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
-                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
+                     'C:/Users/travi/github/Ubuntu-Practice-Machine',
+                     'C:/Users/User/github/Ubuntu-Practice-Machine'])
 else:
     home_path = '/root/Sync'
     data_path = '/root/Sync'
@@ -585,11 +582,7 @@ def makeMap(maps, function):
         data = maps.droughtArea()  # This will require some extra doing...
     return data
 
-
-
-
-###########################################################################################################
-
+###############################################################################
 def percentileArrays(arrays):
     '''
     a list of 2d numpy arrays or a 3d numpy array
@@ -656,7 +649,6 @@ def standardize(indexlist):
         standardizedlist = [single(indexlist[i],
                                    mins, maxes) for i in range(len(indexlist))]
     return(standardizedlist)
-
 
 
 # For making outlines...move to css, maybe

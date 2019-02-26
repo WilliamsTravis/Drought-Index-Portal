@@ -1405,8 +1405,8 @@ for i in range(1, 3):
             sd = np.nanstd(arrays)
             if 'eddi' in choice:
                 sd = sd*-1
-            dmin = -3*sd
-            dmax = 3*sd
+            dmin = 3*sd
+            dmax = 3*sd*-1
         elif function == 'parea':
             yaxis = dict(title='Percent Area',
                           range=[0, 100])

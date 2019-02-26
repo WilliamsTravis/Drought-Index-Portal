@@ -28,12 +28,14 @@ import datetime as dt
 from osgeo import gdal
 import logging
 import matplotlib.pyplot as plt
+from netCDF4 import Dataset
 import numpy as np
 import os
 import pandas as pd
+from rasterio.crs import CRS
 import requests
 import sys
-from progressbar import progressbar as pb
+from tqdm import tqdm
 from urllib.error import HTTPError, URLError
 import urllib
 from socket import timeout
@@ -41,18 +43,41 @@ import xarray as xr
 
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
-                     'C:/Users/User/github/Ubuntu-Practice-Machine',
-                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
+    # sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
+    #                  'C:/Users/User/github/Ubuntu-Practice-Machine',
+    #                  'C:/Users/travi/github/Ubuntu-Practice-Machine'])
+    # Gdal Crisis - works on the ubuntu machine but not on windows
+    os.chdir('Z:/Sync/Ubuntu-Practice-Machine')    
     data_path = 'f:/'
 else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
     data_path = '/root/Sync'
 
 from functions import Index_Maps, readRaster, percentileArrays, im
+from netCDF_functions import toNetCDF
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 
+
+# In[] Attempting a geographic 'accessor' for xarray
+@xr.register_dataset_accessor('geo')
+class GeoAccessor(object):
+    def __init__(self, xarray_obj):
+        self._obj = xarray_obj
+        self._center = None
+
+    @property
+    def center(self):
+        """Return the geographic center point of this dataset."""
+        if self._center is None:
+            # we can use a cache on our accessor objects, because accessors
+            # themselves are cached on instances that access them.
+            lons = self._obj.lat
+            lats = self._obj.lon
+            self._center = (float(lons.mean()), float(lats.mean()))
+        return self._center
+
 # In[] set up
+wkt = CRS.from_epsg(4326).wkt
 wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM'
 local_path = os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt/')
 if not os.path.exists(local_path):
@@ -61,7 +86,7 @@ indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3', 'spei6',
            'pdsi', 'scpdsi', 'pzi']
 local_indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2',
                  'spei3', 'spei6', 'pdsi', 'pdsisc', 'pdsiz']
-
+ 
 index_map = {indices[i]: local_indices[i] for i in range(len(indices))}
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'pdsi': 'Palmer Drought Severity Index',
@@ -105,17 +130,18 @@ for index in indices:
                              ('Original Author',
                               'John Abatzoglou - University of Idaho, jabatzoglou@uidaho.edu'),
                              ('Date', pd.to_datetime(str(today)).strftime('%Y-%m-%d')),
-                             ('Projection', 'North American Datum 1983, EPSG: 4269'),
+                             ('Projection', 'World Geodetic Survey 1984, EPSG: 4326'),
+                             ('spatial_ref', wkt),
                              ('Citation', 'Westwide Drought Tracker, http://www.wrcc.dri.edu/monitor/WWDT')])
 
     # We need the key 'value' to point to local data
     nc_path = os.path.join(data_path,
                              'data/droughtindices/netcdfs/',
                              index_map[index] + '.nc')
-    print(nc_path + " exists, checking for missing data...")
     wwdt_index_url = wwdt_url + '/' + index
 
     if os.path.exists(nc_path):
+        print(nc_path + " exists, checking for missing data...")
         ############## If we only need to add a few dates ###################
         with xr.open_dataset(nc_path) as data:
             nc_index = data.load()
@@ -207,6 +233,10 @@ for index in indices:
             nc_index_arrays = xr.concat(nc_index_list, dim='time')
             index_nc = xr.Dataset(data_vars={'value': nc_index_arrays},
                                   attrs=new_attrs)
+            index_nc.coords['crs'] = 0
+            index_nc.coords['crs'].attrs = dict(spatial_ref=wkt)   
+    
+    
     
             # We need the key 'value' to point to the data
             nc_path = os.path.join(data_path,
@@ -245,13 +275,16 @@ for index in indices:
 
         # Get the data from wwdt
         for i in range(1, 13):
+            # paths
             file_name = '{}_{}_PRISM.nc'.format(index, i)
             target_url = wwdt_url + '/' + index + '/' + file_name
             temp_path = os.path.join(local_path, 'temp_{}.nc'.format(i))
+
+            # Download
             try:
                 urllib.request.urlretrieve(target_url, temp_path)
             except (HTTPError, URLError) as error:
-                logging.error('%s not retrieved because %s\nURL: %s',
+                logging.error('%s not retrieved. %s\nURL: %s',
                               file_name, error, target_url)
             except timeout:
                 logging.error('Socket timed out: %s', target_url)
@@ -260,7 +293,7 @@ for index in indices:
 
         # Get some of the attributes from one of the new data sets
         monthly_ncs = []
-        for i in pb(range(1, 13), redirect_stdout=True):
+        for i in tqdm(range(1, 13), position=0):
             # Okay, so I'd like to keep the original information and only change
             # geometries. Use each temp_X.nc for the dates and attributes
             source_path = os.path.join(local_path, 'temp_{}.nc'.format(i))
@@ -272,10 +305,11 @@ for index in indices:
             if os.path.exists(out_path):
                 os.remove(out_path)
 
-            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4269',
-                           xRes=0.25, yRes=0.25,
+            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4326',  # <----- Untill I figure out how to fit the crs properly
+                           xRes=0.25, yRes=0.25, 
                            outputBounds=[-130, 20, -55, 50])
             del ds
+                                                                    # <-------- I could just warp again here, and build another netcdf for albers
             base_data = gdal.Open(out_path)
 
             # Now we have arrays of the correct dimensions
@@ -291,14 +325,17 @@ for index in indices:
                                            'lat': lats,
                                            'lon': lons},
                                    dims=('time', 'lat', 'lon'))
-                                   # attrs=new_attrs)
             monthly_ncs.append(monthly)
+
+
 
         final_arrays = xr.concat(monthly_ncs, 'time')
         final_arrays = final_arrays.sortby('time')  # somethings off...
         final_arrays = final_arrays.dropna('time', 'all')
         index_nc = xr.Dataset(data_vars={'value': final_arrays},
                               attrs=new_attrs)
+        index_nc.coords['crs'] = 0
+        index_nc['crs'].attrs = dict(spatial_ref=wkt)
         t1 = '1948-01-01'
         t2 = index_nc.time.data[-1]
         index_nc = index_nc.sel(time=slice(t1, t2))
@@ -323,7 +360,7 @@ for index in indices:
                                 index_map[index] + '.nc')
         os.remove(pc_path)
         pc_nc.to_netcdf(pc_path)
-        
+
 print("Update Complete.")
 print("####################################################")
 print("#######################################")
