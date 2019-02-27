@@ -47,7 +47,6 @@ import numpy as np
 import os
 from osgeo import gdal
 import pandas as pd
-from rasterio.crs import CRS
 import requests
 from subprocess import call
 import sys
@@ -67,7 +66,7 @@ else:
     data_path = '/root/Sync'
 
 from functions import Index_Maps, readRaster, percentileArrays, im
-from netCDF_functions import toNetCDF2
+from netCDF_functions import toNetCDF2, toNetCDF3
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
@@ -288,7 +287,7 @@ for index in indices:
             if os.path.exists(out_path):
                 os.remove(out_path)
 
-            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4326',xRes=.25,
+            ds = gdal.Warp(out_path, source_path, format='GTiff', dstSRS='EPSG:4326', xRes=.25,
                            yRes=.25, outputBounds=[-130, 20, -55, 50])
             del ds
 
@@ -301,55 +300,34 @@ for index in indices:
                                 index_map[index] + '.nc')
 
         # This function smooshes everything into one netcdf file
-        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1948,
+        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1948,  # <----------------------------------------- Create one of these for albers?
                   month1=1, year2=todays_date.year, month2=todays_date.month,
-                  wmode='w')
-        
-        ################### Construction Zone #################################
+                  wmode='w', percentiles=False)
+
+        # We are also including percentiles, so lets build another dataset
+        savepath_perc = os.path.join(data_path, 'data/droughtindices/netcdfs/percentiles',
+                                index_map[index] + '.nc')
+        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1948,  # <----------------------------------------- Create one of these for albers?
+                  month1=1, year2=todays_date.year, month2=todays_date.month,
+                  wmode='w', percentiles=True)
+
         # Now, for areal calculations, we'll need a projected version
         inpath = savepath
         outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
-                                index_map[index] + '.nc')
+                                index_map[index] + '.tif')
         if os.path.exists(outpath):
             os.remove(outpath)
+        ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
+                       dstSRS='EPSG:102008')  # <----------------------------------------------------------------------- The data is split into spearate bands with no date, not optimal
+        del ds
 
-        # This is needed because it won't accept absolute paths and driver
-        os.chdir(os.path.join(data_path, 'data/droughtindices/netcdfs'))
-
-        # And this needed because Python is having trouble with the driver
-        call('gdalwarp -s_srs epsg:4326 -t_srs epsg:102008 -of netcdf \
-              -co "WRITE_BOTTOMUP=NO" netcdf:' + index_map[index] + '.nc \
-              albers/' + index_map[index] + '.nc', shell=True)
-
-
-############## Future Material ###############################################
-        # co=['WRITE_BOTTOMUP=NO']        
-        # ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', options=co,
-        #                dstSRS='EPSG:102008', format='netCDF')
-        # del ds
-        
-        # Temporary for testing outputs
-        # testpath = 'f:/data/droughtindices/netcdfs/albers_spi1.nc'
-        # test = Dataset(testpath)
-        # image = test.variables['value'][0,:]
-        # image = test.variables['Band1'][:]
-        # im(image)
-        # test.close()
-
-        # Now recreate the entire percentile data set  <----------------------- From old attempts
-        # print('Reranking percentiles...')
-        # pc_nc = index_nc.copy()
-    
-        # # let's rank this according to the 1948 to present time period
-        # percentiles = percentileArrays(pc_nc.value.data)
-        # pc_nc.value.data = percentiles
-        # pc_nc.attrs['long_name'] = 'Monthly percentile values since 1948'
-        # pc_nc.attrs['standard_name'] = 'percentile'
-        # pc_path = os.path.join(data_path,
-        #                        'data/droughtindices/netcdfs/percentiles',
-        #                         index_map[index] + '.nc')
-        # os.remove(pc_path)
-        # pc_nc.to_netcdf(pc_path)
+        # The format is off, so let's build another netcdf from the tif above
+        tfile = outpath
+        ncfile = savepath
+        savepath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
+                                index_map[index] + '.nc')
+        toNetCDF3(tfile, ncfile, savepath, index, epsg=102008,
+                  wmode='w', percentiles=False)
 
 print("Update Complete.")
 print("####################################################")
@@ -358,4 +336,10 @@ print("#######################")
 print("############")
 print("#####")
 print("##")
-                              
+
+# path = 'f:/data/droughtindices/netcdfs/spi1.nc'
+# path = 'f:/data/droughtindices/netcdfs/albers/spi1.nc'
+# path = 'f:/data/droughtindices/netcdfs/percentiles/spi1.nc'
+# test = Dataset(path)
+# image = test.variables['value'][0,:]
+# im(image)
