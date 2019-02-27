@@ -2,6 +2,20 @@
 """
 An Application to visualize time series of drought indices (or others soon).
 
+Production notes:
+    - Time to time, an initial time series doesn't render. Identify this bug.
+
+    - Time series colors are still relative, and don't show for a single date.
+
+    - For the areal calculations: we'll need some jostling
+        1) It is possible to include both county and state with prexisting
+           rasters and shapefiles in albers equal area conic.
+        2) On the fly reprojections are possible for area selections, though
+           these will be slower
+        3) For areal time series that cannot be generated (points), replace
+           the time series with a "Time series not available" tag.
+
+
 Created on Fri Jan  4 12:39:23 2019
 
 @author: Travis Williams
@@ -259,7 +273,7 @@ max_date = sample_nc.time.data[-1]
 del sample_nc
 max_year = pd.Timestamp(max_date).year
 max_month = pd.Timestamp(max_date).month
-years = [int(y) for y in range(1948, max_year + 1)]
+years = [int(y) for y in range(1900, max_year + 1)]
 yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
@@ -493,7 +507,7 @@ app.layout = html.Div([   # <-------------------------------------------------- 
                              html.Div([dcc.RangeSlider(
                                                      id='year_slider',
                                                      value=[1990, max_year],
-                                                     min=1948,
+                                                     min=1900,
                                                      max=max_year,
                                                      updatemode='drag',
                                                      marks=yearmarks)],
@@ -763,7 +777,7 @@ def toggleDescription(click):
     if click % 2 == 0:
         children = ""
     else:
-        children = open('data/description.txt').read()
+        children = open('data/tables/description.txt').read()
     return children
 
 # Change color of on/off description button
@@ -1358,8 +1372,15 @@ for i in range(1, 3):
 
         # From the location, whatever it is, we need only need y, x and a label
         # Whether x and y are singular or vectors
-        def timeSeries(location, arrays):   # <-------------------------------- Move to functions
-            if location[0] != 'state_mask':
+        print("LOCATION: " + str(location))
+        ################ Construction Zone ####################################
+        location = [[4, 4, 4, 5, 5, 5], [62, 63, 64, 62, 63, 64], 'Flathead County, MT', 4]
+        from pyproj import Proj, transform
+        # transform selection, add in county filter, find time series of averages
+
+
+        def areaSeries(location, arrays):   # <-------------------------------- Move to functions
+            if len(location[0]) == 1:
                 y, x, label, sel_idx = location
                 if type(y) is int:
                     timeseries = np.array([round(a[y, x], 4) for a in arrays])
@@ -1368,6 +1389,19 @@ for i in range(1, 3):
                     y = json.loads(y)
                     timeseries = np.array([round(np.nanmean(a[y, x]), 4) for
                                            a in arrays])
+
+
+
+
+
+            else:
+                y, x, label, sel_idx = location
+                ys = np.array(y)
+                xs = np.array(x)
+                array2 = array.copy()
+                array2[ys, xs] = 1
+
+
             else:
                 flag, states, label, sel_idx = location
                 if states != 'all':
@@ -1382,16 +1416,18 @@ for i in range(1, 3):
 
             return [timeseries, label]
 
+
+###################################################################################
         # If the function is parea, we plot five overlapping timeseries
         if function != 'parea':
-            timeseries, label = timeSeries(location, arrays)
+            timeseries, label = areaSeries(location, arrays)
             bar_type = 'bar'
         else:
             dm_arrays = arrays.copy()
             bar_type = 'overlay'
             ts_series = {}
             for i in range(5):  # 5 drought categories
-                ts_series[i] = timeSeries(location, dm_arrays[i])
+                ts_series[i] = areaSeries(location, dm_arrays[i])
 
         # Format dates
         dates = [pd.to_datetime(str(d)) for d in dates]

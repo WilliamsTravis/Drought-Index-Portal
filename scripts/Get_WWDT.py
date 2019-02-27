@@ -11,25 +11,17 @@
 
 
     Production notes:
-
-        The geographic coordinate systems work for the most part. I had to use
+        - This doesn't work if the files exist! Turn off crontab scheduler!
+        - The geographic coordinate systems work for the most part. I had to use
         'degrees_south' for the latitude unit attribute to avoid flipping the
-        image and I'm not sure whether to use degrees_west or degrees_east for
-        longitute (does not seem to change the image). Also, the netcdfs built
-        using my functions appear to have coordinates at the grid center, which
-        is different than before (lower left corner), so watch out that this
-        doesn't change the output. 
-    
-        Another outcome that I don't understand is that projecting the WGS84
-        maps to Albers Equal Area Conic (or any projection I presume) flips the
-        y axis regardless of the original orientation. 
-        
-        I would like to use the Climate Data Operators (cdo) library, either
-        with python bindings or the command prompt utilities and a subprocess.
-        There is a utility that will do exactly what I want in one line.
-        Syncing this between linux and windows may take some doing, and the app
-        is built around the naming scheme from before, so we'll use this for
-        now.
+        image. Also, the netcdfs built using my functions appear to have coordinates
+        at the grid center, which is different than previous geotiffs I created, however,
+        the maps are rendered properly (point in lower left corner)
+
+        - An error reading wwdt data included artifacts for future dates.
+
+
+
         
     
 Created on Fri Feb  10 14:33:38 2019
@@ -63,7 +55,7 @@ else:
 
 from functions import  percentileArrays
 from netCDF_functions import toNetCDF2, toNetCDF3
-# gdal.PushErrorHandler('CPLQuietErrorHandler')
+gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
 # In[] Set up paths and urls
@@ -231,10 +223,10 @@ for index in indices:
             print('Reranking percentiles...')
             pc_nc = index_nc.copy()
         
-            # let's rank this according to the 1948 to present time period
+            # let's rank this according to the 1900 to present time period
             percentiles = percentileArrays(pc_nc.value.data)
             pc_nc.value.data = percentiles
-            pc_nc.attrs['long_name'] = 'Monthly percentile values since 1948'
+            pc_nc.attrs['long_name'] = 'Monthly percentile values since 1900'
             pc_nc.attrs['standard_name'] = 'percentile'
             pc_path = os.path.join(data_path,
                                    'data/droughtindices/netcdfs/percentiles',
@@ -298,7 +290,7 @@ for index in indices:
                                 index_map[index] + '.nc')
 
         # This function smooshes everything into one netcdf file
-        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1948,
+        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1900,
                   month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=False)
 
@@ -306,7 +298,7 @@ for index in indices:
         savepath_perc = os.path.join(data_path,
                                      'data/droughtindices/netcdfs/percentiles',
                                      index_map[index] + '.nc')
-        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1948,
+        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1900,
                   month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=True)
 

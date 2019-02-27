@@ -32,7 +32,6 @@ import calendar
 import datetime as dt
 import ftplib
 from glob import glob
-from inspect import currentframe, getframeinfo
 import numpy as np
 import os
 from osgeo import gdal

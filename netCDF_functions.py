@@ -6,6 +6,7 @@ Created on Mon Feb 25 19:53:32 2019
 """
 from collections import OrderedDict
 import datetime as dt
+from glob import glob
 from osgeo import gdal
 from osgeo import osr
 from netCDF4 import Dataset
@@ -154,9 +155,21 @@ def toNetCDF(file, ncfile, savepath, index, epsg=4326, wmode='w'):
     # Done
     nco.close()
 
+# Test parameters for toNetCDF2
+# tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/*tif')
+# ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/*nc')
+# savepath = 'testing.nc'
+# index = 'spi1'
+# year1=1948
+# month1=1
+# year2=2019
+# month2=12
+# epsg=4326
+# percentiles=False
+# wmode='w'
 
 def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
-              year2=2019, month2 = 2, epsg=4326, percentiles=False,
+              year2=2019, month2=12, epsg=4326, percentiles=False,
               wmode='w'):
     '''
     Take multiple multiband netcdfs with messed up dates, multiple tiffs with
@@ -175,7 +188,10 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
     geom = data.GetGeoTransform()
     proj = data.GetProjection()
     array = data.ReadAsArray()
-    nlat, nlon = np.shape(array)
+    if len(array.shape) == 3:
+        ntime, nlat, nlon = np.shape(array)
+    else:
+        nlat, nlon = np.shape(array)
     lons = np.arange(nlon) * geom[1] + geom[0]
     lats = np.arange(nlat) * geom[5] + geom[3]
     del data
@@ -238,9 +254,8 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
 
     # Now getting the data, which is not in order because of how wwdt does it
     # We need to associate each day with its array
-
     try:
-        Dataset(ncfiles[i])
+        Dataset(ncfiles[0])
         date_tifs = {}
         for i in range(len(ncfiles)):
             nc = Dataset(ncfiles[i])
@@ -249,6 +264,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
             arrays = rasters.ReadAsArray()
             for y in range(len(arrays)):
                 date_tifs[days[y]] = arrays[y]
+
         # okay, that was just in case the dates wanted to bounce around
         date_tifs = OrderedDict(sorted(date_tifs.items()))
     
@@ -269,14 +285,18 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
             arrays.append(array) 
         arrays = np.array(arrays)
 
-    # Filter out dates before 1948 <-------------------------------------------Also, filter days after year2, month2 for custom netcdfs
-    start = dt.datetime(1900, 1, 15)
-    end = dt.datetime(year1, month1, 15)
-    cutoff_day = end - start
-    cutoff_day = cutoff_day.days
-    idx = len(days) - len(days[np.where(days > cutoff_day)])
-    days = days[idx:]
-    arrays = arrays[idx:]
+    # Filter out dates
+    base = dt.datetime(1900, 1, 15)
+    start = dt.datetime(year1, month1, 15) #<----------------------------------Careful about this day figure
+    day1 = start - base
+    day1 = day1.days
+    end = dt.datetime(year2, month2, 15)  # This is also important because of empty slots in the wwdt data
+    day2 = end - base
+    day2 = day2.days
+    idx = len(days) - len(days[np.where(days > day1)])
+    idx2 = len(days[np.where(days <= day2)])
+    days = days[idx:idx2]
+    arrays = arrays[idx:idx2]
 
     # This allows the option to store the data as percentiles
     if percentiles:
