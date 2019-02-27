@@ -61,7 +61,7 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine/')
     data_path = '/root/Sync'
 
-from functions import Index_Maps, readRaster, percentileArrays, im
+from functions import  percentileArrays
 from netCDF_functions import toNetCDF2, toNetCDF3
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
@@ -278,12 +278,14 @@ for index in indices:
                 data.close()
 
             # It is much easier to transform the files themselves
-            out_path = os.path.join(local_path, 'tifs', 'temp_{}.tif'.format(i))
+            out_path = os.path.join(local_path, 'tifs',
+                                    'temp_{}.tif'.format(i))
 
             if os.path.exists(out_path):
                 os.remove(out_path)
 
-            ds = gdal.Warp(out_path, source_path, format='GTiff', dstSRS='EPSG:4326', xRes=.25,
+            ds = gdal.Warp(out_path, source_path, format='GTiff',
+                           dstSRS='EPSG:4326', xRes=.25,
                            yRes=.25, outputBounds=[-130, 20, -55, 50])
             del ds
 
@@ -296,14 +298,15 @@ for index in indices:
                                 index_map[index] + '.nc')
 
         # This function smooshes everything into one netcdf file
-        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1948,  # <----------------------------------------- Create one of these for albers?
+        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1948,
                   month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=False)
 
         # We are also including percentiles, so lets build another dataset
-        savepath_perc = os.path.join(data_path, 'data/droughtindices/netcdfs/percentiles',
-                                index_map[index] + '.nc')
-        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1948,  # <----------------------------------------- Create one of these for albers?
+        savepath_perc = os.path.join(data_path,
+                                     'data/droughtindices/netcdfs/percentiles',
+                                     index_map[index] + '.nc')
+        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1948,
                   month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=True)
 
@@ -319,7 +322,8 @@ for index in indices:
         # The format is off, so let's build another netcdf from the tif above
         tfile = outpath
         ncfile = savepath
-        savepath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
+        savepath = os.path.join(data_path,
+                                'data/droughtindices/netcdfs/albers',
                                 index_map[index] + '.nc')
         toNetCDF3(tfile, ncfile, savepath, index, epsg=102008,
                   wmode='w', percentiles=False)

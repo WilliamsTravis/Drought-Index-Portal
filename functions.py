@@ -501,25 +501,21 @@ class Index_Maps():
         return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
 
-################################## new function ###########################################################
+################################## new function ###############################
     def droughtArea(self, inclusive=False):
         '''
-        This will take in a time series of arrays and a drought severity category
-        and mask out all cells with values above or below the category thresholds.
-        If inclusive is 'True' it will only mask out all cells that fall above the
-        chosen category.
+        This will take in a time series of arrays and a drought severity
+        category and mask out all cells with values above or below the category
+        thresholds. If inclusive is 'True' it will only mask out all cells that
+        fall above the chosen category.
 
-        For now this requires percentiles.
+        For now this requires original values, percentiles even out too quickly
         '''
 
-        # arrays = self.getAlbersPercentile()  # Don't have albers percentiles just yet
-        indexlist, dmin, dmax = self.getPercentile()
-        arrays = indexlist.value.data
-
-        # Just use the average value map for now
-        data = indexlist.mean('time')
-        array = data.value.data
-        del data
+        arealist, dmin, dmax = self.getAlbers()  # This is used for areal calcs
+        [array, arrays, dates, colorscale,
+            amax, amin, reverse] = self.meanOriginal() # This used for display
+        arrays = arealist.value.data
 
         # Drought Categories
         drought_cats = {0: [.20, .30], 1: [.10, .20], 2: [.05, .10],
@@ -575,6 +571,9 @@ class Index_Maps():
 def makeMap(maps, function):
     '''
     To choose which function to return from Index_Maps
+    
+    Production Notes:
+        
     '''
     gc.collect()
     if function == "omean":
@@ -591,7 +590,7 @@ def makeMap(maps, function):
         data = maps.minPercentile()
     if function == "ocv":
         data = maps.coefficientVariation()
-    if function == "parea":
+    if function == "oarea":
         data = maps.droughtArea()  # This will require some extra doing...
     return data
 

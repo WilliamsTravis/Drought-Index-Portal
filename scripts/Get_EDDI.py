@@ -97,11 +97,11 @@ def getEDDI(scale, date, save_folder, write=False):
             memory_file.append(line)
         try:
             file_name = 'EDDI_ETrs_{:02d}mn_{}{:02d}{}.asc'.format(scale, year,
-                                                           month, last_day)
+                                                               month, last_day)
             ftp.retrlines('RETR ' + file_name, appendline)
         except:
             file_name = 'EDDI_ETrs_{:02d}mn_{}{:02d}{}.asc'.format(scale, year,
-                                               month, last_day-1)
+                                                             month, last_day-1)
             ftp.retrlines('RETR ' + file_name, appendline)
 
         return memory_file
@@ -112,11 +112,11 @@ def getEDDI(scale, date, save_folder, write=False):
         local_file = open(os.path.join(save_folder, 'temp.asc'), 'w')
         try:
             file_name = 'EDDI_ETrs_{:02d}mn_{}{:02d}{}.asc'.format(scale, year,
-                                               month, last_day)
+                                                               month, last_day)
             ftp.retrlines('RETR ' + file_name, writeline)
         except:
             file_name = 'EDDI_ETrs_{:02d}mn_{}{:02d}{}.asc'.format(scale, year,
-                                               month, last_day - 1)
+                                                           month, last_day - 1)
             ftp.retrlines('RETR ' + file_name, writeline)
         local_file.close()
         return os.path.join(save_folder, 'temp.asc')
@@ -211,10 +211,10 @@ for index in indices:
 
         # Now, run a toNetCDF using the available dates instead of an existing
         # netcdf file. I should tweak toNetCDF2 to accept either I think.
+        # Pardon this expediency
         tfiles = glob(os.path.join(save_folder, '*tif'))
         ncdir = os.path.join(data_path, "data/droughtindices/netcdfs/",
                               index + '.nc')
-        ncfiles = None
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,
                   year1=1948, month1=1, year2=todays_date.year, month2=12,
                   epsg=4326, percentiles=False, wmode='w')
@@ -227,7 +227,7 @@ for index in indices:
                   month2=12, epsg=4326, percentiles=True, wmode='w')
 
         # Now we need projected rasters, we can do this from the nc above
-        # One, warp to albers equal area conic as a geotiff for orientation.
+        # Warp to albers equal area conic as a geotiff because ncdf flips axis
         inpath = ncdir
         outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
                                index + '.tif')
