@@ -31,39 +31,37 @@ Created on Fri Feb  1 14:33:38 2019
 import calendar
 import datetime as dt
 import ftplib
-from osgeo import gdal
+from glob import glob
 from inspect import currentframe, getframeinfo
 import numpy as np
 import os
+from osgeo import gdal
 import pandas as pd
 import sys
-import scipy
 from tqdm import tqdm
 import xarray as xr
 
-# Set working directory. Where should this go?
-f = getframeinfo(currentframe()).filename
-p = os.path.dirname(os.path.abspath(f))  # Not working consistently
-
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
+    sys.path.extend(['C:/Users/User/github/Ubuntu-Practice-Machine',
                      'C:/Users/travi/github/Ubuntu-Practice-Machine'])
     data_path = 'f:/'
 else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine/')
     data_path = '/root/Sync'
 
-import functions
-from functions import Index_Maps, readRaster, percentileArrays
+from functions import Index_Maps, readRaster, percentileArrays, im, isInt
+from netCDF_functions import toNetCDF2, toNetCDF3
+# gdal.PushErrorHandler('CPLQuietErrorHandler')
+os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
 # In[] Data source and target directory
 ftp_path = 'ftp://ftp.cdc.noaa.gov/Projects/EDDI/CONUS_archive/data'
-save_folder = os.path.join(data_path, 'data/droughtindices/ascs')
+save_folder = os.path.join(data_path, 'data/droughtindices/temps')
 if not os.path.exists(save_folder):
     os.makedirs(save_folder)
-mask = readRaster(os.path.join(data_path, 'data/droughtindices/prfgrid.tif'),
-                  1, -9999)[0]
+# mask = readRaster(os.path.join(data_path, 'data/droughtindices/prfgrid.tif'),
+#                   1, -9999)[0]
 
 # In[] Today's date, month, and year
 todays_date = dt.datetime.today()
@@ -137,7 +135,8 @@ for index in indices:
                                    "data/droughtindices/netcdfs/percentiles",
                                    index + '.nc')
     scale = int(index[-1:])
-    try:
+
+    if os.path.exists(original_path):   # Create a netcdf and append to file
         with xr.open_dataset(original_path) as data:
             indexlist = data.load()
             data.close()
@@ -155,119 +154,96 @@ for index in indices:
         
         # Is this a new or old data set?
         new_file = False
-        
-    except:  # There is a quicker qay to do this surely
-        print(original_path + " not detected, building new dataset...\n")
-        lons = np.linspace(-130.0, -55.25, 300, dtype=np.float32)
-        lats = np.linspace(50.0, 20.25, 120, dtype=np.float32)
-        old = [xr.DataArray(data=mask,  # It may also be possible to append
-                            coords={'lat': lats,
-                                    'lon': lons,                                        
-                                    'time': today},
-                             dims=('lat', 'lon'),
-                             attrs={'units': 'unitless',
-                                    'long_name': 'Index Value',
-                                    'standard_name': 'index'})]
-        existing_dates = []
-        new_file = True
 
-    # 2: Get a list of the dates available for download
-    def isInt(string):
-        try:
-            int(string)
-            return True
-        except:
-            return False
-
-    ftp_years = ftp.nlst()
-    ftp_years = [f for f in ftp_years if isInt(f)]
-    
-    # First Date
-    ftp.cwd(os.path.join('/Projects/EDDI/CONUS_archive/data/',
-                         ftp_years[0]))
-    ftp_files = ftp.nlst()
-    ftp_files = [f for f in ftp_files
-                 if f[-17:-13] == "{:02d}mn".format(scale)]
-    ftp_first = ftp_files[0]
-    first_date = pd.to_datetime(ftp_first[-12:-4], format='%Y%m%d')
-
-    # Last Date
-    ftp.cwd(os.path.join('/Projects/EDDI/CONUS_archive/data/',
-                         ftp_years[-1]))
-    ftp_files = ftp.nlst()
-    ftp_files = [f for f in ftp_files
-                 if f[-17:-13] == "{:02d}mn".format(scale)]
-    ftp_last = ftp_files[-1]
-    last_date = pd.to_datetime(ftp_last[-12:-4], format='%Y%m%d')
-
-    # All dates available
-    available_dates = pd.date_range(first_date,
-                                    last_date,
-                                    freq='M')
-
-    # 3: Get the list of dates we don't yet have
-    needed_dates = [d for d in available_dates if d not in existing_dates]
-    if len(needed_dates) > 0:
-        print_statement = '{} missing file(s) since {}, adding data now...'
-        print(print_statement.format(len(needed_dates), needed_dates[0]))
     else:
-        print('No missing files.\n')
+        ############## If we need to start over #######################
+        print(original_path + " not detected, building new dataset...\n")
 
-    # Loop through these dates, build the query and download data
-    for date in tqdm(needed_dates, position=0):
+        # Get all of the last day of month files for the index
+        ftp_years = ftp.nlst()
+        ftp_years = [f for f in ftp_years if isInt(f)]
+
+        # First Date
         ftp.cwd(os.path.join('/Projects/EDDI/CONUS_archive/data/',
-                             str(date.year)))
-        file_path = getEDDI(scale, date, save_folder,
-                       write=True)
+                             ftp_years[0]))
+        ftp_files = ftp.nlst()
+        ftp_files = [f for f in ftp_files
+                     if f[-17:-13] == "{:02d}mn".format(scale)]
+        ftp_first = ftp_files[0]
+        first_date = pd.to_datetime(ftp_first[-12:-4], format='%Y%m%d')
+
+        # Last Date
+        ftp.cwd(os.path.join('/Projects/EDDI/CONUS_archive/data/',
+                             ftp_years[-1]))
+        ftp_files = ftp.nlst()
+        ftp_files = [f for f in ftp_files
+                     if f[-17:-13] == "{:02d}mn".format(scale)]
+        ftp_last = ftp_files[-1]
+        last_date = pd.to_datetime(ftp_last[-12:-4], format='%Y%m%d')
+
+        # All dates available
+        available_dates = pd.date_range(first_date, last_date, freq='M')
+
         
-        # Resample, working from disk
-        temp_path = os.path.join(save_folder, 'temp.tif')
-        ds = gdal.Warp(temp_path, file_path,
-                       dstSRS='EPSG:4269',
-                       xRes=0.25, yRes=0.25,
-                       outputBounds=[-130, 20, -55, 50])
+        # Loop through these dates, build the query and download data
+        for date in tqdm(available_dates, position=0):
+            ftp.cwd(os.path.join('/Projects/EDDI/CONUS_archive/data/',
+                                 str(date.year)))
+            file_path = getEDDI(scale, date, save_folder,
+                           write=True)
+
+            # We will save each to a geotiff so we can use the netcdf builders
+            # These will be overwritten for space
+            file_name = ('eddi_' + str(date.year) +
+                         '{:02d}'.format(date.month) + '.tif')
+            tif_path = os.path.join(save_folder, file_name)
+
+            # Resample each, working from disk
+            ds = gdal.Warp(tif_path, file_path,
+                           dstSRS='EPSG:4326',
+                           xRes=0.25, yRes=0.25,
+                           outputBounds=[-130, 20, -55, 50])
+            del ds
+
+        # There are over four hundred of those, this will take a minute. Run it
+        # After Get_WWDT.py just in case. If either of these break I should
+        # have a contingency exception. 
+
+        # Now, run a toNetCDF using the available dates instead of an existing
+        # netcdf file. I should tweak toNetCDF2 to accept either I think.
+        tfiles = glob(os.path.join(save_folder, '*tif'))
+        ncdir = os.path.join(data_path, "data/droughtindices/netcdfs/",
+                              index + '.nc')
+        ncfiles = None
+        toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,
+                  year1=1948, month1=1, year2=todays_date.year, month2=12,
+                  epsg=4326, percentiles=False, wmode='w')
+
+        # Now lets get the percentile values
+        ncdir_perc = os.path.join(data_path, "data/droughtindices/netcdfs/" +
+                                   "percentiles", index + '.nc')
+        toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir_perc,
+                  index=index, year1=1948, month1=1, year2=todays_date.year,
+                  month2=12, epsg=4326, percentiles=True, wmode='w')
+
+        # Now we need projected rasters, we can do this from the nc above
+        # One, warp to albers equal area conic as a geotiff for orientation.
+        inpath = ncdir
+        outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
+                               index + '.tif')
+        if os.path.exists(outpath):
+            os.remove(outpath)
+        ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
+                       dstSRS='EPSG:102008')
         del ds
 
-        # Okay, read the new data from the raster made above
-        array = readRaster(temp_path, 1, -9999)[0]
-        
-        # Use one of the old data arrays as a template
-        new = old[-1].copy()
-
-        # Assign new value and date to the template
-        new.data = array
-        new.time.data = date
-
-        # Add the new to the old
-        old.append(new)
-
-    # If it is a new file, knock off the sample
-    if new_file:
-        old.pop(0)
-
-    # And concatenate everything back together
-    new = xr.concat(old, dim='time')
-    
-    # Before we package this up, create a title
-    title = 'Evaporative Demand Drought Index - {} month'.format(scale)
-    subtitle = 'Monthly Index Values since 1980-01-31'
-    new = xr.Dataset(data_vars={'value': new},
-                     attrs={'title': title, 'subtitle': subtitle})
-
-    # Write this back to a netcdf file
-    new.to_netcdf(original_path, mode='w')
-
-    # It appears to be possible to append data to the file itself, 
-    # though that probably requires an exact structure match
-    # Appending * to the existing dataset would look like this:
-    # *.to_netcdf(original_path, mode='a')
-
-    # Now, recalculate percentiles for the new dataset. 
-    arraylist = new.value.data
-    percentiles = new.copy()    
-    arraylist = percentileArrays(arraylist)    
-    percentiles.value.data = arraylist
-    percentiles.to_netcdf(percentile_path, mode='w')
+        # The format is off, so let's build another netcdf from the tif above
+        tfile = outpath
+        ncfile = ncdir
+        savepath = os.path.join(
+                data_path, 'data/droughtindices/netcdfs/albers', index + '.nc')
+        toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, wmode='w',
+                  percentiles=False)
 
 # Close connection with FTP server
 ftp.quit()

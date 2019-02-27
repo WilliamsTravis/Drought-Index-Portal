@@ -10,29 +10,40 @@
     rebuild the entire percentile netcdf because that is rank based.
 
 
-    production notes:
-        These don't have the correct crs info yet, however when they do the
-        transformation from epsg 4326 to 102008 is fairly simple:
-            
-            gdalwarp -t_srs epsg:102008 -dstnodata 0 in.nc out.nc
-            
-        except, of course, that its upside down :)
+    Production notes:
+
+        The geographic coordinate systems work for the most part. I had to use
+        'degrees_south' for the latitude unit attribute to avoid flipping the
+        image and I'm not sure whether to use degrees_west or degrees_east for
+        longitute (does not seem to change the image). Also, the netcdfs built
+        using my functions appear to have coordinates at the grid center, which
+        is different than before (lower left corner), so watch out that this
+        doesn't change the output. 
+    
+        Another outcome that I don't understand is that projecting the WGS84
+        maps to Albers Equal Area Conic (or any projection I presume) flips the
+        y axis regardless of the original orientation. 
+        
+        I would like to use the Climate Data Operators (cdo) library, either
+        with python bindings or the command prompt utilities and a subprocess.
+        There is a utility that will do exactly what I want in one line.
+        Syncing this between linux and windows may take some doing, and the app
+        is built around the naming scheme from before, so we'll use this for
+        now.
+        
     
 Created on Fri Feb  10 14:33:38 2019
 
 @author: User
 """
 from bs4 import BeautifulSoup
-from collections import OrderedDict
+from glob import glob
 import datetime as dt
-from osgeo import gdal
 import logging
-import matplotlib.pyplot as plt
-from netCDF4 import Dataset
 import numpy as np
 import os
+from osgeo import gdal
 import pandas as pd
-from rasterio.crs import CRS
 import requests
 import sys
 from tqdm import tqdm
@@ -43,41 +54,19 @@ import xarray as xr
 
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    # sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
-    #                  'C:/Users/User/github/Ubuntu-Practice-Machine',
-    #                  'C:/Users/travi/github/Ubuntu-Practice-Machine'])
-    # Gdal Crisis - works on the ubuntu machine but not on windows
-    os.chdir('Z:/Sync/Ubuntu-Practice-Machine')    
+    sys.path.extend(['C:/Users/User/github/Ubuntu-Practice-Machine',
+                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
     data_path = 'f:/'
 else:
-    os.chdir('/root/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
+    os.chdir('/root/Sync/Ubuntu-Practice-Machine/')
     data_path = '/root/Sync'
 
 from functions import Index_Maps, readRaster, percentileArrays, im
-from netCDF_functions import toNetCDF
-gdal.PushErrorHandler('CPLQuietErrorHandler')
+from netCDF_functions import toNetCDF2, toNetCDF3
+# gdal.PushErrorHandler('CPLQuietErrorHandler')
+os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
-
-# In[] Attempting a geographic 'accessor' for xarray
-@xr.register_dataset_accessor('geo')
-class GeoAccessor(object):
-    def __init__(self, xarray_obj):
-        self._obj = xarray_obj
-        self._center = None
-
-    @property
-    def center(self):
-        """Return the geographic center point of this dataset."""
-        if self._center is None:
-            # we can use a cache on our accessor objects, because accessors
-            # themselves are cached on instances that access them.
-            lons = self._obj.lat
-            lats = self._obj.lon
-            self._center = (float(lons.mean()), float(lats.mean()))
-        return self._center
-
-# In[] set up
-wkt = CRS.from_epsg(4326).wkt
+# In[] Set up paths and urls
 wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM'
 local_path = os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt/')
 if not os.path.exists(local_path):
@@ -123,24 +112,13 @@ print(str(today) + '\n')
 
 ############ Get and Build Data Sets ########################################
 for index in indices:
-    # Default attributes.
-    new_attrs = OrderedDict([('title', title_map[index]),
-                             ('Description', 'Monthly gridded data at 0.25 decimal degree (15 arc-minute)' +
-                              ' resolution, calibrated to 1895-2010 for the continental United States.'),
-                             ('Original Author',
-                              'John Abatzoglou - University of Idaho, jabatzoglou@uidaho.edu'),
-                             ('Date', pd.to_datetime(str(today)).strftime('%Y-%m-%d')),
-                             ('Projection', 'World Geodetic Survey 1984, EPSG: 4326'),
-                             ('spatial_ref', wkt),
-                             ('Citation', 'Westwide Drought Tracker, http://www.wrcc.dri.edu/monitor/WWDT')])
-
     # We need the key 'value' to point to local data
     nc_path = os.path.join(data_path,
                              'data/droughtindices/netcdfs/',
                              index_map[index] + '.nc')
     wwdt_index_url = wwdt_url + '/' + index
 
-    if os.path.exists(nc_path):
+    if os.path.exists(nc_path):  # Create a netcdf and append to file
         print(nc_path + " exists, checking for missing data...")
         ############## If we only need to add a few dates ###################
         with xr.open_dataset(nc_path) as data:
@@ -267,15 +245,13 @@ for index in indices:
         else:
             print('No missing files, moving on...\n')
             
-
-
     else:
         ############## If we need to start over #######################
         print(nc_path + " not detected, building new data set...")
 
         # Get the data from wwdt
-        for i in range(1, 13):
-            # paths
+        for i in tqdm(range(1, 13), position=0):
+            # These come in monthly files - e.g. all januaries in one file
             file_name = '{}_{}_PRISM.nc'.format(index, i)
             target_url = wwdt_url + '/' + index + '/' + file_name
             temp_path = os.path.join(local_path, 'temp_{}.nc'.format(i))
@@ -292,74 +268,61 @@ for index in indices:
                 logging.info('Access successful.')
 
         # Get some of the attributes from one of the new data sets
-        monthly_ncs = []
         for i in tqdm(range(1, 13), position=0):
-            # Okay, so I'd like to keep the original information and only change
-            # geometries. Use each temp_X.nc for the dates and attributes
+            # DL each monthly file
             source_path = os.path.join(local_path, 'temp_{}.nc'.format(i))
-            source = xr.open_dataset(source_path)
-            dates = source.day.data
 
-            # However, it is so much easier to transform the files themselves
-            out_path = os.path.join(local_path, 'temp.tif')
+            # Get the original dates in the right format
+            with xr.open_dataset(source_path) as data:
+                dates = data.day.data
+                data.close()
+
+            # It is much easier to transform the files themselves
+            out_path = os.path.join(local_path, 'tifs', 'temp_{}.tif'.format(i))
+
             if os.path.exists(out_path):
                 os.remove(out_path)
 
-            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4326',  # <----- Untill I figure out how to fit the crs properly
-                           xRes=0.25, yRes=0.25, 
-                           outputBounds=[-130, 20, -55, 50])
+            ds = gdal.Warp(out_path, source_path, format='GTiff', dstSRS='EPSG:4326', xRes=.25,
+                           yRes=.25, outputBounds=[-130, 20, -55, 50])
             del ds
-                                                                    # <-------- I could just warp again here, and build another netcdf for albers
-            base_data = gdal.Open(out_path)
 
-            # Now we have arrays of the correct dimensions
-            arrays = base_data.ReadAsArray()
-            del base_data
-            arrays[arrays==-9999.] = np.nan
+        # These are lists of all the temporary files
+        tfiles = glob(os.path.join(local_path, 'tifs', 'temp_*[0-9]*.tif'))
+        ncfiles = glob(os.path.join(local_path, 'temp_*[0-9]*.nc'))
 
-            # Create lats and lons (will change with resolution)
-            lons = np.linspace(-130.0, -55.25, 300, dtype=np.float32)
-            lats = np.linspace(50.0, 20.25, 120, dtype=np.float32)
-            monthly = xr.DataArray(data=arrays,
-                                   coords={'time': dates,
-                                           'lat': lats,
-                                           'lon': lons},
-                                   dims=('time', 'lat', 'lon'))
-            monthly_ncs.append(monthly)
-
-
-
-        final_arrays = xr.concat(monthly_ncs, 'time')
-        final_arrays = final_arrays.sortby('time')  # somethings off...
-        final_arrays = final_arrays.dropna('time', 'all')
-        index_nc = xr.Dataset(data_vars={'value': final_arrays},
-                              attrs=new_attrs)
-        index_nc.coords['crs'] = 0
-        index_nc['crs'].attrs = dict(spatial_ref=wkt)
-        t1 = '1948-01-01'
-        t2 = index_nc.time.data[-1]
-        index_nc = index_nc.sel(time=slice(t1, t2))
-
-        # We need the key 'value' to point to the data
-        nc_path = os.path.join(data_path,
-                               'data/droughtindices/netcdfs/',
+        # This is the target file - wwdt acronyms differ (and I'm not changing)
+        savepath = os.path.join(data_path, 'data/droughtindices/netcdfs/',
                                 index_map[index] + '.nc')
-        index_nc.to_netcdf(nc_path)
 
-        # Now recreate the entire percentile data set
-        print('Reranking percentiles...')
-        pc_nc = index_nc.copy()
-    
-        # let's rank this according to the 1948 to present time period
-        percentiles = percentileArrays(pc_nc.value.data)
-        pc_nc.value.data = percentiles
-        pc_nc.attrs['long_name'] = 'Monthly percentile values since 1948'
-        pc_nc.attrs['standard_name'] = 'percentile'
-        pc_path = os.path.join(data_path,
-                               'data/droughtindices/netcdfs/percentiles',
+        # This function smooshes everything into one netcdf file
+        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1948,  # <----------------------------------------- Create one of these for albers?
+                  month1=1, year2=todays_date.year, month2=todays_date.month,
+                  wmode='w', percentiles=False)
+
+        # We are also including percentiles, so lets build another dataset
+        savepath_perc = os.path.join(data_path, 'data/droughtindices/netcdfs/percentiles',
                                 index_map[index] + '.nc')
-        os.remove(pc_path)
-        pc_nc.to_netcdf(pc_path)
+        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1948,  # <----------------------------------------- Create one of these for albers?
+                  month1=1, year2=todays_date.year, month2=todays_date.month,
+                  wmode='w', percentiles=True)
+
+        # Now, for areal calculations, we'll need a projected version
+        inpath = savepath
+        outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
+                                index_map[index] + '.tif')
+        if os.path.exists(outpath):
+            os.remove(outpath)
+        ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
+                       dstSRS='EPSG:102008')
+
+        # The format is off, so let's build another netcdf from the tif above
+        tfile = outpath
+        ncfile = savepath
+        savepath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
+                                index_map[index] + '.nc')
+        toNetCDF3(tfile, ncfile, savepath, index, epsg=102008,
+                  wmode='w', percentiles=False)
 
 print("Update Complete.")
 print("####################################################")
@@ -368,4 +331,3 @@ print("#######################")
 print("############")
 print("#####")
 print("##")
-                              

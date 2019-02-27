@@ -35,6 +35,13 @@ grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
 
 
 ######## Functions ############################################################
+def isInt(string):
+    try:
+        int(string)
+        return True
+    except:
+        return False
+
 def calculateCV(indexlist):
     '''
      A single array showing the distribution of coefficients of variation
@@ -246,15 +253,11 @@ class Index_Maps():
         d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)  # last day
         
         with xr.open_dataset(array_path) as data:
-            limits = [abs(np.nanmin(data.value.data)),
-                      abs(np.nanmax(data.value.data))]
-            dmax = max(limits)  # Makes an even graph
-            dmin = dmax*-1
-            data = data.sel(time=slice(d1, d2)) * self.mask
+            data = data.sel(time=slice(d1, d2))
             indexlist = data
             del data
 
-        return [indexlist, dmax, dmin]
+        return indexlist
         
     def getOriginal(self):
         '''
@@ -263,7 +266,11 @@ class Index_Maps():
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/",
                                   self.choice + '.nc')
-        indexlist, dmin, dmax = self.getData(array_path)
+        indexlist = self.getData(array_path)
+        limits = [abs(np.nanmin(indexlist.value.data)),
+                  abs(np.nanmax(indexlist.value.data))]
+        dmax = max(limits)  # Makes an even graph
+        dmin = dmax*-1
         gc.collect()
         return [indexlist, dmin, dmax]
 
@@ -274,8 +281,10 @@ class Index_Maps():
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/percentiles",
                                   self.choice + '.nc')
-        indexlist, dmin, dmax = self.getData(array_path)
-        indexlist = indexlist * 100
+        indexlist = self.getData(array_path)
+        indexlist.value.data = indexlist.value.data * 100
+        dmax = np.nanmax(indexlist.value.data)
+        dmin = np.nanmin(indexlist.value.data)
         gc.collect()
         return [indexlist, dmin, dmax]
 
@@ -287,7 +296,11 @@ class Index_Maps():
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/albers",
                                   self.choice + '.nc')
-        indexlist, dmin, dmax = self.getData(array_path)
+        indexlist = self.getData(array_path)
+        limits = [abs(np.nanmin(indexlist.value.data)),
+                  abs(np.nanmax(indexlist.value.data))]
+        dmax = max(limits)  # Makes an even graph
+        dmin = dmax*-1
         gc.collect()
         return [indexlist, dmin, dmax]
 

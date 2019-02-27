@@ -37,6 +37,13 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'eddi6': 'Evaporative Demand Drought Index - 6 month'}
 
 
+def isInt(string):
+    try:
+        int(string)
+        return True
+    except:
+        return False
+
 def percentileArrays(arrays):
     '''
     returns ranked percentiles of a list of 2d numpy arrays or a single 3d numpy array
@@ -155,6 +162,9 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
     Take multiple multiband netcdfs with messed up dates, multiple tiffs with
     desired geometries and writes to a single netcdf as a single time series. This
     has a lot of options, only meant for the app.
+    
+    As an expediency, if there isn't an nc file that means it's eddi and the
+    dates are in the file name.
     '''
     # For attributes
     todays_date = dt.datetime.today()
@@ -164,7 +174,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
     data = gdal.Open(tfiles[0])
     geom = data.GetGeoTransform()
     proj = data.GetProjection()
-    array = data.ReadAsArray()[0]
+    array = data.ReadAsArray()
     nlat, nlon = np.shape(array)
     lons = np.arange(nlon) * geom[1] + geom[0]
     lats = np.arange(nlat) * geom[5] + geom[3]
@@ -228,25 +238,40 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
 
     # Now getting the data, which is not in order because of how wwdt does it
     # We need to associate each day with its array
-    date_tifs = {}
-    for i in range(len(ncfiles)):
-        nc = Dataset(ncfiles[i])
-        days = nc.variables['day'][:]  # This is in days since 1900
-        rasters = gdal.Open(tfiles[i])
-        arrays = rasters.ReadAsArray()
-        for y in range(len(arrays)):
-            date_tifs[days[y]] = arrays[y]
 
-    # okay, that was just in case the dates wanted to bounce around
-    date_tifs = OrderedDict(sorted(date_tifs.items()))
+    try:
+        Dataset(ncfiles[i])
+        date_tifs = {}
+        for i in range(len(ncfiles)):
+            nc = Dataset(ncfiles[i])
+            days = nc.variables['day'][:]  # This is in days since 1900
+            rasters = gdal.Open(tfiles[i])
+            arrays = rasters.ReadAsArray()
+            for y in range(len(arrays)):
+                date_tifs[days[y]] = arrays[y]
+        # okay, that was just in case the dates wanted to bounce around
+        date_tifs = OrderedDict(sorted(date_tifs.items()))
+    
+        # Now that everything is in the right order, split them back up
+        days = np.array(list(date_tifs.keys()))
+        arrays = np.array(list(date_tifs.values()))
 
-    # Now that everything is in the right order, split them back up
-    days = np.array(list(date_tifs.keys()))
-    arrays = np.array(list(date_tifs.values()))
+    except:
+        datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
+        dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
+                 d in datestrings]
+        deltas = [d - dt.datetime(1900, 1, 1) for d in dates]
+        days = np.array([d.days for d in deltas])
+        arrays = []
+        for t in tfiles:
+            data = gdal.Open(t)
+            array = data.ReadAsArray()
+            arrays.append(array) 
+        arrays = np.array(arrays)
 
     # Filter out dates before 1948 <-------------------------------------------Also, filter days after year2, month2 for custom netcdfs
     start = dt.datetime(1900, 1, 15)
-    end = dt.datetime(1948, 1, 15)
+    end = dt.datetime(year1, month1, 15)
     cutoff_day = end - start
     cutoff_day = cutoff_day.days
     idx = len(days) - len(days[np.where(days > cutoff_day)])
