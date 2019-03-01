@@ -40,18 +40,18 @@ import numpy as np
 import pandas as pd
 from plotly import graph_objs as go
 import psutil
-# import redis
 import time
 import warnings
 import xarray as xr
 
-# Where should this go?
-f = getframeinfo(currentframe()).filename
-p = os.path.dirname(os.path.abspath(f))
-os.chdir(p)
+# Set Working Directory
+frame = getframeinfo(currentframe()).filename
+path = os.path.dirname(os.path.abspath(frame))
+os.chdir(path)
 
+# Import functions
 from functions import Index_Maps, outLine, readRaster, im
-from functions import coordinateDictionaries, makeMap
+from functions import coordinateDictionaries, makeMap, areaSeries
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -85,12 +85,9 @@ cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
                       'CACHE_THRESHOLD': 2})
 
-#cache = Cache(config={'CACHE_TYPE': 'redis',
-#                      'CACHE_REDIS_URL': os.environ.get('localhost:6379')})
-
 cache.init_app(server)
 
-# In[] Drought and Climate Indices (looking to include any raster time series)
+# Drought and Climate Indices (looking to include any raster time series)
 # Drought Severity Categories in percentile space
 drought_cats = {0: [20, 30], 1: [10, 20], 2: [5, 10], 3: [2, 5], 4: [0, 2]}
 
@@ -204,10 +201,6 @@ state_options = [{'label': r['STUSAB'], 'value': r['FIPS State']} for
                   r in rows]
 # state_options.insert(0, {'label': 'CONUS',
 #                          'value': 'all'})
-state_arrays = readRaster('data/rasters/us_states.tif', 1, -9999)[0]
-state_arrays_albers = readRaster('data/rasters/us_states_albers.tif',
-                                 1, -9999)[0]
-
 # This is to associate grid ids with points, only once
 # point_dict = {gridid: gridToPoint(grid, gridid) for  # Takes too long
 #               gridid in grid[~np.isnan(grid)]}
@@ -1334,6 +1327,11 @@ for i in range(1, 3):
         return figure
 
 
+
+
+
+
+
     @app.callback(Output('series_{}'.format(i), 'figure'),
                   [Input('submit', 'n_clicks'),
                    Input('signal', 'children'),
@@ -1376,79 +1374,19 @@ for i in range(1, 3):
         # From the location, whatever it is, we need only need y, x and a label
         # Whether x and y are singular or vectors
         print("LOCATION: " + str(location))
-        ################ Construction Zone ####################################
-        # location = [[4, 4, 4, 5, 5, 5], [62, 63, 64, 62, 63, 64], 'Flathead County, MT', 4]
-        # location = [39, 97, 'Boulder County, CO', 2]
-        from pyproj import Proj, transform
-        # transform selection, add in county filter, find time series of averages
 
-
-        def areaSeries(location, arrays):   # <-------------------------------- Move to functions
-            # if type(location[0]) is int:
-            if location[0] != 'state_mask':
-
-                y, x, label, sel_idx = location
-                if type(y) is int:
-                    timeseries = np.array([round(a[y, x], 4) for a in arrays])
-                else:
-                    x = json.loads(x)
-                    y = json.loads(y)
-                    timeseries = np.array([round(np.nanmean(a[y, x]), 4) for
-                                           a in arrays])
-
-            # else:
-            #     # Collect array index positions and other information for print
-            #     y, x, label, sel_idx = location
-
-            #     # The index positions need to be arrays
-            #     ys = np.array(y)
-            #     xs = np.array(x)
-
-            #     # We won't need to make a copy in the final version
-            #     array2 = array.copy()
-
-            #     # Where the array doesnt equal the values at the index position
-            #     # turn it into a NaN value
-            #     array2[~np.isin(array2, array2[ys,xs])] = np.nan  # <---------- With this method, if there are exact value matches, will have noise, but it works.
-                
-            #     # Okay, now we could take the averages of this, but it would be
-            #     # a bit off since it isn't projected. Project to Albers.
-            #     source_proj = Proj(init='epsg:4326')
-            #     dst_proj = Proj('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
-            #                     +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
-            #                     +datum=NAD83 +units=m +no_defs')
-
-            #     # This gives us our projected x and y coordinates
-            #     pxs, pys = transform(source_proj, dst_proj, xs, ys)
-
-            #     # We could make an empty grid from one of our projected sources
-            #     albers = Dataset('f)
-            else:
-                flag, states, label, sel_idx = location
-                if states != 'all':
-                    states = json.loads(states)
-                    state_mask = state_arrays.copy()
-                    state_mask[~np.isin(state_mask, states)] = np.nan
-                    state_mask = state_mask * 0 + 1
-                else:
-                    state_mask = mask
-                arrays = arrays*state_mask
-                timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
-
-            return [timeseries, label]
-
-
-###################################################################################
         # If the function is oarea, we plot five overlapping timeseries
         if function != 'oarea':
-            timeseries, label = areaSeries(location, arrays)
+            timeseries, arrays, label = areaSeries(location, arrays, dates)
             bar_type = 'bar'
         else:
             dm_arrays = arrays.copy()
             bar_type = 'overlay'
             ts_series = {}
             for i in range(5):  # 5 drought categories
-                ts_series[i] = areaSeries(location, dm_arrays[i])
+                 timeseries, arrays, label = areaSeries(location, dm_arrays[i],
+                                                        dates, reproject=True)
+                 ts_series[i] = droughtArea(arrays, choice, inclusive=False)
 
         # Format dates
         dates = [pd.to_datetime(str(d)) for d in dates]
@@ -1492,7 +1430,7 @@ for i in range(1, 3):
                                 line=dict(width=0.2, color="#000000")))]
         else:
 ############################# Construction Zone ###############################
-            label = ts_series[0][1] # these are all too consistent
+            label = ts_series[0][1]
             xs = [i for i in range(len(dates))]
             ts = [ts_series[i][0] for i in range(5)]
             colors = ['#ffff00', '#fcd37f', '#ffaa00', '#e60000', '#730000']
