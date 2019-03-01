@@ -31,7 +31,7 @@ else:
     data_path = '/root/Sync'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 
-grid = np.load(data_path + "/data/prfgrid.npz")["grid"]
+grid = np.load("data/npy/prfgrid.npz")["grid"]
 
 
 ######## Functions ############################################################
@@ -512,31 +512,47 @@ class Index_Maps():
         For now this requires original values, percentiles even out too quickly
         '''
 
-        arealist, dmin, dmax = self.getAlbers()  # This is used for areal calcs
+        # arealist, dmin, dmax = self.getAlbers()  # This is used for areal calcs
+        states = readRaster('data/rasters/us_states_albers.tif', 1, -9999)[0]
+        mask = states * 0 + 1
         [array, arrays, dates, colorscale,
             amax, amin, reverse] = self.meanOriginal() # This used for display
-        arrays = arealist.value.data
 
         # Drought Categories
-        drought_cats = {0: [.20, .30], 1: [.10, .20], 2: [.05, .10],
-                        3: [.02, .05], 4: [.00, .02]}
+        drought_cats = {'sp': {0: [-0.5, -0.8],
+                               1: [-0.8, -1.3],
+                               2: [-1.3, -1.5],
+                               3: [-1.5, -2.0],
+                               4: [-2.0, -999]},
+                        'eddi': {0: [-0.5, -0.8],
+                                 1: [-0.8, -1.3],
+                                 2: [-1.3, -1.5],
+                                 3: [-1.5, -2.0],
+                                 4: [-2.0, -999]},
+                        'pdsi': {0:[-1.0, -2.0],
+                                 1: [-2.0, -3.0],
+                                 2: [-3.0, -4.0],
+                                 3: [-4.0, -5.0],
+                                 4: [-5.0, -999]}}
+
+        # Choose a set of categories
+        cat_key = [key for key in drought_cats.keys() if key in self.choice][0]
+        cats = drought_cats[cat_key]
 
         # Total number of pixels
-        total_area = np.nansum(self.mask)
+        total_area = np.nansum(mask)
 
-        # We want an ndarray for each category, too
+        # We want an ndarray for each category
         dm_arrays = {}
-
-        # We want a map for each drought category?
         for i in range(5):
-            d = drought_cats[i]
+            d = cats[i]
             a = arrays.copy()
 
             # Filter above or below thresholds
             if inclusive is False:
-                a[(a < d[0]) | (a > d[1])] = np.nan
+                a[(a > d[0]) | (a < d[1])] = np.nan
             else:
-                a[a > d[1]] = np.nan
+                a[a > d[0]] = np.nan
 
             dm_arrays[i] = a
 
@@ -551,13 +567,8 @@ class Index_Maps():
         #
         # print('DM ' + str(i)  + ': %' + str(percent))
 
-        del arrays
-
-        # It is easier to work with these in this format
-        dates = indexlist.time.data
-
         # Get color scale
-        colorscale = self.setColor(default='percentile')
+        colorscale = self.setColor(default='original')
 
         # The colorscale will always mean the same thing
         reverse = False

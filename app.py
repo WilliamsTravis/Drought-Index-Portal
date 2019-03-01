@@ -50,7 +50,7 @@ f = getframeinfo(currentframe()).filename
 p = os.path.dirname(os.path.abspath(f))
 os.chdir(p)
 
-from functions import Index_Maps, outLine, readRaster
+from functions import Index_Maps, outLine, readRaster, im
 from functions import coordinateDictionaries, makeMap
 
 # Check if we are working in Windows or Linux to find the data
@@ -136,12 +136,13 @@ indexnames = {'pdsi': 'Palmer Drought Severity Index',
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
                          {'label': 'Maximum', 'value': 'pmax'},
                          {'label': 'Minimum', 'value': 'pmin'},
-                         {'label': 'Drought Severity Area', 'value':'parea'}]
+                         ]
 
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
                          {'label': 'Minimum', 'value': 'omin'},
-                         {'label': 'Coefficient of Variation', 'value': 'ocv'}]
+                         {'label': 'Coefficient of Variation', 'value': 'ocv'},
+                         {'label': 'Drought Severity Area', 'value':'oarea'}]
 
 function_names = {'pmean': 'Average Percentiles',
                   'pmax': 'Maxmium Percentile',
@@ -150,7 +151,7 @@ function_names = {'pmean': 'Average Percentiles',
                   'omax': 'Maximum Original Value',
                   'omin': 'Minimum Original Value',
                   'ocv': 'Coefficient of Variation for Original Values',
-                  'parea': 'Drought Severity Area'}
+                  'oarea': 'Drought Severity Area'}
 
 ################## Move to Maps Section #######################################
 # Set up initial signal and raster to scatterplot conversion
@@ -204,6 +205,8 @@ state_options = [{'label': r['STUSAB'], 'value': r['FIPS State']} for
 # state_options.insert(0, {'label': 'CONUS',
 #                          'value': 'all'})
 state_arrays = readRaster('data/rasters/us_states.tif', 1, -9999)[0]
+state_arrays_albers = readRaster('data/rasters/us_states_albers.tif',
+                                 1, -9999)[0]
 
 # This is to associate grid ids with points, only once
 # point_dict = {gridid: gridToPoint(grid, gridid) for  # Takes too long
@@ -1374,13 +1377,16 @@ for i in range(1, 3):
         # Whether x and y are singular or vectors
         print("LOCATION: " + str(location))
         ################ Construction Zone ####################################
-        location = [[4, 4, 4, 5, 5, 5], [62, 63, 64, 62, 63, 64], 'Flathead County, MT', 4]
+        # location = [[4, 4, 4, 5, 5, 5], [62, 63, 64, 62, 63, 64], 'Flathead County, MT', 4]
+        # location = [39, 97, 'Boulder County, CO', 2]
         from pyproj import Proj, transform
         # transform selection, add in county filter, find time series of averages
 
 
         def areaSeries(location, arrays):   # <-------------------------------- Move to functions
-            if len(location[0]) == 1:
+            # if type(location[0]) is int:
+            if location[0] != 'state_mask':
+
                 y, x, label, sel_idx = location
                 if type(y) is int:
                     timeseries = np.array([round(a[y, x], 4) for a in arrays])
@@ -1390,18 +1396,33 @@ for i in range(1, 3):
                     timeseries = np.array([round(np.nanmean(a[y, x]), 4) for
                                            a in arrays])
 
+            # else:
+            #     # Collect array index positions and other information for print
+            #     y, x, label, sel_idx = location
 
+            #     # The index positions need to be arrays
+            #     ys = np.array(y)
+            #     xs = np.array(x)
 
+            #     # We won't need to make a copy in the final version
+            #     array2 = array.copy()
 
+            #     # Where the array doesnt equal the values at the index position
+            #     # turn it into a NaN value
+            #     array2[~np.isin(array2, array2[ys,xs])] = np.nan  # <---------- With this method, if there are exact value matches, will have noise, but it works.
+                
+            #     # Okay, now we could take the averages of this, but it would be
+            #     # a bit off since it isn't projected. Project to Albers.
+            #     source_proj = Proj(init='epsg:4326')
+            #     dst_proj = Proj('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
+            #                     +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
+            #                     +datum=NAD83 +units=m +no_defs')
 
-            else:
-                y, x, label, sel_idx = location
-                ys = np.array(y)
-                xs = np.array(x)
-                array2 = array.copy()
-                array2[ys, xs] = 1
+            #     # This gives us our projected x and y coordinates
+            #     pxs, pys = transform(source_proj, dst_proj, xs, ys)
 
-
+            #     # We could make an empty grid from one of our projected sources
+            #     albers = Dataset('f)
             else:
                 flag, states, label, sel_idx = location
                 if states != 'all':
@@ -1418,8 +1439,8 @@ for i in range(1, 3):
 
 
 ###################################################################################
-        # If the function is parea, we plot five overlapping timeseries
-        if function != 'parea':
+        # If the function is oarea, we plot five overlapping timeseries
+        if function != 'oarea':
             timeseries, label = areaSeries(location, arrays)
             bar_type = 'bar'
         else:
@@ -1434,7 +1455,7 @@ for i in range(1, 3):
         dates = [d.strftime('%Y-%m') for d in dates]
 
         # The y-axis depends on the chosen function
-        if 'p' in function and function != 'parea':
+        if 'p' in function and function != 'oarea':
             yaxis = dict(title='Percentiles',
                          range=[0, 100])
         elif 'o' in function and 'cv' not in function:
@@ -1445,7 +1466,7 @@ for i in range(1, 3):
                 sd = sd*-1
             dmin = 3*sd
             dmax = 3*sd*-1
-        elif function == 'parea':
+        elif function == 'oarea':
             yaxis = dict(title='Percent Area',
                           range=[0, 100])
         else:
