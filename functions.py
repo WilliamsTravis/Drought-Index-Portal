@@ -68,7 +68,6 @@ def wgsToAlbers(arrays):
                        +datum=NAD83 +units=m +no_defs')
     with salem.open_xr_dataset(os.path.join(data_path,
 				 'data/droughtindices/netcdfs/albers/albers.nc')) as data:
-        albers_grid = data.salem.grid
         albers = data
         albers.salem.grid._proj = albers_proj  # To make sure cause it's glitchy here
         data.close()

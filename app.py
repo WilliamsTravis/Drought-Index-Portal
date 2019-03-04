@@ -161,6 +161,8 @@ source = xr.open_dataarray(os.path.join(data_path,
 
 # This converts array coordinates into array positions
 londict, latdict, res = coordinateDictionaries(source)
+londict_rev = {y: x for x, y in londict.items()}
+latdict_rev = {y: x for x, y in latdict.items()}
 
 # Some more support functions <------------------------------------------------ Create class, include coordinateDictionaries, grid, and other conversion functions
 def pointToGrid(point):
@@ -369,13 +371,14 @@ def divMaker(id_num, index='noaa'):
                                                   selected_style=tablet_style
                                                   )]),
                                 html.Div(id='location_div_{}'.format(id_num),
-                                         children=[
-                                             dcc.Dropdown(
-                                                id='location_{}'.format(id_num),
-                                                options=county_options,
-                                                clearable=False,
-                                                multi=False,
-                                                value=24098)])],
+                                          # children=[
+                                          #     dcc.Dropdown(
+                                          #        id='county_{}'.format(id_num),
+                                          #        options=county_options,
+                                          #        clearable=False,
+                                          #        multi=False,
+                                          #        value=24098)]
+                                         )],
                                 style={'width': '50%',
                                        'float': 'left',
                                        'display': ''}),
@@ -629,20 +632,14 @@ app.layout = html.Div([   # <-------------------------------------------------- 
                  style={'display': 'none'}),
         html.Div(id='key_1', children='1', style={'display': 'none'}),
         html.Div(id='key_2', children='2', style={'display': 'none'}),
-        html.Div(id='key_3', children='3', style={'display': 'none'}),
-        html.Div(id='key_4', children='4', style={'display': 'none'}),
         html.Div(id='time_1', style={'display': 'none'}),
         html.Div(id='time_2', style={'display': 'none'}),
-        html.Div(id='time_3', style={'display': 'none'}),
-        html.Div(id='time_4', style={'display': 'none'}),
         html.Div(id='selection_time_1', style={'display': 'none'}),
         html.Div(id='selection_time_2', style={'display': 'none'}),
-        html.Div(id='selection_time_3', style={'display': 'none'}),
-        html.Div(id='selection_time_4', style={'display': 'none'}),
-        html.Div(id='location_time_1', style={'display': 'none'}),
-        html.Div(id='location_time_2', style={'display': 'none'}),
-        html.Div(id='location_time_3', style={'display': 'none'}),
-        html.Div(id='location_time_4', style={'display': 'none'}),
+        html.Div(id='county_time_1', style={'display': 'none'}),
+        html.Div(id='county_time_2', style={'display': 'none'}),
+        html.Div(id='state_time_1', style={'display': 'none'}),
+        html.Div(id='state_time_2', style={'display': 'none'}),
         html.Div(id='location_store', style={'display': 'none'}),
         html.Div(id='choice_store', style={'display': 'none'}),
 
@@ -856,19 +853,23 @@ def retrieve_data(signal, function, choice):
                Input('time_2', 'children'),
                Input('selection_time_1', 'children'),
                Input('selection_time_2', 'children'),
+               Input('county_time_1', 'children'),
+               Input('county_time_2', 'children'),
                Input('map_1', 'clickData'),
                Input('map_2', 'clickData'),
                Input('map_1', 'selectedData'),
                Input('map_2', 'selectedData'),
+               Input('county_1', 'value'),
+               Input('county_2', 'value'),
                Input('update_graphs_1', 'n_clicks'),
                Input('update_graphs_2', 'n_clicks')],
-              [State('location_time_1', 'children'), 
-               State('location_time_2', 'children'),
-               State('location_1', 'value'),
-               State('location_2', 'value')])
-def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2,
-                   cl1, cl2, sl1, sl2, click1, click2,
-                   loc_time1, loc_time2, loc1, loc2):
+              [State('state_time_1', 'children'), 
+               State('state_time_2', 'children'),
+               State('state_1', 'value'),
+               State('state_2', 'value')])
+def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
+                   cl1, cl2, sl1, sl2, co1, co2, click1, click2,
+                   st_time1, st_time2, st1, st2):
     '''
     Because there is no time stamp on these selections, we are making one
     ourselves. This is the list of selections (in various formats) and the list
@@ -882,9 +883,12 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2,
     location object.
         
     '''
-    times = [cl_time1, cl_time2, sl_time1, sl_time2, loc_time1, loc_time2]
+    times = [cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
+             st_time1, st_time2]
+    print("clickPicker initial choices: " + str(times))
     times = [0 if t is None else t for t in times]
-    sels = [cl1, cl2, sl1, sl2, loc1, loc2]
+    sels = [cl1, cl2, sl1, sl2, co1, co2, st1, st2]
+    print("clickPicker initial choices: " + str(sels))
     sels = [default_click if s is None else s for s in sels]
     idx = times.index(max(times))
     location = sels[idx]
@@ -1006,11 +1010,17 @@ for i in range(1, 3):
         clicktime = time.time()
         return(clicktime)
 
-    @app.callback(Output('location_time_{}'.format(i), 'children'),
-                  [Input('location_{}'.format(i), 'value')])
-    def locationTime(location):
-        loctime = time.time()
-        return(loctime)
+    @app.callback(Output('county_time_{}'.format(i), 'children'),
+                  [Input('county_{}'.format(i), 'value')])
+    def countyTime(county):
+        ctime = time.time()
+        return(ctime)
+
+    @app.callback(Output('state_time_{}'.format(i), 'children'),
+                  [Input('state_{}'.format(i), 'value')])
+    def stateTime(state):
+        stime = time.time()
+        return(stime)
 
     @app.callback(Output('selection_time_{}'.format(i), 'children'),
                   [Input('map_{}'.format(i), 'selectedData')])
@@ -1018,48 +1028,47 @@ for i in range(1, 3):
         selected_time = time.time()
         return(selected_time)
 
-    @app.callback(Output('location_{}'.format(i), 'options'),
-                  [Input('location_tab_{}'.format(i), 'value')])
-    def displayLocOptions(tab_choice):
+    @app.callback(Output('location_div_{}'.format(i), 'children'),
+                  [Input('location_tab_{}'.format(i), 'value')],
+                  [State('key_{}'.format(i), 'children')])
+    def displayLocOptions(tab_choice, key):
+        key = int(key)
         if tab_choice == 'county':
-            options = county_options
+            children = [html.Div([dcc.Dropdown(
+                                       id='county_{}'.format(key),
+                                       options=county_options,
+                                       clearable=False,
+                                       multi=False,
+                                       value=24098)]),
+                        html.Div([dcc.Dropdown(
+                                       id='state_{}'.format(key),
+                                       options=state_options,
+                                       clearable=False,
+                                       multi=True,
+                                       placeholder='Contiguous United States',
+                                       value='all')],
+                                 style={'display': 'none'})]
         else:
-              options = state_options
-        return options
-
-    @app.callback(Output('location_{}'.format(i), 'value'),
-                  [Input('location_tab_{}'.format(i), 'value')])
-    def displayLocValue(tab_choice):
-        if tab_choice == 'county':
-            value = 24098
-        else:
-            value = 'all'
-        return value
-
-    @app.callback(Output('location_{}'.format(i), 'multi'),
-                  [Input('location_tab_{}'.format(i), 'value')])
-    def displayLoMulti(tab_choice):
-        if tab_choice == 'county':
-            multi = False
-        else:
-            multi = True
-        return multi
-
-    @app.callback(Output('location_{}'.format(i), 'placeholder'),
-                  [Input('location_tab_{}'.format(i), 'value')])
-    def displayLocHolder(tab_choice):
-        if tab_choice == 'county':
-            placeholder = 'Boulder County, CO'
-        else:
-            placeholder = 'Contiguous United States'
-        return placeholder
+            children = [html.Div([dcc.Dropdown(
+                                       id='county_{}'.format(key),
+                                       options=county_options,
+                                       clearable=False,
+                                       multi=False,
+                                       value=24098)],
+                                 style={'display': 'none'}),
+                        html.Div([dcc.Dropdown(
+                                       id='state_{}'.format(key),
+                                       options=state_options,
+                                       clearable=False,
+                                       multi=True,
+                                       placeholder='Contiguous United States',
+                                       value='all')])]
+        return children
 
     @app.callback(Output('coverage_div_{}'.format(i), 'children'),
                   [Input('series_{}'.format(i), 'hoverData')])
     def hoverCoverage(hover):
         try:
-            # hover = {'points': [{'curveNumber': 0, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 38.301876187324524}, {'curveNumber': 1, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 32.17211961746216}, {'curveNumber': 2, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 26.667475700378418}, {'curveNumber': 3, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 22.23260720570882}, {'curveNumber': 4, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 20.610548555850983}, {'curveNumber': 5, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 13.67967426776886}, {'curveNumber': 6, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 0}]}
-            # print(str(hover))
             hover['points'][3]['y'] = hover['points'][3]['y'] * 15
             ds = ['{0:.2f}'.format(hover['points'][i]['y']) for i in range(6)]
             coverage_df = pd.DataFrame({'D0 (Dry)': ds[0],
@@ -1133,93 +1142,41 @@ for i in range(1, 3):
             style={'display': 'none'}
         return style
 
-    # @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
-    #               [Input('time_1', 'children'),
-    #                Input('time_2', 'children'),
-    #                Input('location_time_1', 'children'),
-    #                Input('location_time_2', 'children'),
-    #                Input('selection_time_1', 'children'),
-    #                Input('selection_time_2', 'children'),
-    #                Input('signal', 'children'),
-    #                Input('choice_{}'.format(i), 'value'),
-    #                Input('choice_store', 'children')],
-    #               [State('key_{}'.format(i), 'children'),
-    #                State('click_sync', 'children'),
-    #                State('map_1', 'clickData'),
-    #                State('map_2', 'clickData'),
-    #                State('location_1', 'value'),
-    #                State('location_2', 'value'),
-    #                State('map_1', 'selectedData'),
-    #                State('map_2', 'selectedData')])
-    # def dropOne(cl_time1, cl_time2,
-    #             co_time1, co_time2,
-    #             sl_time1, sl_time2,
-    #             signal, choice, choice_store, key, sync,
-    #             cl1, cl2, co1, co2, sl1, sl2):
-    #     '''
-    #     As a work around to updating synced dropdown labels
-    #     and because we can't change the dropdown value with out
-    #     creating an infinite loop, we are temporarily changing
-    #     the options so that the value stays the same, but the one label to that
-    #     value is the synced county name.
-    #     Check that we are working with the right selection, and do this first
-    #     to prevent update if not syncing
-    #     '''
+    @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
+                  [Input('location_store', 'children')],
+                  [State('county_{}'.format(i), 'value'),
+                   State('key_{}'.format(i), 'children'),
+                   State('click_sync', 'children')])
+    def dropOne(location, previous_grid, key, sync):
+        '''
+        As a work around to updating synced dropdown labels and because we
+        can't change the dropdown value with out creating an infinite loop, we
+        are temporarily changing the options so that the value stays the same,
+        but the one label to that value is the synced county name.
 
-    #     # List of all selections
-    #     sels = [cl1, cl2, co1, co2, sl1, sl2]
-    #     sels = [default_click if s is None else s for s in sels]
-        
-    #     # List of all selection times
-    #     times = [cl_time1, cl_time2, co_time1, co_time2, sl_time1, sl_time2]
+        Check that we are working with the right selection, and do this first
+        to prevent update if not syncing
+        '''
 
-    #     # Index position of most recent selection
-    #     sel_idx = times.index(max(times))
+        # Get the appropriate selection
+        sel_idx = location[3]
+        if 'On' not in sync:
+            idx = int(key) - 1  # Graph ID
+            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
+                raise PreventUpdate
 
-    #     # Find the current county value
-    #     idx = int(key) - 1  # Graph ID
-    #     co_sels = [co1, co2, co3, co4]
-    #     sel = co_sels[idx]
-    #     current_county = county_dict[sel]
+        if type(location[0]) is int:
+            current_county = location[2]
+        else:
+            current_county = "Multiple Counties"
 
-    #     # Get the appropriate selection
-    #     if 'On' not in sync:
-    #         if sel_idx not in idx + np.array([0, 4, 8]):  # Associated sels
-    #             raise PreventUpdate
-    #         else:
-    #             idxs = [idx, idx + 4, idx + 8]
-    #             key_sels = list(np.array(sels)[idxs])
-    #             key_times = list(np.array(times)[idxs])
-    #             sel_idx = key_times.index(max(key_times))
-    #             click = key_sels[sel_idx]
+        current_options = county_options.copy()
+        previous_county = counties_df['place'][
+                             counties_df['grid'] == previous_grid].item()
+        old_idx = options_pos[previous_county]
+        current_options[old_idx]['label'] = current_county
 
-    #     else:
-    #         # Get the most recent selection and continue
-    #         click = sels[sel_idx]
-        
-    #     # Is it a grid id, single point or a list of points
-    #     if type(click) is int:
-    #         click = gridToPoint(grid, click)
-
-    #     if type(click) is dict and len(click['points']) > 1:
-    #         county = 'Multiple Counties'
-    #     else:
-    #         lon = click['points'][0]['lon']
-    #         lat = click['points'][0]['lat']
-    #         x = londict[lon]
-    #         y = latdict[lat]
-    #         gridid = grid[y, x]
-    #         counties = counties_df['place'][counties_df.grid == gridid]
-    #         county = counties.unique()
-
-    #     options = county_options.copy()
-
-    #     # if 'On' in sync:  # Try making dictionaries for all of these, too long
-    #     current_idx = options_pos[current_county]
-    #     options[current_idx]['label'] = county
-
-    #     return options
-
+        return current_options
 
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_{}'.format(i), 'value'),
