@@ -215,34 +215,34 @@ for index in indices:
         ncdir = os.path.join(data_path, "data/droughtindices/netcdfs/",
                               index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,
-                  year1=1948, month1=1, year2=todays_date.year, month2=12,
+                  year1=1980, month1=1, year2=todays_date.year, month2=12,
                   epsg=4326, percentiles=False, wmode='w')
 
         # Now lets get the percentile values
         ncdir_perc = os.path.join(data_path, "data/droughtindices/netcdfs/" +
                                    "percentiles", index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir_perc,
-                  index=index, year1=1948, month1=1, year2=todays_date.year,
+                  index=index, year1=1980, month1=1, year2=todays_date.year,
                   month2=12, epsg=4326, percentiles=True, wmode='w')
 
         # Now we need projected rasters, we can do this from the nc above
         # Warp to albers equal area conic as a geotiff because ncdf flips axis
-        inpath = ncdir
-        outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
-                               index + '.tif')
-        if os.path.exists(outpath):
-            os.remove(outpath)
-        ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
-                       dstSRS='EPSG:102008')
-        del ds
+        # inpath = ncdir
+        # outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
+        #                        index + '.tif')
+        # if os.path.exists(outpath):
+        #     os.remove(outpath)
+        # ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
+        #                dstSRS='EPSG:102008')
+        # del ds
 
-        # The format is off, so let's build another netcdf from the tif above
-        tfile = outpath
-        ncfile = ncdir
-        savepath = os.path.join(
-                data_path, 'data/droughtindices/netcdfs/albers', index + '.nc')
-        toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, wmode='w',
-                  percentiles=False)
+        # # The format is off, so let's build another netcdf from the tif above
+        # tfile = outpath
+        # ncfile = ncdir
+        # savepath = os.path.join(
+        #         data_path, 'data/droughtindices/netcdfs/albers', index + '.nc')
+        # toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, wmode='w',
+        #           percentiles=False)
 
 # Close connection with FTP server
 ftp.quit()

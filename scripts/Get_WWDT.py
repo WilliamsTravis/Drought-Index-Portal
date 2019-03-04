@@ -156,7 +156,7 @@ for index in indices:
         if len(needed_dates) > 0:
             print_statement = '{} missing file(s) since {}...\n'
             print(print_statement.format(len(needed_dates), needed_dates[0]))
-            for d in pb(needed_dates, redirect_stdout=True):
+            for d in tqdm(needed_dates, redirect_stdout=True):
                 # build paths
                 file = '{}_{}_{}_PRISM.nc'.format(index, d.year, d.month)
                 url = wwdt_url + '/' + index + '/' + file
@@ -226,7 +226,7 @@ for index in indices:
             # let's rank this according to the 1900 to present time period
             percentiles = percentileArrays(pc_nc.value.data)
             pc_nc.value.data = percentiles
-            pc_nc.attrs['long_name'] = 'Monthly percentile values since 1900'
+            pc_nc.attrs['long_name'] = 'Monthly percentile values since 1895'
             pc_nc.attrs['standard_name'] = 'percentile'
             pc_path = os.path.join(data_path,
                                    'data/droughtindices/netcdfs/percentiles',
@@ -290,7 +290,7 @@ for index in indices:
                                 index_map[index] + '.nc')
 
         # This function smooshes everything into one netcdf file
-        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1900,
+        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1895,
                   month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=False)
 
@@ -298,27 +298,27 @@ for index in indices:
         savepath_perc = os.path.join(data_path,
                                      'data/droughtindices/netcdfs/percentiles',
                                      index_map[index] + '.nc')
-        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1900,
+        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1895,
                   month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=True)
 
-        # Now, for areal calculations, we'll need a projected version
-        inpath = savepath
-        outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
-                                index_map[index] + '.tif')
-        if os.path.exists(outpath):
-            os.remove(outpath)
-        ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
-                       dstSRS='EPSG:102008')
+        # # Now, for areal calculations, we'll need a projected version
+        # inpath = savepath
+        # outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
+        #                         index_map[index] + '.tif')
+        # if os.path.exists(outpath):
+        #     os.remove(outpath)
+        # ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
+        #                dstSRS='EPSG:102008')
 
-        # The format is off, so let's build another netcdf from the tif above
-        tfile = outpath
-        ncfile = savepath
-        savepath = os.path.join(data_path,
-                                'data/droughtindices/netcdfs/albers',
-                                index_map[index] + '.nc')
-        toNetCDF3(tfile, ncfile, savepath, index, epsg=102008,
-                  wmode='w', percentiles=False)
+        # # The format is off, so let's build another netcdf from the tif above
+        # tfile = outpath
+        # ncfile = savepath
+        # savepath = os.path.join(data_path,
+        #                         'data/droughtindices/netcdfs/albers',
+        #                         index_map[index] + '.nc')
+        # toNetCDF3(tfile, ncfile, savepath, index, epsg=102008,
+        #           wmode='w', percentiles=False)
 
 print("Update Complete.")
 print("####################################################")
