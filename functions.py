@@ -11,7 +11,6 @@ import gc
 import json
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
-from numba import jit
 import numpy as np
 import os
 from osgeo import gdal

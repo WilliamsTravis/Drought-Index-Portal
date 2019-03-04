@@ -20,10 +20,6 @@
 
         - An error reading wwdt data included artifacts for future dates.
 
-
-
-        
-    
 Created on Fri Feb  10 14:33:38 2019
 
 @author: User
@@ -50,7 +46,7 @@ if sys.platform == 'win32':
                      'C:/Users/travi/github/Ubuntu-Practice-Machine'])
     data_path = 'f:/'
 else:
-    os.chdir('/root/Sync/Ubuntu-Practice-Machine/')
+    sys.path.extend(['/root/Sync/Ubuntu-Practice-Machine/'])
     data_path = '/root/Sync'
 
 from functions import  percentileArrays
@@ -58,7 +54,7 @@ from netCDF_functions import toNetCDF2, toNetCDF3
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
-# In[] Set up paths and urls
+# Set up paths and urls
 wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM'
 local_path = os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt/')
 if not os.path.exists(local_path):
@@ -67,7 +63,7 @@ indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3', 'spei6',
            'pdsi', 'scpdsi', 'pzi']
 local_indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2',
                  'spei3', 'spei6', 'pdsi', 'pdsisc', 'pdsiz']
- 
+
 index_map = {indices[i]: local_indices[i] for i in range(len(indices))}
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'pdsi': 'Palmer Drought Severity Index',
