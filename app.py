@@ -866,10 +866,11 @@ def retrieve_data(signal, function, choice):
               [State('state_time_1', 'children'), 
                State('state_time_2', 'children'),
                State('state_1', 'value'),
-               State('state_2', 'value')])
+               State('state_2', 'value'),
+               State('location_store', 'children')])
 def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
                    cl1, cl2, sl1, sl2, co1, co2, click1, click2,
-                   st_time1, st_time2, st1, st2):
+                   st_time1, st_time2, st1, st2, old_location):
     '''
     Because there is no time stamp on these selections, we are making one
     ourselves. This is the list of selections (in various formats) and the list
@@ -883,15 +884,26 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
     location object.
         
     '''
-    times = [cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
-             st_time1, st_time2]
-    print("clickPicker initial choices: " + str(times))
-    times = [0 if t is None else t for t in times]
-    sels = [cl1, cl2, sl1, sl2, co1, co2, st1, st2]
+    times = np.array([cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
+                     st_time1, st_time2])
+    sels = np.array([cl1, cl2, sl1, sl2, co1, co2, st1, st2])
+    print("clickPicker initial times: " + str(times))
     print("clickPicker initial choices: " + str(sels))
-    sels = [default_click if s is None else s for s in sels]
-    idx = times.index(max(times))
+    times = [times[i] for i in range(len(sels)) if sels[i] is not None]
+    sels = [sels[i] for i in range(len(sels)) if sels[i] is not None]
+    # times[np.where(sels is None) == 'NoneType'))] = None
+    # sels = [s for s in sels if s is not None]
+    # times = [t for t in times if t is not None]
+    # sels = [default_click if s is None else s for s in sels]
+    # times = [0 if t is None else t for t in times]
+    idx = times.index(np.nanmax(times))
     location = sels[idx]
+    print("clickPicker final choice: " + str(location))
+    try:
+        if old_location[2] == location[2]:
+            raise PreventUpdate
+    except:
+        pass
 
     # 1: Selection is a grid ID  # <------------------------------------------- Move to function
     if type(location) is int and len(str(location)) >= 3:
@@ -919,6 +931,7 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
             states = ", ".join(state)
             location = ['state_mask', str(location), states, idx]
 
+    # Selection is the default 'all' states
     elif type(location) is str:
         location = ['state_mask', 'all', 'Contiguous United States', idx]
 
@@ -1046,7 +1059,7 @@ for i in range(1, 3):
                                        clearable=False,
                                        multi=True,
                                        placeholder='Contiguous United States',
-                                       value='all')],
+                                       value=None)],
                                  style={'display': 'none'})]
         else:
             children = [html.Div([dcc.Dropdown(
@@ -1054,7 +1067,7 @@ for i in range(1, 3):
                                        options=county_options,
                                        clearable=False,
                                        multi=False,
-                                       value=24098)],
+                                       value=None)],
                                  style={'display': 'none'}),
                         html.Div([dcc.Dropdown(
                                        id='state_{}'.format(key),
@@ -1142,41 +1155,41 @@ for i in range(1, 3):
             style={'display': 'none'}
         return style
 
-    @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
-                  [Input('location_store', 'children')],
-                  [State('county_{}'.format(i), 'value'),
-                   State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children')])
-    def dropOne(location, previous_grid, key, sync):
-        '''
-        As a work around to updating synced dropdown labels and because we
-        can't change the dropdown value with out creating an infinite loop, we
-        are temporarily changing the options so that the value stays the same,
-        but the one label to that value is the synced county name.
+    # @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
+    #               [Input('location_store', 'children')],
+    #               [State('county_{}'.format(i), 'value'),
+    #                State('key_{}'.format(i), 'children'),
+    #                State('click_sync', 'children')])
+    # def dropOne(location, previous_grid, key, sync):
+    #     '''
+    #     As a work around to updating synced dropdown labels and because we
+    #     can't change the dropdown value with out creating an infinite loop, we
+    #     are temporarily changing the options so that the value stays the same,
+    #     but the one label to that value is the synced county name.
 
-        Check that we are working with the right selection, and do this first
-        to prevent update if not syncing
-        '''
+    #     Check that we are working with the right selection, and do this first
+    #     to prevent update if not syncing
+    #     '''
 
-        # Get the appropriate selection
-        sel_idx = location[3]
-        if 'On' not in sync:
-            idx = int(key) - 1  # Graph ID
-            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
-                raise PreventUpdate
+    #     # Get the appropriate selection
+    #     sel_idx = location[3]
+    #     if 'On' not in sync:
+    #         idx = int(key) - 1  # Graph ID
+    #         if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
+    #             raise PreventUpdate
 
-        if type(location[0]) is int:
-            current_county = location[2]
-        else:
-            current_county = "Multiple Counties"
+    #     if type(location[0]) is int:
+    #         current_county = location[2]
+    #     else:
+    #         current_county = "Multiple Counties"
 
-        current_options = county_options.copy()
-        previous_county = counties_df['place'][
-                             counties_df['grid'] == previous_grid].item()
-        old_idx = options_pos[previous_county]
-        current_options[old_idx]['label'] = current_county
+    #     current_options = county_options.copy()
+    #     previous_county = counties_df['place'][
+    #                          counties_df['grid'] == previous_grid].item()
+    #     old_idx = options_pos[previous_county]
+    #     current_options[old_idx]['label'] = current_county
 
-        return current_options
+    #     return current_options
 
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_{}'.format(i), 'value'),
