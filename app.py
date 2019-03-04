@@ -1042,7 +1042,7 @@ for i in range(1, 3):
     def selectionTime(selection):
         selected_time = time.time()
         return(selected_time)
-        
+
     @app.callback(Output('location_{}'.format(i), 'options'),
                   [Input('location_tab_{}'.format(i), 'value')])
     def displayLocOptions(tab_choice):
@@ -1052,7 +1052,6 @@ for i in range(1, 3):
               options = state_options
         return options
 
-
     @app.callback(Output('location_{}'.format(i), 'value'),
                   [Input('location_tab_{}'.format(i), 'value')])
     def displayLocValue(tab_choice):
@@ -1061,8 +1060,7 @@ for i in range(1, 3):
         else:
             value = 'all'
         return value
-    
-    
+
     @app.callback(Output('location_{}'.format(i), 'multi'),
                   [Input('location_tab_{}'.format(i), 'value')])
     def displayLoMulti(tab_choice):
@@ -1072,7 +1070,6 @@ for i in range(1, 3):
             multi = True
         return multi
 
-
     @app.callback(Output('location_{}'.format(i), 'placeholder'),
                   [Input('location_tab_{}'.format(i), 'value')])
     def displayLocHolder(tab_choice):
@@ -1081,7 +1078,6 @@ for i in range(1, 3):
         else:
             placeholder = 'Contiguous United States'
         return placeholder
-
 
     @app.callback(Output('coverage_div_{}'.format(i), 'children'),
                   [Input('series_{}'.format(i), 'hoverData')])
@@ -1107,40 +1103,40 @@ for i in range(1, 3):
                        style_header_conditional=[
                                {'if': {'column_id': 'D0 (Dry)'},
                                        'backgroundColor': '#ffff00',
-                                       'color': 'black'},                               
+                                       'color': 'black'},
                                {'if': {'column_id': 'D1 (Moderate)'},
                                            'backgroundColor': '#fcd37f',
-                                           'color': 'black'},                               
+                                           'color': 'black'},
                                {'if': {'column_id': 'D2 (Severe)'},
                                       'backgroundColor': '#ffaa00',
-                                      'color': 'black'},  
+                                      'color': 'black'},
                                {'if': {'column_id': 'DSCI'},
                                       'backgroundColor': '#27397F',
                                       'color': 'white',
-                                      'width': '75'},   
+                                      'width': '75'},
                                {'if': {'column_id': 'D3 (Extreme)'},
                                       'backgroundColor': '#e60000',
-                                      'color': 'white'},                               
+                                      'color': 'white'},
                                {'if': {'column_id': 'D4 (Exceptional)'},
                                        'backgroundColor': '#730000',
                                        'color': 'white'}],
                        style_data_conditional=[
                                {'if': {'column_id': 'D0 (Dry)'},
                                        'backgroundColor': '#ffffa5',
-                                       'color': 'black'},                               
+                                       'color': 'black'},
                                {'if': {'column_id': 'D1 (Moderate)'},
                                        'backgroundColor': '#ffe5af',
-                                       'color': 'black'},                               
+                                       'color': 'black'},
                                {'if': {'column_id': 'D2 (Severe)'},
                                        'backgroundColor': '#ffbf3f',
-                                       'color': 'black'},  
+                                       'color': 'black'},
                                {'if': {'column_id': 'DSCI'},
                                       'backgroundColor': '#3b497c',
                                       'color': 'white',
                                       'width': '75'},
                                {'if': {'column_id': 'D3 (Extreme)'},
                                        'backgroundColor': '#dd6666',
-                                       'color': 'white'},                               
+                                       'color': 'white'},
                                {'if': {'column_id': 'D4 (Exceptional)'},
                                        'backgroundColor': '#a35858',
                                        'color': 'white'}]),
@@ -1487,7 +1483,7 @@ for i in range(1, 3):
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
-        colors = ['#ffff00','#fcd37f', '#ffaa00', '#27397F', '#e60000', 
+        colors = ['#ffff00','#fcd37f', '#ffaa00', '#27397F', '#e60000',
                   '#730000']
 
         # The y-axis depends on the chosen function
@@ -1564,7 +1560,7 @@ for i in range(1, 3):
                                          overlaying='y',
                                          side='right',
                                          position=-0.15)
-            layout_copy['margin'] = dict(l=55, r=65, b=65, t=90, pad=4)
+            layout_copy['margin'] = dict(l=55, r=65, b=65, t=90, pad=1)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
@@ -1577,7 +1573,6 @@ for i in range(1, 3):
 
         return figure
 
-
 # In[] Run Application through the server
 if __name__ == '__main__':
-    app.run_server(port=8000)
+    app.run_server()

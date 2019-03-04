@@ -66,7 +66,8 @@ def wgsToAlbers(arrays):
     albers_proj = Proj('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
                        +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
                        +datum=NAD83 +units=m +no_defs')
-    with salem.open_xr_dataset('f:/data/droughtindices/netcdfs/albers/spi1.nc') as data:
+    with salem.open_xr_dataset(os.path.join(data_path,
+				 'data/droughtindices/netcdfs/albers/albers.nc')) as data:
         albers_grid = data.salem.grid
         albers = data
         albers.salem.grid._proj = albers_proj  # To make sure cause it's glitchy here
@@ -164,12 +165,12 @@ def droughtArea(arrays, choice, inclusive=False):
     # @jit
     def rangeFilter(a, d, inclusive):
         # Filter above or below thresholds
-        ac = a.copy()
-        if inclusive is False:
-            ac[(ac >= d[0]) | (ac < d[1])] = np.nan
-        else:
-            ac[ac > d[0]] = np.nan
-        area = ac*0+1
+        # ac = a.copy()
+        #if inclusive is False:
+           # ac[(ac >= d[0]) | (ac < d[1])] = np.nan
+        #else:
+        a[a > d[0]] = np.nan
+        area = a*0+1
         ps = [(np.nansum(b)/total_area) * 100 for b in area]
         return ps
 
@@ -179,7 +180,7 @@ def droughtArea(arrays, choice, inclusive=False):
         d = cats[i]
         ps = rangeFilter(arrays, d, inclusive=True)
         p[i] = ps
-    
+
     DSCI = np.array([np.array(p[key]) for key in p.keys()])
     DSCI = np.array([DSCI[i]*(i+1) for i in range(5)])
     DSCI = np.sum(DSCI, axis=0)
