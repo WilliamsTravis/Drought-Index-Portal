@@ -851,24 +851,43 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
-@app.callback(Output('location_store', 'children'),
+@app.callback(Output('location_store', 'children'),  # Move state selectors to state, add submitState button to input
               [Input('time_1', 'children'),
                Input('time_2', 'children'),
+               # Input('time_3', 'children'), 
+               # Input('time_4', 'children'),
+               Input('location_time_1', 'children'), 
+               Input('location_time_2', 'children'),
+               # Input('location_time_3', 'children'),
+               # Input('location_time_4', 'children'),
                Input('selection_time_1', 'children'),
                Input('selection_time_2', 'children'),
+               # Input('selection_time_3', 'children'),
+               # Input('selection_time_4', 'children'),
                Input('map_1', 'clickData'),
                Input('map_2', 'clickData'),
+               # Input('map_3', 'clickData'),
+               # Input('map_4', 'clickData'),
+               Input('location_1', 'value'),
+               Input('location_2', 'value'),
+               # Input('location_3', 'value'),
+               # Input('location_4', 'value'),
                Input('map_1', 'selectedData'),
                Input('map_2', 'selectedData'),
-               Input('update_graphs_1', 'n_clicks'),
-               Input('update_graphs_2', 'n_clicks')],
-              [State('location_time_1', 'children'), 
-               State('location_time_2', 'children'),
-               State('location_1', 'value'),
-               State('location_2', 'value')])
-def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2,
-                   cl1, cl2, sl1, sl2, click1, click2,
-                   loc_time1, loc_time2, loc1, loc2):
+               ])
+def locationPicker(cl_time1, cl_time2,
+                   # cl_time3, cl_time4,
+                   loc_time1, loc_time2,
+                   # loc_time3, loc_time4,
+                   sl_time1, sl_time2,
+                   # sl_time3, sl_time4,
+                   cl1, cl2,
+                   # cl3, cl4,
+                   loc1, loc2,
+                   # loc3, loc4,
+                   sl1, sl2,
+                   # sl3, sl4
+                   ):
     '''
     Because there is no time stamp on these selections, we are making one
     ourselves. This is the list of selections (in various formats) and the list
@@ -882,9 +901,21 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2,
     location object.
         
     '''
-    times = [cl_time1, cl_time2, sl_time1, sl_time2, loc_time1, loc_time2]
+    times = [cl_time1, cl_time2,
+             # cl_time3, cl_time4,
+             loc_time1, loc_time2,
+             # loc_time3, loc_time4,
+             sl_time1, sl_time2,
+             # sl_time3, sl_time4
+             ]
     times = [0 if t is None else t for t in times]
-    sels = [cl1, cl2, sl1, sl2, loc1, loc2]
+    sels = [cl1, cl2,
+            # cl3, cl4,
+            loc1, loc2, 
+            # loc3, loc4, 
+            sl1, sl2, 
+            # sl3, sl4
+            ]
     sels = [default_click if s is None else s for s in sels]
     idx = times.index(max(times))
     location = sels[idx]
@@ -961,9 +992,12 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2,
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
               [Input('choice_1', 'value'),
-               Input('choice_2', 'value')])
-def choiceStore(choice1, choice2):
-    return (json.dumps([choice1, choice2]))
+               Input('choice_2', 'value'),
+               # Input('choice_3', 'value'),
+               # Input('choice_4', 'value')
+               ])
+def choiceStore(choice1, choice2): # choice3, choice4):
+    return (json.dumps([choice1, choice2])) # choice3, choice4]))
 
 # Store data in the cache and hide the signal to activate it in the hidden div
 @app.callback(Output('signal', 'children'),
@@ -1133,45 +1167,60 @@ for i in range(1, 3):
             style={'display': 'none'}
         return style
 
-    # @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
+    # @app.callback(Output('county_a{}'.format(i), 'options'),  # <------------ Dropdown label updates, old version
     #               [Input('time_1', 'children'),
-    #                Input('time_2', 'children'),
-    #                Input('location_time_1', 'children'),
-    #                Input('location_time_2', 'children'),
-    #                Input('selection_time_1', 'children'),
-    #                Input('selection_time_2', 'children'),
-    #                Input('signal', 'children'),
-    #                Input('choice_{}'.format(i), 'value'),
-    #                Input('choice_store', 'children')],
+    #                 Input('time_2', 'children'),
+    #                 Input('time_3', 'children'),
+    #                 Input('time_4', 'children'),
+    #                 Input('location_time_1', 'children'),
+    #                 Input('location_time_2', 'children'),
+    #                 Input('location_time_3', 'children'),
+    #                 Input('location_time_4', 'children'),
+    #                 Input('selection_time_1', 'children'),
+    #                 Input('selection_time_2', 'children'),
+    #                 Input('selection_time_3', 'children'),
+    #                 Input('selection_time_4', 'children'),
+    #                 Input('signal', 'children'),
+    #                 Input('choice_{}'.format(i), 'value'),
+    #                 Input('choice_store', 'children')],
     #               [State('key_{}'.format(i), 'children'),
-    #                State('click_sync', 'children'),
-    #                State('map_1', 'clickData'),
-    #                State('map_2', 'clickData'),
-    #                State('location_1', 'value'),
-    #                State('location_2', 'value'),
-    #                State('map_1', 'selectedData'),
-    #                State('map_2', 'selectedData')])
-    # def dropOne(cl_time1, cl_time2,
-    #             co_time1, co_time2,
-    #             sl_time1, sl_time2,
+    #                 State('click_sync', 'children'),
+    #                 State('map_1', 'clickData'),
+    #                 State('map_2', 'clickData'),
+    #                 State('map_3', 'clickData'),
+    #                 State('map_4', 'clickData'),
+    #                 State('locaiton_1', 'value'),
+    #                 State('location_2', 'value'),
+    #                 State('location_3', 'value'),
+    #                 State('location_4', 'value'),
+    #                 State('map_1', 'selectedData'),
+    #                 State('map_2', 'selectedData'),
+    #                 State('map_3', 'selectedData'),
+    #                 State('map_4', 'selectedData')])
+    # def dropOne(cl_time1, cl_time2, cl_time3, cl_time4,
+    #             co_time1, co_time2, co_time3, co_time4,
+    #             sl_time1, sl_time2, sl_time3, sl_time4,
     #             signal, choice, choice_store, key, sync,
-    #             cl1, cl2, co1, co2, sl1, sl2):
+    #             cl1, cl2, cl3, cl4, co1, co2, co3, co4,
+    #             sl1, sl2, sl3, sl4):
     #     '''
     #     As a work around to updating synced dropdown labels
     #     and because we can't change the dropdown value with out
     #     creating an infinite loop, we are temporarily changing
-    #     the options so that the value stays the same, but the one label to that
-    #     value is the synced county name.
-    #     Check that we are working with the right selection, and do this first
-    #     to prevent update if not syncing
+    #     the options each time such that the value stays the same,
+    #     but the one label to that value is the synced county name
+    #     Selecting the right selection, do this first to prevent update
+    #     if not syncing
     #     '''
 
     #     # List of all selections
-    #     sels = [cl1, cl2, co1, co2, sl1, sl2]
+    #     sels = [cl1, cl2, cl3, cl4, co1, co2, co3, co4, sl1, sl2, sl3, sl4]
     #     sels = [default_click if s is None else s for s in sels]
         
     #     # List of all selection times
-    #     times = [cl_time1, cl_time2, co_time1, co_time2, sl_time1, sl_time2]
+    #     times = [cl_time1, cl_time2, cl_time3, cl_time4,
+    #               co_time1, co_time2, co_time3, co_time4,
+    #               sl_time1, sl_time2, sl_time3, sl_time4]
 
     #     # Index position of most recent selection
     #     sel_idx = times.index(max(times))
@@ -1225,11 +1274,14 @@ for i in range(1, 3):
                   [Input('choice_{}'.format(i), 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
-                   Input('location_store', 'children')],
-                  [State('function_choice', 'value'),
+                   Input('update_graphs_1', 'n_clicks'),
+                   Input('update_graphs_2', 'n_clicks')],
+                  [State('location_store', 'children'),
+                   State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def makeGraph(choice, map_type, signal, location, function, key, sync):
+    def makeGraph(choice, map_type, signal, click1, click2,
+                   location, function, key, sync):
         if 'On' not in sync:
             sel_idx = location[3]
             idx = int(key) - 1
@@ -1238,7 +1290,7 @@ for i in range(1, 3):
 
         print("Rendering Map #{}".format(int(key)))
 
-        # Clear memory space
+        # Clear memory space...what's the best way to do this?
         gc.collect()
 
         # Create signal for the global_store
@@ -1436,7 +1488,7 @@ for i in range(1, 3):
                                                    dates, reproject=True)
 
             # for i in range(5):  # 5 drought categories
-            ts_series = droughtArea(arrays, choice, inclusive=False)  # <------ Check the order of this list
+            ts_series = droughtArea(arrays, choice, inclusive=False)
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
@@ -1488,14 +1540,14 @@ for i in range(1, 3):
                             fill='tozeroy',
                             showlegend=False,
                             x=dates,
-                            y=ts_series[i],  # <-------------------------------The order of seems to be changing
+                            y=ts_series[i],
                             hoverinfo='x',
                             marker=dict(color=colors[i],
                                         line=dict(width=.01,
                                                   color="#000000")))
                 data.append(trace)
-            data.append(dict(x=dates, y=list(np.repeat(0, len(dates))),  # <---Empty trace for second y-axis
-                            yaxis='y2', hoverinfo='x', showlegend=False))
+            data.append(dict(x=dates, y=list(np.repeat(0, len(dates))),
+                            yaxis='y2',hoverinfo='x', showlegend=False))
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
@@ -1517,7 +1569,7 @@ for i in range(1, 3):
                                          overlaying='y',
                                          side='right',
                                          position=-0.15)
-            layout_copy['margin'] = dict(l=55, r=65, b=65, t=90, pad=10)
+            layout_copy['margin'] = dict(l=55, r=65, b=65, t=90, pad=1)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
