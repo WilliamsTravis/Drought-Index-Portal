@@ -11,6 +11,7 @@ import gc
 import json
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
+from numba import jit
 import numpy as np
 import os
 from osgeo import gdal
@@ -39,6 +40,7 @@ grid = np.load("data/npy/prfgrid.npz")["grid"]
 
 ####### Variables #############################################################
 state_array = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
+mask = state_array * 0 + 1
 
 ######## Functions ############################################################
 def im(array):
@@ -47,27 +49,46 @@ def im(array):
     '''
     plt.imshow(array)
 
+# WGS
+def wgsToAlbers(arrays):
+    dates = range(len(arrays))
+    wgs_proj = Proj(init='epsg:4326')
+    wgrid = salem.Grid(nxny=(300, 120), dxdy=(0.25, -0.25),
+                       x0y0=(-130, 50), proj=wgs_proj)
+    lats = np.unique(wgrid.xy_coordinates[1])
+    lats = lats[::-1]
+    lons = np.unique(wgrid.xy_coordinates[0])
+    data_array = xr.DataArray(data=arrays,
+                              coords=[dates, lats, lons],
+                              dims=['time', 'lat', 'lon'])
+    wgs_data = xr.Dataset(data_vars={'value': data_array})
+
+    # Albers Equal Area Conic North America
+    albers_proj = Proj('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
+                       +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
+                       +datum=NAD83 +units=m +no_defs')
+    with salem.open_xr_dataset('f:/data/droughtindices/netcdfs/albers/spi1.nc') as data:
+        albers_grid = data.salem.grid
+        albers = data
+        albers.salem.grid._proj = albers_proj  # To make sure cause it's glitchy here
+        data.close()
+
+    projection = albers.salem.transform(wgs_data, 'linear')
+    arrays = projection.value.data
+    return(arrays)
+
 def areaSeries(location, arrays, dates, reproject=False):
     '''
     location = list output from app.callback function 'locationPicker'
     arrays = a time series of arrays falling into each of 5 drought categories
     inclusive = whether or to categorize drought by including all categories
     '''
-    data = Dataset('f:/data/droughtindices/netcdfs/spi1.nc')
-    arrays = data.variables['value'][:].data
-    dates = data.variables['time'][:]
-    location = [[4, 4, 4, 5, 5, 5], [62, 63, 64, 62, 63, 64], 'Flathead County, MT', 4]
-    location = [39, 97, 'Boulder County, CO', 2]
-    states = [8, 56]
-    if type(location[0]) is int:  # <------------------------------------------------Use a different flag here
+    print("areaSeries location: " + str(location))
+    if type(location[0]) is int:
+        print("Location is singular")
         y, x, label, sel_idx = location
-        if type(y) is int:
-            timeseries = np.array([round(a[y, x], 4) for a in arrays])
-        else:
-            x = json.loads(x)
-            y = json.loads(y)
-            timeseries = np.array([round(np.nanmean(a[y, x]), 4) for
-                                   a in arrays])
+        timeseries = np.array([round(a[y, x], 4) for a in arrays])
+
     else:
         if location[0] == 'state_mask':
             flag, states, label, sel_idx = location
@@ -82,6 +103,8 @@ def areaSeries(location, arrays, dates, reproject=False):
         else:
             # Collect array index positions and other information for print
             y, x, label, sel_idx = location
+            x = json.loads(x)
+            y = json.loads(y)
 
             # Create a location mask and filter the arrays
             ys = np.array(y)
@@ -92,97 +115,83 @@ def areaSeries(location, arrays, dates, reproject=False):
             loc_mask = loc_mask * 0 + 1
             arrays = arrays * loc_mask
 
-        # Now, I believe that we need to create a referenced data set out of our arrays  # <------ get these from source arrays
-        # WGS
-        def wgsToAlbers(arrays):
-            dates = range(len(arrays))
-            wgs_proj = Proj(init='epsg:4326')
-            wgrid = salem.Grid(nxny=(300, 120), dxdy=(0.25, -0.25),
-                               x0y0=(-130, 50), proj=wgs_proj)
-            lats = np.unique(wgrid.xy_coordinates[1])
-            lats = lats[::-1]
-            lons = np.unique(wgrid.xy_coordinates[0])
-            data_array = xr.DataArray(data=arrays,
-                                      coords=[dates, lats, lons],
-                                      dims=['time', 'lat', 'lon'])
-            wgs_data = xr.Dataset(data_vars={'value': data_array})
-
-            # Albers Equal Area Conic North America
-            albers_proj = Proj('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
-                               +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
-                               +datum=NAD83 +units=m +no_defs')
-            with salem.open_xr_dataset('f:/data/droughtindices/netcdfs/albers/spi1.nc') as data:
-                albers_grid = data.salem.grid
-                albers = data
-                albers.salem.grid._proj = albers_proj  # To make sure cause it's glitchy here
-                data.close()
-
-            projection = albers.salem.transform(wgs_data, 'linear')
-            arrays = projection.value.data
-            return(arrays)
-
-        if reproject==True:
-            arrays = wgsToAlbers(arrays)
-
         timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
 
-        return [timeseries, arrays, label]
+
+    if reproject:
+        print("Reprojecting to Alber's")
+        arrays = wgsToAlbers(arrays)
+    print("Area fitlering complete.")
+    return [timeseries, arrays, label]
 
 ################################## new function ###############################
-    def droughtArea(arrays, choice, inclusive=False):
-        '''
-        This will take in a time series of arrays and a drought severity
-        category and mask out all cells with values above or below the category
-        thresholds. If inclusive is 'True' it will only mask out all cells that
-        fall above the chosen category.
+def droughtArea(arrays, choice, inclusive=False):
+    '''
+    This will take in a time series of arrays and a drought severity
+    category and mask out all cells with values above or below the category
+    thresholds. If inclusive is 'True' it will only mask out all cells that
+    fall above the chosen category.
 
-        For now this requires original values, percentiles even out too quickly
-        '''
+    For now this requires original values, percentiles even out too quickly
+    '''
 
-        # Drought Categories
-        drought_cats = {'sp': {0: [-0.5, -0.8],
-                               1: [-0.8, -1.3],
-                               2: [-1.3, -1.5],
-                               3: [-1.5, -2.0],
-                               4: [-2.0, -999]},
-                        'eddi': {0: [-0.5, -0.8],
-                                 1: [-0.8, -1.3],
-                                 2: [-1.3, -1.5],
-                                 3: [-1.5, -2.0],
-                                 4: [-2.0, -999]},
-                        'pdsi': {0:[-1.0, -2.0],
-                                 1: [-2.0, -3.0],
-                                 2: [-3.0, -4.0],
-                                 3: [-4.0, -5.0],
-                                 4: [-5.0, -999]}}
+    # Drought Categories
+    print("calculating drought area...")
+    drought_cats = {'sp': {0: [-0.5, -0.8],
+                           1: [-0.8, -1.3],
+                           2: [-1.3, -1.5],
+                           3: [-1.5, -2.0],
+                           4: [-2.0, -999]},
+                    'eddi': {0: [-0.5, -0.8],
+                             1: [-0.8, -1.3],
+                             2: [-1.3, -1.5],
+                             3: [-1.5, -2.0],
+                             4: [-2.0, -999]},
+                    'pdsi': {0:[-1.0, -2.0],
+                             1: [-2.0, -3.0],
+                             2: [-3.0, -4.0],
+                             3: [-4.0, -5.0],
+                             4: [-5.0, -999]}}
 
-        # Choose a set of categories
-        cat_key = [key for key in drought_cats.keys() if key in choice][0]
-        cats = drought_cats[cat_key]
+    # Choose a set of categories
+    cat_key = [key for key in drought_cats.keys() if key in choice][0]
+    cats = drought_cats[cat_key]
 
-        # Total number of pixels
-        mask = arrays[0] * 0 + 1
-        total_area = np.nansum(mask)
+    # Total number of pixels
+    mask = arrays[0] * 0 + 1
+    total_area = np.nansum(mask)
 
-        # We want an ndarray for each category
-        percentages = {}
-        for i in range(5):
-            d = cats[i]
-            a = arrays.copy()
+    # We want an ndarray for each category
+    # @jit
+    def rangeFilter(a, d, inclusive):
+        # Filter above or below thresholds
+        ac = a.copy()
+        if inclusive is False:
+            ac[(ac >= d[0]) | (ac < d[1])] = np.nan
+        else:
+            ac[ac > d[0]] = np.nan
+        area = ac*0+1
+        ps = [(np.nansum(b)/total_area) * 100 for b in area]
+        return ps
 
-            # Filter above or below thresholds
-            if inclusive is False:
-                a[(a > d[0]) | (a < d[1])] = np.nan
-            else:
-                a[a > d[0]] = np.nan
+    print("starting offending loops...")
+    p = {}
+    for i in range(5):  # <---------------------------------------------------- Slowest part of whole app
+        d = cats[i]
+        ps = rangeFilter(arrays, d, inclusive=True)
+        p[i] = ps
+    
+    DSCI = np.array([np.array(p[key]) for key in p.keys()])
+    DSCI = np.array([DSCI[i]*(i+1) for i in range(5)])
+    DSCI = np.sum(DSCI, axis=0)
+    DSCI = DSCI/15
+    p = [i for key, i in p.items()]
+    p.insert(3, list(DSCI))
 
-            area = a*0+1
-            ps = [np.nansum(b)/total_area for b in area]
-            percentages[i] = ps
-
-        # Return a list of five layers, the signal might need to be adjusted
-        # for inclusive
-        return percentages
+    # Return a list of five layers, the signal might need to be adjusted
+    # for inclusive
+    print("drought area calculations complete.")
+    return p
 
 def isInt(string):
     try:
@@ -630,8 +639,8 @@ class Index_Maps():
         [indexlist, dmin, dmax] = self.getOriginal()
 
         # Get data
-        array = calculateCV(arrays)
         arrays = indexlist.value.data
+        array = calculateCV(arrays)
         dates = indexlist.time.data
         del indexlist
 
@@ -668,7 +677,7 @@ def makeMap(maps, function):
     if function == "ocv":
         data = maps.coefficientVariation()
     if function == "oarea":
-        data = maps.droughtArea()  # This will require some extra doing...
+        data = maps.meanOriginal()  # This will require some extra doing...
     return data
 
 ###############################################################################

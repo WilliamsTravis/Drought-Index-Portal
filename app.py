@@ -16,7 +16,7 @@ Production notes:
            the time series with a "Time series not available" tag.
 
 
-Created on Fri Jan  4 12:39:23 2019
+Created on Fri Jan 4 12:39:23 2019
 
 @author: Travis Williams
 
@@ -32,14 +32,15 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 import dash_core_components as dcc
 import dash_html_components as html
+import dash_table
 from flask_caching import Cache
 import gc
 from inspect import currentframe, getframeinfo
 import json
 import numpy as np
 import pandas as pd
-from plotly import graph_objs as go
 import psutil
+from osgeo import gdal
 import time
 import warnings
 import xarray as xr
@@ -50,8 +51,8 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions
-from functions import Index_Maps, outLine, readRaster, im
-from functions import coordinateDictionaries, makeMap, areaSeries
+from functions import Index_Maps, coordinateDictionaries, makeMap, areaSeries
+from functions import droughtArea
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -90,6 +91,9 @@ cache.init_app(server)
 # Drought and Climate Indices (looking to include any raster time series)
 # Drought Severity Categories in percentile space
 drought_cats = {0: [20, 30], 1: [10, 20], 2: [5, 10], 3: [2, 5], 4: [0, 2]}
+# coverage_df = pd.DataFrame({'D0 (Dry)': 100, 'D1 (Moderate)': 100,
+#                             'D2 (Severe)': 100, 'D3 (Extreme)': 100,
+#                             'D4 (Exceptional)': 100}, index=[0])
 
 # Index Paths (for npz files)
 indices = [{'label': 'PDSI', 'value': 'pdsi'},
@@ -132,8 +136,7 @@ indexnames = {'pdsi': 'Palmer Drought Severity Index',
 # Function options
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
                          {'label': 'Maximum', 'value': 'pmax'},
-                         {'label': 'Minimum', 'value': 'pmin'},
-                         ]
+                         {'label': 'Minimum', 'value': 'pmin'}]
 
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
@@ -182,6 +185,7 @@ def gridToPoint(grid, gridid):
 # For the county names - need to get a more complete data set
 grid = np.load("data/npy/prfgrid.npz")["grid"]
 mask = grid * 0 + 1
+state_arrays = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
 
 # County Data Frame and options
 counties_df = pd.read_csv('data/tables/counties3.csv')
@@ -258,6 +262,14 @@ colorscales = ['Default', 'Blackbody', 'Bluered', 'Blues', 'Earth', 'Electric',
                'Rainbow', 'RdBu', 'Reds', 'Viridis', 'RdWhBu',
                'RdWhBu (NOAA PSD Scale)', 'RdYlGnBu', 'BrGn']
 color_options = [{'label': c, 'value': c} for c in colorscales]
+
+# I need one external colorscale
+RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
+          [0.20, 'rgb(255,170,0)'], [0.30, 'rgb(252,211,127)'],
+          [0.40, 'rgb(255, 255, 0)'], [0.45, 'rgb(255, 255, 255)'],
+          [0.55, 'rgb(255, 255, 255)'], [0.60, 'rgb(143, 238, 252)'],
+          [0.70, 'rgb(12,164,235)'], [0.80, 'rgb(0,125,255)'],
+          [0.90, 'rgb(10,55,166)'], [1.00, 'rgb(5,16,110)']]
 
 # Year Marks for Slider
 with xr.open_dataset(
@@ -379,13 +391,20 @@ def divMaker(id_num, index='noaa'):
 
                  dcc.Graph(id='map_{}'.format(id_num),
                            config={'staticPlot': False}),
+                 # html.Button(id='update_series_{}'.format(id_num),
+                 #             children=['Update Series'],
+                 #             style={'width': '20%',
+                 #                    'background-color': '#C7D4EA',
+                 #                    'font-family': 'Times New Roman',
+                 #                    'padding': '0px',
+                 #                    'margin-top': '26'}),
                  html.Div([dcc.Graph(id='series_{}'.format(id_num))]),
-
-              ], className='six columns')
+                 html.Div(id='coverage_div_{}'.format(id_num)),
+            ], className='six columns')
     return div
 
 app.layout = html.Div([   # <-------------------------------------------------- Line all brackets and parens up
-             html.Div([
+               html.Div([
                 # Sponsers
                 html.A(html.Img(
                     src = ("https://github.com/WilliamsTravis/" +
@@ -517,11 +536,12 @@ app.layout = html.Div([   # <-------------------------------------------------- 
                                               children=['Month Range']),
                                       html.Div(id='month_slider_holder',
                                                children=[
-                                               dcc.RangeSlider(id='month',
-                                                               value=[1, 12],
-                                                               min=1, max=12,
-                                                               updatemode='drag',
-                                                               marks=monthmarks)],
+                                                   dcc.RangeSlider(
+                                                       id='month',
+                                                       value=[1, 12],
+                                                       min=1, max=12,
+                                                       updatemode='drag',
+                                                       marks=monthmarks)],
                                                style={'width': '35%'})],
                               style={'display': 'none'},
                               )],
@@ -1062,6 +1082,86 @@ for i in range(1, 3):
             placeholder = 'Contiguous United States'
         return placeholder
 
+
+    @app.callback(Output('coverage_div_{}'.format(i), 'children'),
+                  [Input('series_{}'.format(i), 'hoverData')])
+    def hoverCoverage(hover):
+        try:
+            # hover = {'points': [{'curveNumber': 0, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 38.301876187324524}, {'curveNumber': 1, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 32.17211961746216}, {'curveNumber': 2, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 26.667475700378418}, {'curveNumber': 3, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 22.23260720570882}, {'curveNumber': 4, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 20.610548555850983}, {'curveNumber': 5, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 13.67967426776886}, {'curveNumber': 6, 'pointNumber': 259, 'pointIndex': 259, 'x': '2011-08-01', 'y': 0}]}
+            # print(str(hover))
+            hover['points'][3]['y'] = hover['points'][3]['y'] * 15
+            ds = ['{0:.2f}'.format(hover['points'][i]['y']) for i in range(6)]
+            coverage_df = pd.DataFrame({'D0 (Dry)': ds[0],
+                                        'D1 (Moderate)': ds[1],
+                                        'D2 (Severe)': ds[2],
+                                        'DSCI':ds[3],
+                                        'D3 (Extreme)': ds[4],
+                                        'D4 (Exceptional)': ds[5]},
+                                       index=[0])
+            children=[dash_table.DataTable(
+                       data=coverage_df.to_dict('rows'),
+                       columns=[
+                          {"name": i, "id": i} for i in coverage_df.columns],
+                       style_cell={'textAlign': 'center'},
+                       style_header={'fontWeight': 'bold'},
+                       style_header_conditional=[
+                               {'if': {'column_id': 'D0 (Dry)'},
+                                       'backgroundColor': '#ffff00',
+                                       'color': 'black'},                               
+                               {'if': {'column_id': 'D1 (Moderate)'},
+                                           'backgroundColor': '#fcd37f',
+                                           'color': 'black'},                               
+                               {'if': {'column_id': 'D2 (Severe)'},
+                                      'backgroundColor': '#ffaa00',
+                                      'color': 'black'},  
+                               {'if': {'column_id': 'DSCI'},
+                                      'backgroundColor': '#27397F',
+                                      'color': 'white',
+                                      'width': '75'},   
+                               {'if': {'column_id': 'D3 (Extreme)'},
+                                      'backgroundColor': '#e60000',
+                                      'color': 'white'},                               
+                               {'if': {'column_id': 'D4 (Exceptional)'},
+                                       'backgroundColor': '#730000',
+                                       'color': 'white'}],
+                       style_data_conditional=[
+                               {'if': {'column_id': 'D0 (Dry)'},
+                                       'backgroundColor': '#ffffa5',
+                                       'color': 'black'},                               
+                               {'if': {'column_id': 'D1 (Moderate)'},
+                                       'backgroundColor': '#ffe5af',
+                                       'color': 'black'},                               
+                               {'if': {'column_id': 'D2 (Severe)'},
+                                       'backgroundColor': '#ffbf3f',
+                                       'color': 'black'},  
+                               {'if': {'column_id': 'DSCI'},
+                                      'backgroundColor': '#3b497c',
+                                      'color': 'white',
+                                      'width': '75'},
+                               {'if': {'column_id': 'D3 (Extreme)'},
+                                       'backgroundColor': '#dd6666',
+                                       'color': 'white'},                               
+                               {'if': {'column_id': 'D4 (Exceptional)'},
+                                       'backgroundColor': '#a35858',
+                                       'color': 'white'}]),
+                html.Button(title='description here.')]
+        except:
+            raise PreventUpdate
+        return children
+
+    @app.callback(Output('coverage_div_{}'.format(i), 'style'),
+                  [Input('submit', 'n_clicks')],
+                  [State('function_choice', 'value')])
+    def displayCoverage(click, function):
+        if function == 'oarea':
+            style={'margin-bottom': '25',
+                   'width': '85%',
+                   'text-align': 'center',
+                   'margin': '0 auto'}
+        else:
+            style={'display': 'none'}
+        return style
+
     # @app.callback(Output('county_a{}'.format(i), 'options'),  # <------------ Dropdown label updates, old version
     #               [Input('time_1', 'children'),
     #                 Input('time_2', 'children'),
@@ -1277,11 +1377,16 @@ for i in range(1, 3):
         if 'p' in function:
             yaxis = dict(title='Percentiles',
                           range=[0, 100])
-        elif 'o' in function and 'cv' not in function:
+        elif 'o' in function and 'cv' not in function and function != 'oarea':
             dmin = index_ranges['min'][index_ranges['index'] == choice]
             dmax = index_ranges['max'][index_ranges['index'] == choice]
             yaxis = dict(range=[dmin, dmax],
                           title='Index')
+        elif function == 'oarea':
+            dmin = 0
+            dmax = 100
+            colorscale = RdWhBu
+            yaxis = dict(title='Index')
         else:
             yaxis = dict(title='C.V.')
 
@@ -1327,11 +1432,6 @@ for i in range(1, 3):
         return figure
 
 
-
-
-
-
-
     @app.callback(Output('series_{}'.format(i), 'figure'),
                   [Input('submit', 'n_clicks'),
                    Input('signal', 'children'),
@@ -1371,34 +1471,32 @@ for i in range(1, 3):
         if reverse_override == 'yes':
             reverse = not reverse
 
-        # From the location, whatever it is, we need only need y, x and a label
-        # Whether x and y are singular or vectors
-        print("LOCATION: " + str(location))
-
         # If the function is oarea, we plot five overlapping timeseries
         if function != 'oarea':
-            timeseries, arrays, label = areaSeries(location, arrays, dates)
+            print("LOCATION: " + str(location))
+            timeseries, arrays, label = areaSeries(location, arrays, dates,
+                                                   reproject=False)
             bar_type = 'bar'
         else:
-            dm_arrays = arrays.copy()
             bar_type = 'overlay'
-            ts_series = {}
-            for i in range(5):  # 5 drought categories
-                 timeseries, arrays, label = areaSeries(location, dm_arrays[i],
-                                                        dates, reproject=True)
-                 ts_series[i] = droughtArea(arrays, choice, inclusive=False)
+            timeseries, arrays, label = areaSeries(location, arrays,
+                                                   dates, reproject=True)
+
+            # for i in range(5):  # 5 drought categories
+            ts_series = droughtArea(arrays, choice, inclusive=False)
 
         # Format dates
-        dates = [pd.to_datetime(str(d)) for d in dates]
-        dates = [d.strftime('%Y-%m') for d in dates]
+        dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
+        colors = ['#ffff00','#fcd37f', '#ffaa00', '#27397F', '#e60000', 
+                  '#730000']
 
         # The y-axis depends on the chosen function
         if 'p' in function and function != 'oarea':
             yaxis = dict(title='Percentiles',
                          range=[0, 100])
-        elif 'o' in function and 'cv' not in function:
+        elif 'o' in function and 'cv' not in function and function != 'oarea':
             yaxis = dict(range=[dmin, dmax],
-                          title='Index')
+                         title='Index')
             sd = np.nanstd(arrays)
             if 'eddi' in choice:
                 sd = sd*-1
@@ -1406,7 +1504,8 @@ for i in range(1, 3):
             dmax = 3*sd*-1
         elif function == 'oarea':
             yaxis = dict(title='Percent Area',
-                          range=[0, 100])
+                         range=[0, 100],
+                         hovermode='y')
         else:
             yaxis = dict(title='C.V.')
 
@@ -1429,23 +1528,21 @@ for i in range(1, 3):
                                 cmax=dmax,
                                 line=dict(width=0.2, color="#000000")))]
         else:
-############################# Construction Zone ###############################
-            label = ts_series[0][1]
-            xs = [i for i in range(len(dates))]
-            ts = [ts_series[i][0] for i in range(5)]
-            colors = ['#ffff00', '#fcd37f', '#ffaa00', '#e60000', '#730000']
-            widths = list(np.linspace(1, .25, 5))
-            cats = ['D0 (dry)', 'D1 (moderate)', 'D2 (severe)',
-                    'D3 (extreme)', 'D4 (exceptional)']
             data = []
-            for i in range(5):
-                trace = go.Bar(x=xs, y=ts[i], name=cats[i], width=widths[i],
-                               marker=dict(
-                                        color=colors[i],
-                                        line=dict(width=.2,
+            for i in range(6):
+                trace = dict(
+                            type='scatter',
+                            fill='tozeroy',
+                            showlegend=False,
+                            x=dates,
+                            y=ts_series[i],
+                            hoverinfo='x',
+                            marker=dict(color=colors[i],
+                                        line=dict(width=.01,
                                                   color="#000000")))
                 data.append(trace)
-###############################################################################
+            data.append(dict(x=dates, y=list(np.repeat(0, len(dates))),
+                            yaxis='y2',hoverinfo='x', showlegend=False))
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
@@ -1453,15 +1550,26 @@ for i in range(1, 3):
                                 "<Br>" + label)
         layout_copy['plot_bgcolor'] = "white"
         layout_copy['paper_bgcolor'] = "white"
-        layout_copy['height'] = 250
+        layout_copy['height'] = 300
         layout_copy['yaxis'] = yaxis
-        # layout_copy['xaxis'] = dict(tickvals=xs,
-        #                             ticktext=dates)
-        layout_copy['hovermode'] = 'compare'
+        if function == 'oarea':
+            if type(location[0]) is int:
+                layout_copy['title'] = (indexnames[choice] +
+                                        "<Br>" + 'Contiguous US ' +
+                                        '(point estimates not available)')
+            layout_copy['xaxis'] = dict(type='date')
+            layout_copy['yaxis2'] = dict(title='Drought Severity',
+                                         range=[0, 1500],
+                                         anchor='x',
+                                         overlaying='y',
+                                         side='right',
+                                         position=-0.15)
+            layout_copy['margin'] = dict(l=55, r=65, b=65, t=90, pad=4)
+        layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
-                                     y=-.5, markers=dict(size=8),
-                                     font=dict(size=8))
+                                     y=-.5, markers=dict(size=10),
+                                     font=dict(size=10))
         layout_copy['titlefont']['color'] = '#636363'
         layout_copy['font']['color'] = '#636363'
 
@@ -1472,4 +1580,4 @@ for i in range(1, 3):
 
 # In[] Run Application through the server
 if __name__ == '__main__':
-    app.run_server()
+    app.run_server(port=8000)
