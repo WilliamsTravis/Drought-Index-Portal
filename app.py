@@ -891,19 +891,9 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
     print("clickPicker initial choices: " + str(sels))
     times = [times[i] for i in range(len(sels)) if sels[i] is not None]
     sels = [sels[i] for i in range(len(sels)) if sels[i] is not None]
-    # times[np.where(sels is None) == 'NoneType'))] = None
-    # sels = [s for s in sels if s is not None]
-    # times = [t for t in times if t is not None]
-    # sels = [default_click if s is None else s for s in sels]
-    # times = [0 if t is None else t for t in times]
     idx = times.index(np.nanmax(times))
     location = sels[idx]
     print("clickPicker final choice: " + str(location))
-    try:
-        if old_location[2] == location[2]:
-            raise PreventUpdate
-    except:
-        pass
 
     # 1: Selection is a grid ID  # <------------------------------------------- Move to function
     if type(location) is int and len(str(location)) >= 3:
@@ -1155,41 +1145,41 @@ for i in range(1, 3):
             style={'display': 'none'}
         return style
 
-    # @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
-    #               [Input('location_store', 'children')],
-    #               [State('county_{}'.format(i), 'value'),
-    #                State('key_{}'.format(i), 'children'),
-    #                State('click_sync', 'children')])
-    # def dropOne(location, previous_grid, key, sync):
-    #     '''
-    #     As a work around to updating synced dropdown labels and because we
-    #     can't change the dropdown value with out creating an infinite loop, we
-    #     are temporarily changing the options so that the value stays the same,
-    #     but the one label to that value is the synced county name.
+    @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
+                  [Input('location_store', 'children')],
+                  [State('county_{}'.format(i), 'value'),
+                    State('key_{}'.format(i), 'children'),
+                    State('click_sync', 'children')])
+    def dropOne(location, previous_grid, key, sync):
+        '''
+        As a work around to updating synced dropdown labels and because we
+        can't change the dropdown value with out creating an infinite loop, we
+        are temporarily changing the options so that the value stays the same,
+        but the one label to that value is the synced county name.
 
-    #     Check that we are working with the right selection, and do this first
-    #     to prevent update if not syncing
-    #     '''
+        Check that we are working with the right selection, and do this first
+        to prevent update if not syncing
+        '''
 
-    #     # Get the appropriate selection
-    #     sel_idx = location[3]
-    #     if 'On' not in sync:
-    #         idx = int(key) - 1  # Graph ID
-    #         if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
-    #             raise PreventUpdate
+        # Get the appropriate selection
+        sel_idx = location[3]
+        if 'On' not in sync:
+            idx = int(key) - 1  # Graph ID
+            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
+                raise PreventUpdate
 
-    #     if type(location[0]) is int:
-    #         current_county = location[2]
-    #     else:
-    #         current_county = "Multiple Counties"
+        if type(location[0]) is int:
+            current_county = location[2]
+        else:
+            current_county = "Multiple Counties"
 
-    #     current_options = county_options.copy()
-    #     previous_county = counties_df['place'][
-    #                          counties_df['grid'] == previous_grid].item()
-    #     old_idx = options_pos[previous_county]
-    #     current_options[old_idx]['label'] = current_county
+        current_options = county_options.copy()
+        previous_county = counties_df['place'][
+                              counties_df['grid'] == previous_grid].item()
+        old_idx = options_pos[previous_county]
+        current_options[old_idx]['label'] = current_county
 
-    #     return current_options
+        return current_options
 
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_{}'.format(i), 'value'),
