@@ -33,6 +33,7 @@ from dash.exceptions import PreventUpdate
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
+import datetime as dt
 from flask_caching import Cache
 import gc
 from inspect import currentframe, getframeinfo
@@ -391,8 +392,16 @@ def divMaker(id_num, index='noaa'):
                         className='row'),
 
                  dcc.Graph(id='map_{}'.format(id_num),
-                           config={'staticPlot': False}),
-                 html.Div([dcc.Graph(id='series_{}'.format(id_num))]),
+                           config={
+                                    'sendDataToCloud': True 
+                                   # 'showLink': True,
+                                   # 'sendData': True
+                                   }),
+                 html.Div([dcc.Graph(id='series_{}'.format(id_num),
+                                     config={
+                                              # 'showLink': True,
+                                             # 'sendData': True
+                                             })]),
                  html.Div(id='coverage_div_{}'.format(id_num)),
             ], className='six columns')
     return div
@@ -1071,6 +1080,9 @@ for i in range(1, 3):
                   [Input('series_{}'.format(i), 'hoverData')])
     def hoverCoverage(hover):
         try:
+            # print(str(hover))
+            date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
+            date = dt.datetime.strftime(date, '%b %d, %Y')
             hover['points'][3]['y'] = hover['points'][3]['y'] * 15
             ds = ['{0:.2f}'.format(hover['points'][i]['y']) for i in range(6)]
             coverage_df = pd.DataFrame({'D0 (Dry)': ds[0],
@@ -1080,7 +1092,9 @@ for i in range(1, 3):
                                         'D3 (Extreme)': ds[4],
                                         'D4 (Exceptional)': ds[5]},
                                        index=[0])
-            children=[dash_table.DataTable(
+            children=[html.H6([date],
+                              style={'text-align': 'left'}),
+                      dash_table.DataTable(
                        data=coverage_df.to_dict('rows'),
                        columns=[
                           {"name": i, "id": i} for i in coverage_df.columns],
@@ -1114,10 +1128,10 @@ for i in range(1, 3):
                                        'backgroundColor': '#ffe5af',
                                        'color': 'black'},
                                {'if': {'column_id': 'D2 (Severe)'},
-                                       'backgroundColor': '#ffbf3f',
+                                       'backgroundColor': '#ffc554',
                                        'color': 'black'},
                                {'if': {'column_id': 'DSCI'},
-                                      'backgroundColor': '#3b497c',
+                                      'backgroundColor': '#5c678e',
                                       'color': 'white',
                                       'width': '75'},
                                {'if': {'column_id': 'D3 (Extreme)'},
@@ -1366,7 +1380,7 @@ for i in range(1, 3):
         sel_idx = location[3]
         if 'On' not in sync:
             idx = int(key) - 1  # Graph ID
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # [0, 4, 8] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # [0, 4, 8, 12] for the full panel
                 raise PreventUpdate
 
         # Create signal for the global_store
@@ -1455,7 +1469,7 @@ for i in range(1, 3):
                                         line=dict(width=.01,
                                                   color="#000000")))
                 data.append(trace)
-            data.append(dict(x=dates, y=list(np.repeat(0, len(dates))),  # <---Empty trace for second y-axis
+            data.append(dict(x=dates, y=list(np.repeat(np.nan, len(dates))),  # <---Empty trace for second y-axis
                             yaxis='y2', hoverinfo='x', showlegend=False))
 
         # Copy and customize Layout
@@ -1477,7 +1491,7 @@ for i in range(1, 3):
                                          anchor='x',
                                          overlaying='y',
                                          side='right',
-                                         position=-0.15)
+                                         position=0.15)
             layout_copy['margin'] = dict(l=55, r=65, b=65, t=90, pad=10)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
