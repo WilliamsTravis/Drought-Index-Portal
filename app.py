@@ -205,12 +205,10 @@ states_df = states_df.sort_values('STUSAB')
 rows = [r for idx, r in states_df.iterrows()]
 state_options = [{'label': r['STUSAB'], 'value': r['FIPS State']} for
                   r in rows]
-# state_options.insert(0, {'label': 'CONUS',
-#                          'value': 'all'})
+
 # This is to associate grid ids with points, only once
 # point_dict = {gridid: gridToPoint(grid, gridid) for  # Takes too long
 #               gridid in grid[~np.isnan(grid)]}
-
 # np.save('data/point_dict.npy', point_dict)
 point_dict = np.load('data/npy/point_dict.npy').item()
 grid_dict = {json.dumps(y): x for x, y in point_dict.items()}
@@ -224,7 +222,7 @@ index_ranges = pd.read_csv('data/tables/index_ranges.csv')
 
 ###############################################################################
 # For when EDDI before 1980 is selected
-with np.load("data/npy/NA_overlay.npz") as data:  # <------------------------------ Redo this to look more professional
+with np.load("data/npy/NA_overlay.npz") as data:  # <-------------------------- Redo this to look more professional
     na = data.f.arr_0
     data.close()
 
@@ -887,10 +885,10 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
     times = np.array([cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
                      st_time1, st_time2])
     sels = np.array([cl1, cl2, sl1, sl2, co1, co2, st1, st2])
-    print("clickPicker initial times: " + str(times))
-    print("clickPicker initial choices: " + str(sels))
     times = [times[i] for i in range(len(sels)) if sels[i] is not None]
     sels = [sels[i] for i in range(len(sels)) if sels[i] is not None]
+    print("clickPicker times: " + str(times))
+    print("clickPicker choices: " + str(sels))
     idx = times.index(np.nanmax(times))
     location = sels[idx]
     print("clickPicker final choice: " + str(location))
@@ -962,7 +960,8 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
             location = [str(y), str(x), label, idx]
     else:
         location = [50, 50, 'No Selection Found', idx]
-
+    if location == old_location:
+        raise PreventUpdate
     return location
 
 # Output list of all index choices for syncing
@@ -1148,8 +1147,8 @@ for i in range(1, 3):
     @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
                   [Input('location_store', 'children')],
                   [State('county_{}'.format(i), 'value'),
-                    State('key_{}'.format(i), 'children'),
-                    State('click_sync', 'children')])
+                   State('key_{}'.format(i), 'children'),
+                   State('click_sync', 'children')])
     def dropOne(location, previous_grid, key, sync):
         '''
         As a work around to updating synced dropdown labels and because we
@@ -1167,19 +1166,21 @@ for i in range(1, 3):
             idx = int(key) - 1  # Graph ID
             if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
                 raise PreventUpdate
-
-        if type(location[0]) is int:
-            current_county = location[2]
-        else:
-            current_county = "Multiple Counties"
-
-        current_options = county_options.copy()
-        previous_county = counties_df['place'][
-                              counties_df['grid'] == previous_grid].item()
-        old_idx = options_pos[previous_county]
-        current_options[old_idx]['label'] = current_county
-
-        return current_options
+        try:
+            if type(location[0]) is int:
+                current_county = location[2]
+            else:
+                current_county = "Multiple Counties"
+    
+            current_options = county_options.copy()
+            previous_county = counties_df['place'][
+                                  counties_df['grid'] == previous_grid].item()
+            old_idx = options_pos[previous_county]
+            current_options[old_idx]['label'] = current_county
+    
+            return current_options
+        except:
+            raise PreventUpdate
 
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_{}'.format(i), 'value'),
@@ -1193,7 +1194,7 @@ for i in range(1, 3):
         if 'On' not in sync:
             sel_idx = location[3]
             idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4]):  # <------------------[0, 4, 8] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <------------------[0, 4, 8] for the full panel
                 raise PreventUpdate
 
         print("Rendering Map #{}".format(int(key)))
@@ -1365,7 +1366,7 @@ for i in range(1, 3):
         sel_idx = location[3]
         if 'On' not in sync:
             idx = int(key) - 1  # Graph ID
-            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # [0, 4, 8] for the full panel
                 raise PreventUpdate
 
         # Create signal for the global_store
