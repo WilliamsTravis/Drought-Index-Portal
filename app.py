@@ -3,18 +3,13 @@
 An Application to visualize time series of drought indices (or others soon).
 
 Production notes:
-    - Time to time, an initial time series doesn't render. Identify this bug.
-
     - Time series colors are still relative, and don't show for a single date.
-
+    - For the second axis that is supposed to display the DSCI, it's actually
+       not attached. I wonder how to attach the DSCI to that axis and keep it
+       centered between D2 and D3? Is it possible to give each its own axis??
     - For the areal calculations: we'll need some jostling
         1) It is possible to include both county and state with prexisting
            rasters and shapefiles in albers equal area conic.
-        2) On the fly reprojections are possible for area selections, though
-           these will be slower
-        3) For areal time series that cannot be generated (points), replace
-           the time series with a "Time series not available" tag.
-
 
 Created on Fri Jan 4 12:39:23 2019
 
@@ -23,7 +18,7 @@ Created on Fri Jan 4 12:39:23 2019
 Sync Check: 01/20/2019
 """
 
-# In[] Functions and Libraries
+# Functions and Libraries
 import os
 import sys
 import copy
@@ -90,13 +85,6 @@ cache = Cache(config={'CACHE_TYPE': 'filesystem',
 cache.init_app(server)
 
 # Drought and Climate Indices (looking to include any raster time series)
-# Drought Severity Categories in percentile space
-drought_cats = {0: [20, 30], 1: [10, 20], 2: [5, 10], 3: [2, 5], 4: [0, 2]}
-# coverage_df = pd.DataFrame({'D0 (Dry)': 100, 'D1 (Moderate)': 100,
-#                             'D2 (Severe)': 100, 'D3 (Extreme)': 100,
-#                             'D4 (Exceptional)': 100}, index=[0])
-
-# Index Paths (for npz files)
 indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'PDSI-Self Calibrated', 'value': 'pdsisc'},
            {'label': 'Palmer Z Index', 'value': 'pdsiz'},
@@ -232,7 +220,7 @@ for i in range(na.shape[0]):
     na[i] = na[i]*i
 
 # Default click before the first click for any map  # <------------------------ Perhaps include the gridid in the click data?
-default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,  
+default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
                              'marker.color': 0, 'pointIndex': 0,
                              'pointNumber': 0, 'text': 'Boulder County, CO'}]}
 
@@ -369,15 +357,7 @@ def divMaker(id_num, index='noaa'):
                                                   style=tablet_style,
                                                   selected_style=tablet_style
                                                   )]),
-                                html.Div(id='location_div_{}'.format(id_num),
-                                          # children=[
-                                          #     dcc.Dropdown(
-                                          #        id='county_{}'.format(id_num),
-                                          #        options=county_options,
-                                          #        clearable=False,
-                                          #        multi=False,
-                                          #        value=24098)]
-                                         )],
+                                html.Div(id='location_div_{}'.format(id_num))],
                                 style={'width': '50%',
                                        'float': 'left',
                                        'display': ''}),
@@ -390,10 +370,9 @@ def divMaker(id_num, index='noaa'):
                                            'margin-top': '26'
                                            })],
                         className='row'),
-
                  dcc.Graph(id='map_{}'.format(id_num),
                            config={
-                                    'sendDataToCloud': True 
+                                    'sendDataToCloud': True
                                    # 'showLink': True,
                                    # 'sendData': True
                                    }),
@@ -402,7 +381,9 @@ def divMaker(id_num, index='noaa'):
                                               # 'showLink': True,
                                              # 'sendData': True
                                              })]),
-                 html.Div(id='coverage_div_{}'.format(id_num)),
+                 html.Div(id='coverage_div_{}'.format(id_num),
+                          style={'margin-bottom': '50'}),
+                 html.Hr(),
             ], className='six columns')
     return div
 
@@ -552,7 +533,7 @@ app.layout = html.Div([   # <-------------------------------------------------- 
                      style={'margin-bottom': '55'}),
 
             # Options
-            html.Div(id='options_div', 
+            html.Div(id='options_div',
                      children=[
                         # Maptype
                         html.Div([
@@ -562,7 +543,7 @@ app.layout = html.Div([   # <-------------------------------------------------- 
                                         value="basic",
                                         options=maptypes)],
                                  className='two columns'),
-        
+
                         # Function
                         html.Div([
                                  html.H3("Function"),
@@ -577,12 +558,12 @@ app.layout = html.Div([   # <-------------------------------------------------- 
                                         dcc.Tab(label='Index Values',
                                                 value='index',
                                                 style=tablet_style,
-                                                selected_style=tablet_style)]),                      
+                                                selected_style=tablet_style)]),
                                  dcc.Dropdown(id='function_choice',
                                                 options=function_options_perc,
                                                 value='pmean')],
                                  className='three columns'),
-        
+
                         # Customize Color Scales
                         html.Div([
                                 html.H3('Color Gradient'),
@@ -846,7 +827,6 @@ def functionValue(function_type):
     else:
         return 'omean'
 
-
 # In[]: App callbacks
 @cache.memoize() # To be replaced with something more efficient
 def retrieve_data(signal, function, choice):
@@ -870,7 +850,7 @@ def retrieve_data(signal, function, choice):
                Input('county_2', 'value'),
                Input('update_graphs_1', 'n_clicks'),
                Input('update_graphs_2', 'n_clicks')],
-              [State('state_time_1', 'children'), 
+              [State('state_time_1', 'children'),
                State('state_time_2', 'children'),
                State('state_1', 'value'),
                State('state_2', 'value'),
@@ -882,14 +862,13 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
     Because there is no time stamp on these selections, we are making one
     ourselves. This is the list of selections (in various formats) and the list
     of times they were selected. The function will return the most recent
-    selection to be used across all elements if syncing is on. 
-    
+    selection to be used across all elements if syncing is on.
+
     It would be best if the selection as in a standard format. Perhaps just
     x, y coords and a label.
 
     Also, to help unsync, I'm adding an index position of the click to the
     location object.
-        
     '''
     times = np.array([cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
                      st_time1, st_time2])
@@ -1082,7 +1061,7 @@ for i in range(1, 3):
         try:
             # print(str(hover))
             date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
-            date = dt.datetime.strftime(date, '%b %d, %Y')
+            date = dt.datetime.strftime(date, '%b, %Y')
             hover['points'][3]['y'] = hover['points'][3]['y'] * 15
             ds = ['{0:.2f}'.format(hover['points'][i]['y']) for i in range(6)]
             coverage_df = pd.DataFrame({'D0 (Dry)': ds[0],
@@ -1139,8 +1118,7 @@ for i in range(1, 3):
                                        'color': 'white'},
                                {'if': {'column_id': 'D4 (Exceptional)'},
                                        'backgroundColor': '#a35858',
-                                       'color': 'white'}]),
-                html.Button(title='description here.')]
+                                       'color': 'white'}])]
         except:
             raise PreventUpdate
         return children
@@ -1185,13 +1163,13 @@ for i in range(1, 3):
                 current_county = location[2]
             else:
                 current_county = "Multiple Counties"
-    
+
             current_options = county_options.copy()
             previous_county = counties_df['place'][
                                   counties_df['grid'] == previous_grid].item()
             old_idx = options_pos[previous_county]
             current_options[old_idx]['label'] = current_county
-    
+
             return current_options
         except:
             raise PreventUpdate
