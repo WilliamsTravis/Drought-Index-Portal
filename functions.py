@@ -10,17 +10,12 @@ from dateutil.relativedelta import relativedelta
 import gc
 import json
 import matplotlib.pyplot as plt
-from netCDF4 import Dataset
 import numpy as np
 import os
 from osgeo import gdal
-from osgeo import osr
-import pandas as pd
-from pyproj import Proj, transform
+from pyproj import Proj
 import salem
 from scipy.stats import rankdata
-from scipy.ndimage.interpolation import map_coordinates
-import skimage
 import sys
 import xarray as xr
 
@@ -35,47 +30,13 @@ else:
     data_path = '/root/Sync'
     os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 
-grid = np.load("data/npy/prfgrid.npz")["grid"]
 
 ####### Variables #############################################################
+grid = np.load("data/npy/prfgrid.npz")["grid"]
 state_array = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
 mask = state_array * 0 + 1
 
 ######## Functions ############################################################
-def im(array):
-    '''
-    This just plots an array as an image
-    '''
-    plt.imshow(array)
-
-# WGS
-def wgsToAlbers(arrays):
-    dates = range(len(arrays))
-    wgs_proj = Proj(init='epsg:4326')
-    wgrid = salem.Grid(nxny=(300, 120), dxdy=(0.25, -0.25),
-                       x0y0=(-130, 50), proj=wgs_proj)
-    lats = np.unique(wgrid.xy_coordinates[1])
-    lats = lats[::-1]
-    lons = np.unique(wgrid.xy_coordinates[0])
-    data_array = xr.DataArray(data=arrays,
-                              coords=[dates, lats, lons],
-                              dims=['time', 'lat', 'lon'])
-    wgs_data = xr.Dataset(data_vars={'value': data_array})
-
-    # Albers Equal Area Conic North America
-    albers_proj = Proj('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
-                       +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
-                       +datum=NAD83 +units=m +no_defs')
-    with salem.open_xr_dataset(os.path.join(data_path,
-				 'data/droughtindices/netcdfs/albers/albers.nc')) as data:
-        albers = data
-        albers.salem.grid._proj = albers_proj  # To make sure cause it's glitchy here
-        data.close()
-
-    projection = albers.salem.transform(wgs_data, 'linear')
-    arrays = projection.value.data
-    return(arrays)
-
 def areaSeries(location, arrays, dates, reproject=False):
     '''
     location = list output from app.callback function 'locationPicker'
@@ -113,17 +74,49 @@ def areaSeries(location, arrays, dates, reproject=False):
             loc_mask[loc_mask<9999] = np.nan
             loc_mask = loc_mask * 0 + 1
             arrays = arrays * loc_mask
-
+        
+        # Timeseries of mean values
         timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
 
-
+    # If we are sending the output to the drought area function
     if reproject:
         print("Reprojecting to Alber's")
         arrays = wgsToAlbers(arrays)
+
     print("Area fitlering complete.")
     return [timeseries, arrays, label]
 
-################################## new function ###############################
+
+def calculateCV(indexlist):
+    '''
+     A single array showing the distribution of coefficients of variation
+         throughout the time period represented by the chosen rasters
+    '''
+    # is it a named list or not?
+    if type(indexlist[0]) is list:
+        # Get just the arrays from this
+        indexlist = [a[1] for a in indexlist]
+    else:
+        indexlist = indexlist
+
+    # Adjust for outliers
+    sd = np.nanstd(indexlist)
+    thresholds = [-3*sd, 3*sd]
+    for a in indexlist:
+        a[a <= thresholds[0]] = thresholds[0]
+        a[a >= thresholds[1]] = thresholds[1]
+
+    # Standardize Range
+    indexlist = standardize(indexlist)
+
+    # Simple Cellwise calculation of variance
+    sds = np.nanstd(indexlist, axis=0)
+    avs = np.nanmean(indexlist, axis=0)
+    covs = sds/avs
+
+    return covs
+
+
 def droughtArea(arrays, choice, inclusive=False):
     '''
     This will take in a time series of arrays and a drought severity
@@ -161,14 +154,24 @@ def droughtArea(arrays, choice, inclusive=False):
     total_area = np.nansum(mask)
 
     # We want an ndarray for each category
-    # @jit
+    # @jit  # <---------------------------------------------------------------- Possible way to speed this up, but not quite that simple
     def rangeFilter(a, d, inclusive):
+        '''
+        There is somem question about the Drought Severity Coverage Index. The
+        NDMC does not use inclusive drought categories though NIDIS appeared to
+        in the "Historical Character of US Northern Great Plains Drought"
+        study. In an effort to match NIDIS' sample chart, we are using the
+        inclusive method for now. It would be fine either way as long as the
+        index is compared to other values with the same calculation, but we
+        should really defer to NDMC. We could also add an option to display
+        inclusive vs non-inclusive drought severity coverages.
+        '''
         # Filter above or below thresholds
         # ac = a.copy()
-        #if inclusive is False:
-           # ac[(ac >= d[0]) | (ac < d[1])] = np.nan
-        #else:
-        a[a > d[0]] = np.nan
+        if inclusive is False:
+            ac[(ac >= d[0]) | (ac < d[1])] = np.nan
+        else:
+            a[a > d[0]] = np.nan
         area = a*0+1
         ps = [(np.nansum(b)/total_area) * 100 for b in area]
         return ps
@@ -192,6 +195,14 @@ def droughtArea(arrays, choice, inclusive=False):
     print("drought area calculations complete.")
     return p
 
+
+def im(array):
+    '''
+    This just plots an array as an image
+    '''
+    plt.imshow(array)
+
+
 def isInt(string):
     try:
         int(string)
@@ -199,59 +210,144 @@ def isInt(string):
     except:
         return False
 
-def calculateCV(indexlist):
+
+def makeMap(maps, function):
     '''
-     A single array showing the distribution of coefficients of variation
-         throughout the time period represented by the chosen rasters
+    To choose which function to return from Index_Maps
+
+    Production Notes:
+
     '''
-    # is it a named list or not?
-    if type(indexlist[0]) is list:
-        # Get just the arrays from this
-        indexlist = [a[1] for a in indexlist]
+    gc.collect()
+    if function == "omean":
+        data = maps.meanOriginal()
+    if function == "omax":
+        data = maps.maxOriginal()
+    if function == "omin":
+        data = maps.minOriginal()
+    if function == "pmean":
+        data = maps.meanPercentile()
+    if function == "pmax":
+        data = maps.maxPercentile()
+    if function == "pmin":
+        data = maps.minPercentile()
+    if function == "ocv":
+        data = maps.coefficientVariation()
+    if function == "oarea":
+        data = maps.meanOriginal()  # This will require some extra doing...
+    return data
+
+
+# For making outlines...move to css, maybe
+def outLine(color, width):
+    string = ('-{1}px -{1}px 0 {0}, {1}px -{1}px 0 {0}, ' +
+              '-{1}px {1}px 0 {0}, {1}px {1}px 0 {0}').format(color, width)
+    return string
+
+
+def percentileArrays(arrays):
+    '''
+    a list of 2d numpy arrays or a 3d numpy array
+    '''
+    def percentiles(lst):
+        '''
+        lst = single time series of numbers as a list
+        '''
+        import scipy.stats
+        scipy.stats.moment(lst, 1)
+
+        pct = rankdata(lst)/len(lst)
+        return pct
+
+    mask = arrays[0] * 0 + 1
+    pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
+    pcts = pcts*mask
+    return pcts
+
+
+def readRaster(rasterpath, band, navalue=-9999):
+    """
+    rasterpath = path to folder containing a series of rasters
+    navalue = a number (float) for nan values if we forgot
+                to translate the file with one originally
+
+    This converts a raster into a numpy array along with spatial features
+    needed to write any results to a raster file. The return order is:
+
+      array (numpy), spatial geometry (gdal object),
+                                      coordinate reference system (gdal object)
+    """
+    raster = gdal.Open(rasterpath)
+    geometry = raster.GetGeoTransform()
+    arrayref = raster.GetProjection()
+    array = np.array(raster.GetRasterBand(band).ReadAsArray())
+    del raster
+    array = array.astype(float)
+    if np.nanmin(array) < navalue:
+        navalue = np.nanmin(array)
+    array[array==navalue] = np.nan
+    return(array, geometry, arrayref)
+
+
+def standardize(indexlist):
+    '''
+    Min/max standardization
+    '''
+    def single(array, mins, maxes):
+        newarray = (array - mins)/(maxes - mins)
+        return(newarray)
+
+    if type(indexlist[0][0]) == str:
+        arrays = [a[1] for a in indexlist]
+        mins = np.nanmin(arrays)
+        maxes = np.nanmax(arrays)
+        standardizedlist = [[indexlist[i][0],
+                             single(indexlist[i][1],
+                                    mins,
+                                    maxes)] for i in range(len(indexlist))]
+
     else:
-        indexlist = indexlist
-
-    # Adjust for outliers
-    sd = np.nanstd(indexlist)
-    thresholds = [-3*sd, 3*sd]
-    for a in indexlist:
-        a[a <= thresholds[0]] = thresholds[0]
-        a[a >= thresholds[1]] = thresholds[1]
-
-    # Standardize Range
-    indexlist = standardize(indexlist)
-
-    # Simple Cellwise calculation of variance
-    sds = np.nanstd(indexlist, axis=0)
-    avs = np.nanmean(indexlist, axis=0)
-    covs = sds/avs
-
-    return covs
+        mins = np.nanmin(indexlist)
+        maxes = np.nanmax(indexlist)
+        standardizedlist = [single(indexlist[i],
+                                   mins, maxes) for i in range(len(indexlist))]
+    return(standardizedlist)
 
 
-def coordinateDictionaries(source):
-    '''
-    Create Coordinate index positions from xarray
-    '''
-    # Geometry
-    x_length = source.shape[2]
-    y_length = source.shape[1]
-    res = source.res[0]
-    lon_min = source.transform[0]
-    lat_max = source.transform[3] - res
+# WGS
+def wgsToAlbers(arrays):
+    dates = range(len(arrays))
+    wgs_proj = Proj(init='epsg:4326')
+    wgrid = salem.Grid(nxny=(300, 120), dxdy=(0.25, -0.25),
+                       x0y0=(-130, 50), proj=wgs_proj)
+    lats = np.unique(wgrid.xy_coordinates[1])
+    lats = lats[::-1]
+    lons = np.unique(wgrid.xy_coordinates[0])
+    data_array = xr.DataArray(data=arrays,
+                              coords=[dates, lats, lons],
+                              dims=['time', 'lat', 'lon'])
+    wgs_data = xr.Dataset(data_vars={'value': data_array})
 
-    # Make dictionaires with coordinates and array index positions
-    xs = range(x_length)
-    ys = range(y_length)
-    lons = [lon_min + res*x for x in xs]
-    lats = [lat_max - res*y for y in ys]
-    londict = dict(zip(lons, xs))
-    latdict = dict(zip(lats, ys))
+    # Albers Equal Area Conic North America
+    albers_proj = Proj('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
+                       +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
+                       +datum=NAD83 +units=m +no_defs')
+    with salem.open_xr_dataset(os.path.join(data_path,
+				 'data/droughtindices/netcdfs/albers/albers.nc')) as data:
+        albers = data
+        albers.salem.grid._proj = albers_proj  # Something was off here
+        data.close()
 
-    return londict, latdict, res
+    projection = albers.salem.transform(wgs_data, 'linear')
+    arrays = projection.value.data
+    return(arrays)
 
-######### Classes #############################################################
+
+################################ classes ######################################
 class Cacher:
+    '''
+    A simple stand in cache for storing objects in memory.
+    '''
     def __init__(self, key):
         self.cache={}
         self.key=key
@@ -271,7 +367,55 @@ class Cacher:
             return self.cache[key]
         return cacher
 
-# Main Functions for app
+
+class Coordinate_Dictionaries:
+    '''
+    This translates numpy coordinates to geographic coordinates and back
+    '''
+    def __init__(self, source_path):
+        self.source = xr.open_dataarray(source_path)
+        self.grid = grid  #  <------------------------------------------------- best way to make a custom grid from source?
+
+        # Geometry
+        self.x_length = self.source.shape[2]
+        self.y_length = self.source.shape[1]
+        self.res = self.source.res[0]
+        self.lon_min = self.source.transform[0]
+        self.lat_max = self.source.transform[3] - self.res
+        self.xs = range(self.x_length)
+        self.ys = range(self.y_length)
+        self.lons = [self.lon_min + self.res*x for x in self.xs]
+        self.lats = [self.lat_max - self.res*y for y in self.ys]
+
+        # Dictionaires with coordinates and array index positions
+        self.londict = dict(zip(self.lons, self.xs))
+        self.latdict = dict(zip(self.lats, self.ys))
+        self.londict_rev = {y: x for x, y in self.londict.items()}
+        self.latdict_rev = {y: x for x, y in self.latdict.items()}
+
+        def pointToGrid(self, point):
+            '''
+            Takes in a plotly point dictionary and outputs a grid ID
+            '''
+            lon = point['points'][0]['lon']
+            lat = point['points'][0]['lat']
+            x = self.londict[lon]
+            y = self.latdict[lat]
+            gridid = self.grid[y, x]
+            return gridid
+
+        # Let's say we also a list of gridids
+        def gridToPoint(self, gridid):
+            '''
+            Takes in a grid ID and outputs a plotly point dictionary
+            '''
+            y, x = np.where(self.grid == gridid)
+            lon = self.londict_rev[int(x[0])]
+            lat = self.latdict_rev[int(y[0])]
+            point = {'points': [{'lon': lon, 'lat': lat}]}
+            return point
+
+
 class Index_Maps():
     '''
     This class creates a singular map as a function of some timeseries of
@@ -651,105 +795,3 @@ class Index_Maps():
 
         return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
-
-#########################################################################
-def makeMap(maps, function):
-    '''
-    To choose which function to return from Index_Maps
-
-    Production Notes:
-
-    '''
-    gc.collect()
-    if function == "omean":
-        data = maps.meanOriginal()
-    if function == "omax":
-        data = maps.maxOriginal()
-    if function == "omin":
-        data = maps.minOriginal()
-    if function == "pmean":
-        data = maps.meanPercentile()
-    if function == "pmax":
-        data = maps.maxPercentile()
-    if function == "pmin":
-        data = maps.minPercentile()
-    if function == "ocv":
-        data = maps.coefficientVariation()
-    if function == "oarea":
-        data = maps.meanOriginal()  # This will require some extra doing...
-    return data
-
-###############################################################################
-def percentileArrays(arrays):
-    '''
-    a list of 2d numpy arrays or a 3d numpy array
-    '''
-    def percentiles(lst):
-        '''
-        lst = single time series of numbers as a list
-        '''
-        import scipy.stats
-        scipy.stats.moment(lst, 1)
-
-        pct = rankdata(lst)/len(lst)
-        return pct
-
-    mask = arrays[0] * 0 + 1
-    pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
-    pcts = pcts*mask
-    return pcts
-
-
-def readRaster(rasterpath, band, navalue=-9999):
-    """
-    rasterpath = path to folder containing a series of rasters
-    navalue = a number (float) for nan values if we forgot
-                to translate the file with one originally
-
-    This converts a raster into a numpy array along with spatial features
-    needed to write any results to a raster file. The return order is:
-
-      array (numpy), spatial geometry (gdal object),
-                                      coordinate reference system (gdal object)
-    """
-    raster = gdal.Open(rasterpath)
-    geometry = raster.GetGeoTransform()
-    arrayref = raster.GetProjection()
-    array = np.array(raster.GetRasterBand(band).ReadAsArray())
-    del raster
-    array = array.astype(float)
-    if np.nanmin(array) < navalue:
-        navalue = np.nanmin(array)
-    array[array==navalue] = np.nan
-    return(array, geometry, arrayref)
-
-def standardize(indexlist):
-    '''
-    Min/max standardization
-    '''
-    def single(array, mins, maxes):
-        newarray = (array - mins)/(maxes - mins)
-        return(newarray)
-
-    if type(indexlist[0][0]) == str:
-        arrays = [a[1] for a in indexlist]
-        mins = np.nanmin(arrays)
-        maxes = np.nanmax(arrays)
-        standardizedlist = [[indexlist[i][0],
-                             single(indexlist[i][1],
-                                    mins,
-                                    maxes)] for i in range(len(indexlist))]
-
-    else:
-        mins = np.nanmin(indexlist)
-        maxes = np.nanmax(indexlist)
-        standardizedlist = [single(indexlist[i],
-                                   mins, maxes) for i in range(len(indexlist))]
-    return(standardizedlist)
-
-
-# For making outlines...move to css, maybe
-def outLine(color, width):
-    string = ('-{1}px -{1}px 0 {0}, {1}px -{1}px 0 {0}, ' +
-              '-{1}px {1}px 0 {0}, {1}px {1}px 0 {0}').format(color, width)
-    return string
