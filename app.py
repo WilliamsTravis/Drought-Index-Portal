@@ -136,11 +136,11 @@ function_options_orig = [{'label': 'Mean', 'value': 'omean'},
 function_names = {'pmean': 'Average Percentiles',
                   'pmax': 'Maxmium Percentile',
                   'pmin': 'Minimum Percentile',
-                  'omean': 'Average Original Index Values',
-                  'omax': 'Maximum Original Value',
-                  'omin': 'Minimum Original Value',
-                  'ocv': 'Coefficient of Variation for Original Values',
-                  'oarea': 'Drought Severity Area'}
+                  'omean': 'Average Index Values',
+                  'omax': 'Maximum Index Value',
+                  'omin': 'Minimum Index Value',
+                  'ocv': 'Coefficient of Variation',
+                  'oarea': 'Average Index Values'}
 
 ################## Move to Maps Section #######################################
 # Set up initial signal and raster to scatterplot conversion
@@ -1128,7 +1128,7 @@ for i in range(1, 3):
                   [State('function_choice', 'value')])
     def displayCoverage(click, function):
         if function == 'oarea':
-            style={'margin-bottom': '25',
+            style={'margin-bottom': '10',
                    'width': '85%',
                    'text-align': 'center',
                    'margin': '0 auto'}
@@ -1409,7 +1409,7 @@ for i in range(1, 3):
             dmin = 3*sd
             dmax = 3*sd*-1
         elif function == 'oarea':
-            yaxis = dict(title='Percent Area',
+            yaxis = dict(title='Percent Area (%)',
                          range=[0, 100],
                          hovermode='y')
         else:
@@ -1464,13 +1464,14 @@ for i in range(1, 3):
                                         "<Br>" + 'Contiguous US ' +
                                         '(point estimates not available)')
             layout_copy['xaxis'] = dict(type='date')
-            layout_copy['yaxis2'] = dict(title='Drought Severity',
+            layout_copy['yaxis2'] = dict(title='Drought Severity<br>Coverage Index (DSCI)',
                                          range=[0, 1500],
                                          anchor='x',
                                          overlaying='y',
                                          side='right',
-                                         position=0.15)
-            layout_copy['margin'] = dict(l=55, r=65, b=65, t=90, pad=10)
+                                         position=0.15,
+                                         font=dict(size=8))
+            layout_copy['margin'] = dict(l=55, r=80, b=25, t=90, pad=10)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
