@@ -487,6 +487,7 @@ class Index_Maps():
                                          "data/prfgrid.npz"))["grid"]
         self.mask = self.grid * 0 + 1
 
+
     def setColor(self, default='percentile'):
         '''
         This is tricky because the color can be a string pointing to
@@ -556,6 +557,7 @@ class Index_Maps():
             scale = options[self.colorscale]
         return scale
 
+
     def getData(self, array_path):
         '''
         The challenge is to read as little as possible into memory without
@@ -574,6 +576,7 @@ class Index_Maps():
 
         return indexlist
 
+
     def getOriginal(self):
         '''
         Retrieve Original Timeseries
@@ -589,6 +592,7 @@ class Index_Maps():
         gc.collect()
         return [indexlist, dmin, dmax]
 
+
     def getPercentile(self):
         '''
         Retrieve Percentiles of Original Timeseries
@@ -602,6 +606,7 @@ class Index_Maps():
         dmin = np.nanmin(indexlist.value.data)
         gc.collect()
         return [indexlist, dmin, dmax]
+
 
     def getAlbers(self):
         '''
@@ -618,6 +623,7 @@ class Index_Maps():
         dmin = dmax*-1
         gc.collect()
         return [indexlist, dmin, dmax]
+
 
     def calculateCV(indexlist):
         '''
@@ -648,6 +654,7 @@ class Index_Maps():
 
         return covs
 
+
     def meanOriginal(self):
         '''
         Calculate mean of original index values
@@ -671,6 +678,7 @@ class Index_Maps():
             reverse = False
 
         return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+
 
     def maxOriginal(self):
         '''
@@ -793,6 +801,7 @@ class Index_Maps():
             reverse = False
 
         return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+
 
     def coefficientVariation(self):
         '''

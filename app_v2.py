@@ -37,7 +37,6 @@ import numpy as np
 import pandas as pd
 import psutil
 from osgeo import gdal
-import time
 import warnings
 import xarray as xr
 
@@ -47,8 +46,8 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions
-from functions_v2 import Index_Maps, makeMap, areaSeries, droughtArea
-from functions_v2 import Coordinate_Dictionaries, Location_Builder
+from functions import Index_Maps, makeMap, areaSeries, droughtArea
+from functions import Coordinate_Dictionaries, Location_Builder
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -309,22 +308,43 @@ def divMaker(id_num, index='noaa'):
                                    'float': 'left'}),
                     html.Div([
                             dcc.Tabs(id='location_tab_{}'.format(id_num),
-                                      value='county',
-                                      style=tab_style,
-                                      children=[
-                                          dcc.Tab(value='county',
-                                                  label='County',
-                                                  style=tablet_style,
-                                                  selected_style=tablet_style),
-                                          dcc.Tab(value='state',
-                                                  label='State/States',
-                                                  style=tablet_style,
-                                                  selected_style=tablet_style
-                                                  )]),
-                                html.Div(id='location_div_{}'.format(id_num))],
+                                     value='county',
+                                     style=tab_style,
+                                     children=[
+                                         dcc.Tab(value='county',
+                                                 label='County',
+                                                 style=tablet_style,
+                                                 selected_style=tablet_style),
+                                         dcc.Tab(value='state',
+                                                 label='State/States',
+                                                 style=tablet_style,
+                                                 selected_style=tablet_style
+                                                 )]),
+                                html.Div(id='location_div_{}'.format(id_num),
+                                         children=[
+                                            html.Div(
+                                             id='county_div_{}'.format(id_num),
+                                             children=
+                                               [dcc.Dropdown(
+                                                 id='county_{}'.format(id_num),
+                                                 options=county_options,
+                                                 clearable=False,
+                                                 multi=False,
+                                                 value=24098)]),
+                                            html.Div(
+                                             id='state_div_{}'.format(id_num),
+                                             children=
+                                               [dcc.Dropdown(
+                                                 id='state_{}'.format(id_num),
+                                                 options=state_options,
+                                                 clearable=False,
+                                                 multi=True,
+                                                 placeholder=('Contiguous ' +
+                                                              'United States'),
+                                                 value=None)],
+                                               style={'display': 'none'})])],
                                 style={'width': '50%',
-                                       'float': 'left',
-                                       'display': ''}),
+                                       'float': 'left'}),
                         html.Button(id='update_graphs_{}'.format(id_num),
                                     children=['Update Graphs'],
                                     style={'width': '20%',
@@ -565,19 +585,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
 
         # Signals  # <--------------------------------------------------------- Destruction Zone! Most of these aren't needed with the dash updates
         html.Div(id='signal', style={'display': 'none'}),
-        html.Div(id='click_store',
-                  children=default_clicks,
-                  style={'display': 'none'}),
         html.Div(id='key_1', children='1', style={'display': 'none'}),
         html.Div(id='key_2', children='2', style={'display': 'none'}),
-        html.Div(id='time_1', style={'display': 'none'}),
-        html.Div(id='time_2', style={'display': 'none'}),
-        html.Div(id='selection_time_1', style={'display': 'none'}),
-        html.Div(id='selection_time_2', style={'display': 'none'}),
-        html.Div(id='county_time_1', style={'display': 'none'}),
-        html.Div(id='county_time_2', style={'display': 'none'}),
-        html.Div(id='state_time_1', style={'display': 'none'}),
-        html.Div(id='state_time_2', style={'display': 'none'}),
         html.Div(id='location_store', style={'display': 'none'}),
         html.Div(id='choice_store', style={'display': 'none'}),
 
@@ -751,12 +760,70 @@ def choiceStore(choice1, choice2):
                State('reverse', 'value'),
                State('year_slider', 'value'),
                State('month', 'value')])
-def submitSignal(click, colorscale, reverse, year_range,
-                 month_range):
+def submitSignal(click, colorscale, reverse, year_range, month_range):
+    '''
+    Collect and hide the options signal in the hidden div.
+    '''
     if not month_range:
         month_range = [1, 1]
     signal = [[year_range, month_range], colorscale, reverse]
     return json.dumps(signal)
+
+
+@app.callback(Output('location_store', 'children'),
+              [Input('map_1', 'clickData'),
+               Input('map_2', 'clickData'),
+               Input('map_1', 'selectedData'),
+               Input('map_2', 'selectedData'),
+               Input('county_1', 'value'),
+               Input('county_2', 'value'),
+               Input('update_graphs_1', 'n_clicks'),
+               Input('update_graphs_2', 'n_clicks')],
+              [State('state_1', 'value'),
+               State('state_2', 'value')])
+def locationPicker(click1, click2, select1, select2, county1, county2, update1, 
+                   update2, state1, state2):
+        '''
+        With the context strategy it is still useful to have an independent
+        selection filter callback. Because there are many types of buttons and
+        clicks that could trigger a graph update we would have to parse through
+        each input to check if it is a location. It's still much nicer than
+        setting up a dozen hidden divs, timing callbacks, and writing long
+        lines of logic to determine which was most recently updated.
+        '''
+        # package the selections for indexing
+        locations = [click1, click2, select1, select2, county1, county2,
+                     state1, state2]
+        updates = [update1, update2]
+        context = dash.callback_context
+        triggered_value = context.triggered[0]['value']
+        
+        print('Triggered Prop ID ' + str(context.triggered[0]['prop_id']))
+        print('Triggered Value ' + str(triggered_value))
+        
+        # The update graph button activates state selections
+        if 'update_graph' in context.triggered[0]['prop_id']:
+            # When you switch from county to state, there is no initial value -- This is also the initializing condition, by chance 
+            if triggered_value is None:
+                print("Triggered selection is update button and value is None Defaulting to CONUS")
+                triggered_value = 'all'
+                sel_idx = 0
+            
+            else:
+                update_idx = updates.index(triggered_value) - 2  # <----------- We need the position of the most recent update...
+                if locations[update_idx] is None:
+                    raise PreventUpdate
+                triggered_value = locations[update_idx] # <-------------------- ...to be -2 or -1 to serve as the index to the selected state
+                sel_idx = locations.index(triggered_value)
+        else:
+            sel_idx = locations.index(triggered_value)
+        
+        selector = Location_Builder(triggered_value, cd)
+        location = selector.chooseRecent()
+        location.append(sel_idx)
+        print('clickPicker picks: ' + str(location))
+        
+        return location
 
 
 # In[] Any callback with multiple instances goes here
@@ -766,56 +833,33 @@ for i in range(1, 3):
     def displayStateSubmit(selection_type):
         if selection_type != 'state':
             style={'width': '20%',
-                   'background-color': '#C7D4EA',
-                   'font-family': 'Times New Roman',
-                   'padding': '0px',
-                   'margin-top': '26',
-                   'display': 'none'}
+                    'background-color': '#C7D4EA',
+                    'font-family': 'Times New Roman',
+                    'padding': '0px',
+                    'margin-top': '26',
+                    'display': 'none'}
         else:
             style={'width': '20%',
-                   'background-color': '#C7D4EA',
-                   'font-family': 'Times New Roman',
-                   'padding': '0px',
-                   'margin-top': '26'}
+                    'background-color': '#C7D4EA',
+                    'font-family': 'Times New Roman',
+                    'padding': '0px',
+                    'margin-top': '26'}
         return style
 
 
-    @app.callback(Output('location_div_{}'.format(i), 'children'),
+    @app.callback([Output('county_div_{}'.format(i), 'style'),
+                   Output('state_div_{}'.format(i), 'style')],
                   [Input('location_tab_{}'.format(i), 'value')],
                   [State('key_{}'.format(i), 'children')])
     def displayLocOptions(tab_choice, key):
         key = int(key)
         if tab_choice == 'county':
-            children = [html.Div([dcc.Dropdown(
-                                       id='county_{}'.format(key),
-                                       options=county_options,
-                                       clearable=False,
-                                       multi=False,
-                                       value=24098)]),
-                        html.Div([dcc.Dropdown(
-                                       id='state_{}'.format(key),
-                                       options=state_options,
-                                       clearable=False,
-                                       multi=True,
-                                       placeholder='Contiguous United States',
-                                       value=None)],
-                                 style={'display': 'none'})]
+            county_style = {}
+            state_style = {'display': 'none'}
         else:
-            children = [html.Div([dcc.Dropdown(
-                                       id='county_{}'.format(key),
-                                       options=county_options,
-                                       clearable=False,
-                                       multi=False,
-                                       value=None)],
-                                 style={'display': 'none'}),
-                        html.Div([dcc.Dropdown(
-                                       id='state_{}'.format(key),
-                                       options=state_options,
-                                       clearable=False,
-                                       multi=True,
-                                       placeholder='Contiguous United States',
-                                       value='all')])]
-        return children
+            county_style = {'display': 'none'}
+            state_style = {}
+        return county_style, state_style
 
     @app.callback(Output('coverage_div_{}'.format(i), 'children'),
                   [Input('series_{}'.format(i), 'hoverData')])
@@ -902,17 +946,11 @@ for i in range(1, 3):
         return style
 
     @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
-                  [Input('map_1', 'clickData'),
-                   Input('map_2', 'clickData'),
-                   Input('map_1', 'selectedData'),
-                   Input('map_2', 'selectedData'),
-                   Input('county_1', 'value'),
-                   Input('county_2', 'value')],
+                  [Input('location_store', 'children')],
                   [State('county_{}'.format(i), 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def dropOne(click1, click2, select1, select2, county1, county2,
-                previous_grid, key, sync):
+    def dropOne(location, previous_grid, key, sync):
         '''
         As a work around to updating synced dropdown labels and because we
         can't change the dropdown value with out creating an infinite loop, we
@@ -922,17 +960,9 @@ for i in range(1, 3):
         Check that we are working with the right selection, and do this first
         to prevent update if not syncing
         '''
-        # New location selection strategy
-        locations = [click1, click2, select1, select2, county1, county2]
-        context = dash.callback_context
-        if not context.triggered:
-            location = [39, 97, 'Boulder County, CO']
-        else:
-            triggered_value = context.triggered[0]['value']
-            sel_idx = locations.index(triggered_value)
-            selector = Location_Builder(triggered_value, cd)
-            location = selector.chooseRecent()
 
+        # Check which element the selection came from
+        sel_idx = location[-1]
         if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
             idx = int(key) - 1
             if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
@@ -958,48 +988,17 @@ for i in range(1, 3):
                   [Input('choice_{}'.format(i), 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
-                   Input('map_1', 'clickData'),
-                   Input('map_2', 'clickData'),
-                   Input('map_1', 'selectedData'),
-                   Input('map_2', 'selectedData'),
-                   Input('county_1', 'value'),
-                   Input('county_2', 'value'),
-                   Input('update_graphs_1', 'n_clicks'),
-                   Input('update_graphs_2', 'n_clicks')],
+                   Input('location_store', 'children')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children'),
-                   State('state_1', 'value'),
-                   State('state_2', 'value')])
-    def makeGraph(choice, map_type, signal, click1, click2, select1, select2,
-                  county1, county2, update1, update2, function, key, sync,
-                  state1, state2):
-
-        # New location selection strategy
-        locations = [click1, click2, select1, select2, county1, county2,
-                     state1, state2]
-        updates = [update1, update2]
-        context = dash.callback_context
-        if not context.triggered:
-            location = [39, 97, 'Boulder County, CO']
-        else:
-            triggered_value = context.triggered[0]['value']
-            
-        if triggered_value is None:
+                   State('click_sync', 'children')])
+    def makeGraph(choice, map_type, signal, location, function, key, sync):
+        # Prevent update from location unless it is a state filter
+        if location[0] != 'state_mask':
             raise PreventUpdate
-        if type(triggered_value) is int and triggered_value < 6190:  # <------- It's an update button
-            update_idx = updates.index(triggered_value) - 2  # <--------------- We need the position of the most recent update...
-            if locations[update_idx] is None:
-                raise PreventUpdate
-            state = locations[update_idx] # <---------------------------------- ...to be -2 or -1 to serve as the index to the selected state
-            sel_idx = locations.index(state)
-            selector = Location_Builder(state, cd)
-            location = selector.chooseRecent()
-        else:
-            sel_idx = locations.index(triggered_value)
-            selector = Location_Builder(triggered_value, cd)
-            location = selector.chooseRecent()
 
+        # Check which element the selection came from
+        sel_idx = location[-1]
         if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
             idx = int(key) - 1
             if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
@@ -1018,12 +1017,12 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
         #Filter by state
         if location:
             if location[0] == 'state_mask':
-                flag, states, label = location
+                flag, states, label, idx = location
                 if states != 'all':
                     states = json.loads(states)
                     state_mask = state_arrays.copy()
@@ -1160,64 +1159,15 @@ for i in range(1, 3):
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children'),
                    Input('click_sync', 'children'),
-                   Input('map_1', 'clickData'),
-                   Input('map_2', 'clickData'),
-                   Input('map_1', 'selectedData'),
-                   Input('map_2', 'selectedData'),
-                   Input('county_1', 'value'),
-                   Input('county_2', 'value'),
-                   Input('update_graphs_1', 'n_clicks'),
-                   Input('update_graphs_2', 'n_clicks')],
+                   Input('location_store', 'children')],
                   [State('key_{}'.format(i), 'children'),
-                   State('function_choice', 'value'),
-                   State('state_1', 'value'),
-                   State('state_2', 'value')])
-    def makeSeries(submit, signal, choice, choice_store, sync, click1, click2,
-                   select1, select2, county1, county2, 
-                   update1, update2, 
-                   key,
-                   function, state1, state2):
-        '''
-        Each callback is called even if this isn't synced...It would require
-          a whole new set of callbacks to avoid the lag from that. Also, the
-          synced click process is too slow...what can be done?
-        '''
-        # New location selection strategy
-        locations = [click1, click2, select1, select2, county1, county2,
-                     state1, state2]
-        updates = [update1, update2]
-        location_keys = ['map_1.clickData', 'map_2.clickData',
-                         'map_1.selectedData', 'map_2.selectedData',
-                         'county_1.value', 'county_2.value',
-                         'update_graphs_1.n_clicks', 'update_graphs_1.n_clicks',
-                         'state_1.value', 'state_.value']
-        
-        # List of inputs, current values, and the most recently changed
-        context = dash.callback_context
-        print("CONTEXT: " + str(context.states))
-        if not context.triggered:
-            location = [39, 97, 'Boulder County, CO']
-        else:
-            triggered_value = context.triggered[0]['value']
-        
-        if context.triggered[0]['prop_id'] in location_keys:
-            if triggered_value is None:
-                raise PreventUpdate
-    
-            if type(triggered_value) is int and triggered_value < 6190:  # <------- It's an update button
-                update_idx = updates.index(triggered_value) - 2  # <--------------- We need the position of the most recent update...
-                if locations[update_idx] is None:
-                    raise PreventUpdate
-                state = locations[update_idx] # <---------------------------------- ...to be -2 or -1 to serve as the index to the selected state
-                sel_idx = locations.index(state)
-                selector = Location_Builder(state, cd)
-                location = selector.chooseRecent()       
-            else:
-                sel_idx = locations.index(triggered_value)
-                selector = Location_Builder(triggered_value, cd)
-                location = selector.chooseRecent()
+                   State('function_choice', 'value')])
+    def makeSeries(submit, signal, choice, choice_store, sync, location, key,
+                    function):
 
-        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
+        # Check which element the selection came from
+        sel_idx = location[-1]
+        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update (not syncing)
             idx = int(key) - 1
             if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
@@ -1231,7 +1181,7 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
         # There's a lot of color scale switching in the default settings...
         # ...so sorry any one who's trying to figure this out, I will fix this
@@ -1242,15 +1192,15 @@ for i in range(1, 3):
         if function != 'oarea':
             print("LOCATION: " + str(location))
             timeseries, arrays, label = areaSeries(location, arrays, dates,
-                                                   reproject=False)
+                                                    reproject=False)
             bar_type = 'bar'
         else:
             bar_type = 'overlay'
             timeseries, arrays, label = areaSeries(location, arrays,
-                                                   dates, reproject=True)
+                                                    dates, reproject=True)
 
             # for i in range(5):  # 5 drought categories
-            ts_series = droughtArea(arrays, choice, inclusive=False)  # <------ Check the order of this list
+            ts_series = droughtArea(arrays, choice, inclusive=False)
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
@@ -1260,10 +1210,10 @@ for i in range(1, 3):
         # The y-axis depends on the chosen function
         if 'p' in function and function != 'oarea':
             yaxis = dict(title='Percentiles',
-                         range=[0, 100])
+                          range=[0, 100])
         elif 'o' in function and 'cv' not in function and function != 'oarea':
             yaxis = dict(range=[dmin, dmax],
-                         title='Index')
+                          title='Index')
             sd = np.nanstd(arrays)
             if 'eddi' in choice:
                 sd = sd*-1
@@ -1271,8 +1221,8 @@ for i in range(1, 3):
             dmax = 3*sd*-1
         elif function == 'oarea':
             yaxis = dict(title='Percent Area (%)',
-                         range=[0, 100],
-                         hovermode='y')
+                          range=[0, 100],
+                          hovermode='y')
         else:
             yaxis = dict(title='C.V.')
 
@@ -1302,7 +1252,7 @@ for i in range(1, 3):
                             fill='tozeroy',
                             showlegend=False,
                             x=dates,
-                            y=ts_series[i],  # <-------------------------------The order of seems to be changing
+                            y=ts_series[i],
                             hoverinfo='x',
                             marker=dict(color=colors[i],
                                         line=dict(width=.01,
@@ -1326,18 +1276,18 @@ for i in range(1, 3):
                                         '(point estimates not available)')
             layout_copy['xaxis'] = dict(type='date')
             layout_copy['yaxis2'] = dict(title='Drought Severity<br>Coverage Index (DSCI)',
-                                         range=[0, 1500],
-                                         anchor='x',
-                                         overlaying='y',
-                                         side='right',
-                                         position=0.15,
-                                         font=dict(size=8))
+                                          range=[0, 1500],
+                                          anchor='x',
+                                          overlaying='y',
+                                          side='right',
+                                          position=0.15,
+                                          font=dict(size=8))
             layout_copy['margin'] = dict(l=55, r=80, b=25, t=90, pad=10)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
-                                     y=-.5, markers=dict(size=10),
-                                     font=dict(size=10))
+                                      y=-.5, markers=dict(size=10),
+                                      font=dict(size=10))
         layout_copy['titlefont']['color'] = '#636363'
         layout_copy['font']['color'] = '#636363'
 
