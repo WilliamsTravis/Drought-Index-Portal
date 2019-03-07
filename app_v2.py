@@ -1096,35 +1096,27 @@ for i in range(1, 3):
 
         # The y-axis depends on the chosen function
         if 'p' in function and 'mean' in function:
-            # yaxis = dict(title='Percentiles',
-            #               range=[0, 100])
-
             # The maximum distance from 50
             delta = max([amax - 50, 50 - amin])
     
             # The same distance above and below 50
             amin = 50 - delta
             amax = 50 + delta
+
         elif 'min' in function or 'max' in function:
             amin = amin
             amax = amax
 
         elif 'o' in function and 'mean' in function and function != 'oarea':
-            # dmin = index_ranges['min'][index_ranges['index'] == choice]
-            # dmax = index_ranges['max'][index_ranges['index'] == choice]
             alimit = max([abs(amax), abs(amin)])
             amax = alimit
             amin = alimit * -1
-            # yaxis = dict(range=[dmin, dmax],
-            #               title='Index')
+
         elif function == 'oarea':
             alimit = max([abs(amax), abs(amin)])
             amax = alimit
             amin = alimit * -1
             colorscale = RdWhBu
-            # yaxis = dict(title='Index')
-        # else:
-        #     yaxis = dict(title='C.V.')
 
         # Create the scattermapbox object
         data = [
@@ -1159,7 +1151,6 @@ for i in range(1, 3):
             style=map_type,
             center=dict(lon=-95.7, lat=37.1),
             zoom=2)
-        # layout_copy['yaxis'] = yaxis
         layout_copy['title'] = (indexnames[choice] + '<br>' +
                                 function_names[function] + ': ' +
                                 date_print)
@@ -1234,12 +1225,15 @@ for i in range(1, 3):
                 sd = sd*-1
             dmin = 3*sd
             dmax = 3*sd*-1
+    
+        elif 'min' in function or 'max' in function:
+            dmin = dmin
+            dmax = dmax
+
         elif function == 'oarea':
             yaxis = dict(title='Percent Area (%)',
                           range=[0, 100],
                           hovermode='y')
-        else:
-            yaxis = dict(title='C.V.')
 
         # Trying to free up space for more workers
         del array
