@@ -47,8 +47,8 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions
-from functions import Index_Maps, makeMap, areaSeries, droughtArea
-from functions import Coordinate_Dictionaries, Location_Builder
+from functions_v2 import Index_Maps, makeMap, areaSeries, droughtArea
+from functions_v2 import Coordinate_Dictionaries, Location_Builder
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -1167,8 +1167,7 @@ for i in range(1, 3):
                    Input('county_1', 'value'),
                    Input('county_2', 'value'),
                    Input('update_graphs_1', 'n_clicks'),
-                   Input('update_graphs_2', 'n_clicks')
-                   ],
+                   Input('update_graphs_2', 'n_clicks')],
                   [State('key_{}'.format(i), 'children'),
                    State('function_choice', 'value'),
                    State('state_1', 'value'),
@@ -1185,29 +1184,38 @@ for i in range(1, 3):
         '''
         # New location selection strategy
         locations = [click1, click2, select1, select2, county1, county2,
-                      state1, state2]
+                     state1, state2]
         updates = [update1, update2]
+        location_keys = ['map_1.clickData', 'map_2.clickData',
+                         'map_1.selectedData', 'map_2.selectedData',
+                         'county_1.value', 'county_2.value',
+                         'update_graphs_1.n_clicks', 'update_graphs_1.n_clicks',
+                         'state_1.value', 'state_.value']
+        
+        # List of inputs, current values, and the most recently changed
         context = dash.callback_context
+        print("CONTEXT: " + str(context.states))
         if not context.triggered:
             location = [39, 97, 'Boulder County, CO']
         else:
             triggered_value = context.triggered[0]['value']
-
-        if triggered_value is None:
-            raise PreventUpdate
-
-        if type(triggered_value) is int and triggered_value < 6190:  # <------- It's an update button
-            update_idx = updates.index(triggered_value) - 2  # <--------------- We need the position of the most recent update...
-            if locations[update_idx] is None:
+        
+        if context.triggered[0]['prop_id'] in location_keys:
+            if triggered_value is None:
                 raise PreventUpdate
-            state = locations[update_idx] # <---------------------------------- ...to be -2 or -1 to serve as the index to the selected state
-            sel_idx = locations.index(state)
-            selector = Location_Builder(state, cd)
-            location = selector.chooseRecent()       
-        else:
-            sel_idx = locations.index(triggered_value)
-            selector = Location_Builder(triggered_value, cd)
-            location = selector.chooseRecent()
+    
+            if type(triggered_value) is int and triggered_value < 6190:  # <------- It's an update button
+                update_idx = updates.index(triggered_value) - 2  # <--------------- We need the position of the most recent update...
+                if locations[update_idx] is None:
+                    raise PreventUpdate
+                state = locations[update_idx] # <---------------------------------- ...to be -2 or -1 to serve as the index to the selected state
+                sel_idx = locations.index(state)
+                selector = Location_Builder(state, cd)
+                location = selector.chooseRecent()       
+            else:
+                sel_idx = locations.index(triggered_value)
+                selector = Location_Builder(triggered_value, cd)
+                location = selector.chooseRecent()
 
         if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
             idx = int(key) - 1

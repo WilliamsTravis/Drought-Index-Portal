@@ -47,12 +47,12 @@ def areaSeries(location, arrays, dates, reproject=False):
     print("areaSeries location: " + str(location))
     if type(location[0]) is int:
         print("Location is singular")
-        y, x, label = location
+        y, x, label, idx = location
         timeseries = np.array([round(a[y, x], 4) for a in arrays])
 
     else:
         if location[0] == 'state_mask':
-            flag, states, label = location
+            flag, states, label, idx = location
             if states != 'all':
                 states = json.loads(states)
                 state_mask = state_array.copy()
@@ -63,7 +63,7 @@ def areaSeries(location, arrays, dates, reproject=False):
             arrays = arrays * state_mask
         else:
             # Collect array index positions and other information for print
-            y, x, label = location
+            y, x, label, idx = location
             x = json.loads(x)
             y = json.loads(y)
 
@@ -117,6 +117,23 @@ def calculateCV(indexlist):
 
     return covs
 
+def coordinateDictionaries(source):
+        # Geometry
+        x_length = source.shape[2]
+        y_length = source.shape[1]
+        res = source.res[0]
+        lon_min = source.transform[0]
+        lat_max = source.transform[3] - res
+        xs = range(x_length)
+        ys = range(y_length)
+        lons = [lon_min + res*x for x in xs]
+        lats = [lat_max - res*y for y in ys]
+
+        # Dictionaires with coordinates and array index positions
+        londict = dict(zip(lons, xs))
+        latdict = dict(zip(lats, ys))
+        
+        return londict, latdict, res
 
 def droughtArea(arrays, choice, inclusive=False):
     '''
