@@ -828,23 +828,23 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
 
 # In[] Any callback with multiple instances goes here
 for i in range(1, 3):
-    @app.callback(Output('update_graphs_{}'.format(i), 'style'),
-                  [Input('location_tab_{}'.format(i), 'value')])
-    def displayStateSubmit(selection_type):
-        if selection_type != 'state':
-            style={'width': '20%',
-                    'background-color': '#C7D4EA',
-                    'font-family': 'Times New Roman',
-                    'padding': '0px',
-                    'margin-top': '26',
-                    'display': 'none'}
-        else:
-            style={'width': '20%',
-                    'background-color': '#C7D4EA',
-                    'font-family': 'Times New Roman',
-                    'padding': '0px',
-                    'margin-top': '26'}
-        return style
+    # @app.callback(Output('update_graphs_{}'.format(i), 'style'),
+    #               [Input('location_tab_{}'.format(i), 'value')])
+    # def displayStateSubmit(selection_type):
+    #     if selection_type != 'state':
+    #         style={'width': '20%',
+    #                 'background-color': '#C7D4EA',
+    #                 'font-family': 'Times New Roman',
+    #                 'padding': '0px',
+    #                 'margin-top': '26',
+    #                 'display': 'none'}
+    #     else:
+    #         style={'width': '20%',
+    #                 'background-color': '#C7D4EA',
+    #                 'font-family': 'Times New Roman',
+    #                 'padding': '0px',
+    #                 'margin-top': '26'}
+    #     return style
 
 
     @app.callback([Output('county_div_{}'.format(i), 'style'),
@@ -1095,7 +1095,7 @@ for i in range(1, 3):
             date_print = "{}, {}".format(monthmarks[m1], y1)
 
         # The y-axis depends on the chosen function
-        if 'p' in function:
+        if 'p' in function and 'mean' in function:
             # yaxis = dict(title='Percentiles',
             #               range=[0, 100])
 
@@ -1105,8 +1105,11 @@ for i in range(1, 3):
             # The same distance above and below 50
             amin = 50 - delta
             amax = 50 + delta
+        elif 'min' in function or 'max' in function:
+            amin = amin
+            amax = amax
 
-        elif 'o' in function and 'cv' not in function and function != 'oarea':
+        elif 'o' in function and 'mean' in function and function != 'oarea':
             # dmin = index_ranges['min'][index_ranges['index'] == choice]
             # dmax = index_ranges['max'][index_ranges['index'] == choice]
             alimit = max([abs(amax), abs(amin)])

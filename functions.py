@@ -797,7 +797,7 @@ class Index_Maps():
         [indexlist, dmin, dmax] = self.getPercentile()
 
         # Get data
-        array = indexlist.max('time').value.data
+        array = indexlist.min('time').value.data
         arrays = indexlist.value.data
         dates = indexlist.time.data
         del indexlist
