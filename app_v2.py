@@ -146,7 +146,7 @@ function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
                          {'label': 'Minimum', 'value': 'omin'},
-                         {'label': 'Coefficient of Variation', 'value': 'ocv'},
+                         # {'label': 'Coefficient of Variation', 'value': 'ocv'},
                          {'label': 'Drought Severity Area', 'value':'oarea'}]
 
 function_names = {'pmean': 'Average Percentiles',
@@ -155,7 +155,7 @@ function_names = {'pmean': 'Average Percentiles',
                   'omean': 'Average Index Values',
                   'omax': 'Maximum Index Value',
                   'omin': 'Minimum Index Value',
-                  'ocv': 'Coefficient of Variation',
+                  # 'ocv': 'Coefficient of Variation',
                   'oarea': 'Average Index Values'}
 
 # County Data Frame and options  # <------------------------------------------- Clean this up, automate csv building from source
@@ -1017,7 +1017,7 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
         #Filter by state
         if location:
@@ -1096,20 +1096,32 @@ for i in range(1, 3):
 
         # The y-axis depends on the chosen function
         if 'p' in function:
-            yaxis = dict(title='Percentiles',
-                          range=[0, 100])
+            # yaxis = dict(title='Percentiles',
+            #               range=[0, 100])
+
+            # The maximum distance from 50
+            delta = max([amax - 50, 50 - amin])
+    
+            # The same distance above and below 50
+            amin = 50 - delta
+            amax = 50 + delta
+
         elif 'o' in function and 'cv' not in function and function != 'oarea':
-            dmin = index_ranges['min'][index_ranges['index'] == choice]
-            dmax = index_ranges['max'][index_ranges['index'] == choice]
-            yaxis = dict(range=[dmin, dmax],
-                          title='Index')
+            # dmin = index_ranges['min'][index_ranges['index'] == choice]
+            # dmax = index_ranges['max'][index_ranges['index'] == choice]
+            alimit = max([abs(amax), abs(amin)])
+            amax = alimit
+            amin = alimit * -1
+            # yaxis = dict(range=[dmin, dmax],
+            #               title='Index')
         elif function == 'oarea':
-            dmin = 0
-            dmax = 100
+            alimit = max([abs(amax), abs(amin)])
+            amax = alimit
+            amin = alimit * -1
             colorscale = RdWhBu
-            yaxis = dict(title='Index')
-        else:
-            yaxis = dict(title='C.V.')
+            # yaxis = dict(title='Index')
+        # else:
+        #     yaxis = dict(title='C.V.')
 
         # Create the scattermapbox object
         data = [
@@ -1127,7 +1139,7 @@ for i in range(1, 3):
                     color=df['data'],
                     cmax=amax,
                     cmin=amin,
-                    opacity=0.85,
+                    opacity=1.0,
                     size=5,
                     colorbar=dict(
                         textposition="auto",
@@ -1144,7 +1156,7 @@ for i in range(1, 3):
             style=map_type,
             center=dict(lon=-95.7, lat=37.1),
             zoom=2)
-        layout_copy['yaxis'] = yaxis
+        # layout_copy['yaxis'] = yaxis
         layout_copy['title'] = (indexnames[choice] + '<br>' +
                                 function_names[function] + ': ' +
                                 date_print)

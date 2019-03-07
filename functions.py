@@ -602,9 +602,20 @@ class Index_Maps():
                                   self.choice + '.nc')
         indexlist = self.getData(array_path)
         indexlist.value.data = indexlist.value.data * 100
+
+        # We want the color scale to be centered on 50, first get max/min
         dmax = np.nanmax(indexlist.value.data)
         dmin = np.nanmin(indexlist.value.data)
+
+        # The maximum distance from 50
+        delta = max([dmax - 50, 50 - dmin])
+
+        # The same distance above and below 50
+        dmin = 50 - delta
+        dmax = 50 + delta
+
         gc.collect()
+
         return [indexlist, dmin, dmax]
 
 
