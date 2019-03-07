@@ -48,7 +48,7 @@ os.chdir(path)
 
 # Import functions
 from functions import Index_Maps, makeMap, areaSeries, droughtArea
-from functions import Coordinate_Dictionaries
+from functions import Coordinate_Dictionaries, Location_Builder
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -666,7 +666,7 @@ def toggleOptions(click):
 @app.callback([Output('click_sync', 'style'),
                Output('click_sync', 'children')],
               [Input('click_sync', 'n_clicks')])
-def toggleSyncColor(click):
+def toggleSyncButton(click):
     '''
     change the color of on/off location syncing button  - for css
     '''
@@ -735,122 +735,6 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
-@app.callback(Output('location_store', 'children'),
-              [Input('time_1', 'children'),
-               Input('time_2', 'children'),
-               Input('selection_time_1', 'children'),
-               Input('selection_time_2', 'children'),
-               Input('county_time_1', 'children'),
-               Input('county_time_2', 'children'),
-               Input('map_1', 'clickData'),
-               Input('map_2', 'clickData'),
-               Input('map_1', 'selectedData'),
-               Input('map_2', 'selectedData'),
-               Input('county_1', 'value'),
-               Input('county_2', 'value'),
-               Input('update_graphs_1', 'n_clicks'),
-               Input('update_graphs_2', 'n_clicks')],
-              [State('state_time_1', 'children'),
-               State('state_time_2', 'children'),
-               State('state_1', 'value'),
-               State('state_2', 'value'),
-               State('location_store', 'children')])
-def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
-                   cl1, cl2, sl1, sl2, co1, co2, click1, click2,
-                   st_time1, st_time2, st1, st2, old_location):
-    '''
-    Because there is no time stamp on these selections, we are making one
-    ourselves. This is the list of selections (in various formats) and the list
-    of times they were selected. The function will return the most recent
-    selection to be used across all elements if syncing is on.
-
-    It would be best if the selection as in a standard format. Perhaps just
-    x, y coords and a label.
-
-    Also, to help unsync, I'm adding an index position of the click to the
-    location object.
-    '''
-    times = np.array([cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
-                     st_time1, st_time2])
-    sels = np.array([cl1, cl2, sl1, sl2, co1, co2, st1, st2])
-    times = [times[i] for i in range(len(sels)) if sels[i] is not None]
-    sels = [sels[i] for i in range(len(sels)) if sels[i] is not None]
-    print("clickPicker times: " + str(times))
-    print("clickPicker choices: " + str(sels))
-    idx = times.index(np.nanmax(times))
-    location = sels[idx]
-    print("clickPicker final choice: " + str(location))
-
-    # 1: Selection is a grid ID  # <------------------------------------------- Move to function
-    if type(location) is int and len(str(location)) >= 3:
-        county = counties_df['place'][counties_df.grid == location].item()
-        y, x = np.where(cd.grid == location)
-        location = [int(y), int(x), county, idx]
-
-    # 2: location is a list of states
-    elif type(location) is list:
-        # Empty, default to CONUS
-        if len(location) == 0:
-            location = ['state_mask', 'all', 'Contiguous United States', idx]
-
-        elif len(location) == 1 and location[0] == 'all':
-            location = ['state_mask', 'all', 'Contiguous United States', idx]
-
-        # Single or multiple, not all or empty, state or list of states
-        elif len(location) >= 1:
-            # Return the mask, a flag, and the state names
-            state = list(states_df['STUSAB'][
-                         states_df['FIPS State'].isin(location)])
-            if len(state) < 4:
-                state = [states_df['STATE_NAME'][
-                         states_df['STUSAB'] == s].item() for s in state]
-            states = ", ".join(state)
-            location = ['state_mask', str(location), states, idx]
-
-    # Selection is the default 'all' states
-    elif type(location) is str:
-        location = ['state_mask', 'all', 'Contiguous United States', idx]
-
-    # 4: Location is a point object
-    elif type(location) is dict:
-        if len(location['points']) == 1:
-            lon = location['points'][0]['lon']
-            lat = location['points'][0]['lat']
-            x = cd.londict[lon]
-            y = cd.latdict[lat]
-            gridid = cd.grid[y, x]
-            counties = counties_df['place'][counties_df.grid == gridid]
-            county = counties.unique()
-            if len(county) == 0:
-                label = ""
-            else:
-                label = county[0]
-            location = [y, x, label, idx]
-
-        elif len(location['points']) > 1:
-            selections = location['points']
-            y = list([cd.latdict[d['lat']] for d in selections])
-            x = list([cd.londict[d['lon']] for d in selections])
-            counties = np.array([d['text'][:d['text'].index(':')] for
-                                 d in selections])
-            county_df = counties_df[counties_df['place'].isin(
-                                    list(np.unique(counties)))]
-
-            # Use gradient to print NW and SE most counties as a range
-            NW = county_df['place'][
-                    county_df['gradient'] == min(county_df['gradient'])].item()
-            SE = county_df['place'][
-                    county_df['gradient'] == max(county_df['gradient'])].item()
-            if NW != SE:
-                label = NW + " to " + SE
-            else:
-                label = NW
-            location = [str(y), str(x), label, idx]
-    else:
-        location = [50, 50, 'No Selection Found', idx]
-    if location == old_location:
-        raise PreventUpdate
-    return location
 
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
@@ -858,6 +742,7 @@ def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
                Input('choice_2', 'value')])
 def choiceStore(choice1, choice2):
     return (json.dumps([choice1, choice2]))
+
 
 # Store data in the cache and hide the signal to activate it in the hidden div
 @app.callback(Output('signal', 'children'),
@@ -894,29 +779,6 @@ for i in range(1, 3):
                    'margin-top': '26'}
         return style
 
-    @app.callback(Output('time_{}'.format(i), 'children'),
-                  [Input('map_{}'.format(i), 'clickData')])
-    def clickTime(click):
-        clicktime = time.time()
-        return(clicktime)
-
-    @app.callback(Output('county_time_{}'.format(i), 'children'),
-                  [Input('county_{}'.format(i), 'value')])
-    def countyTime(county):
-        ctime = time.time()
-        return(ctime)
-
-    @app.callback(Output('state_time_{}'.format(i), 'children'),
-                  [Input('state_{}'.format(i), 'value')])
-    def stateTime(state):
-        stime = time.time()
-        return(stime)
-
-    @app.callback(Output('selection_time_{}'.format(i), 'children'),
-                  [Input('map_{}'.format(i), 'selectedData')])
-    def selectionTime(selection):
-        selected_time = time.time()
-        return(selected_time)
 
     @app.callback(Output('location_div_{}'.format(i), 'children'),
                   [Input('location_tab_{}'.format(i), 'value')],
@@ -1040,11 +902,17 @@ for i in range(1, 3):
         return style
 
     @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
-                  [Input('location_store', 'children')],
+                  [Input('map_1', 'clickData'),
+                   Input('map_2', 'clickData'),
+                   Input('map_1', 'selectedData'),
+                   Input('map_2', 'selectedData'),
+                   Input('county_1', 'value'),
+                   Input('county_2', 'value')],
                   [State('county_{}'.format(i), 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def dropOne(location, previous_grid, key, sync):
+    def dropOne(click1, click2, select1, select2, county1, county2,
+                previous_grid, key, sync):
         '''
         As a work around to updating synced dropdown labels and because we
         can't change the dropdown value with out creating an infinite loop, we
@@ -1054,12 +922,20 @@ for i in range(1, 3):
         Check that we are working with the right selection, and do this first
         to prevent update if not syncing
         '''
+        # New location selection strategy
+        locations = [click1, click2, select1, select2, county1, county2]
+        context = dash.callback_context
+        if not context.triggered:
+            location = [39, 97, 'Boulder County, CO']
+        else:
+            triggered_value = context.triggered[0]['value']
+            sel_idx = locations.index(triggered_value)
+            selector = Location_Builder(triggered_value, cd)
+            location = selector.chooseRecent()
 
-        # Get the appropriate selection
-        sel_idx = location[3]
-        if 'On' not in sync:
-            idx = int(key) - 1  # Graph ID
-            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
+        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
+            idx = int(key) - 1
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
         try:
             if type(location[0]) is int:
@@ -1077,19 +953,56 @@ for i in range(1, 3):
         except:
             raise PreventUpdate
 
+
     @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_{}'.format(i), 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
-                   Input('location_store', 'children')],
+                   Input('map_1', 'clickData'),
+                   Input('map_2', 'clickData'),
+                   Input('map_1', 'selectedData'),
+                   Input('map_2', 'selectedData'),
+                   Input('county_1', 'value'),
+                   Input('county_2', 'value'),
+                   Input('update_graphs_1', 'n_clicks'),
+                   Input('update_graphs_2', 'n_clicks')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children')])
-    def makeGraph(choice, map_type, signal, location, function, key, sync):
-        if 'On' not in sync:
-            sel_idx = location[3]
+                   State('click_sync', 'children'),
+                   State('state_1', 'value'),
+                   State('state_2', 'value')])
+    def makeGraph(choice, map_type, signal, click1, click2, select1, select2,
+                  county1, county2, update1, update2, function, key, sync,
+                  state1, state2):
+
+        # New location selection strategy
+        locations = [click1, click2, select1, select2, county1, county2,
+                     state1, state2]
+        updates = [update1, update2]
+        context = dash.callback_context
+        if not context.triggered:
+            location = [39, 97, 'Boulder County, CO']
+        else:
+            triggered_value = context.triggered[0]['value']
+            
+        if triggered_value is None:
+            raise PreventUpdate
+        if type(triggered_value) is int and triggered_value < 6190:  # <------- It's an update button
+            update_idx = updates.index(triggered_value) - 2  # <--------------- We need the position of the most recent update...
+            if locations[update_idx] is None:
+                raise PreventUpdate
+            state = locations[update_idx] # <---------------------------------- ...to be -2 or -1 to serve as the index to the selected state
+            sel_idx = locations.index(state)
+            selector = Location_Builder(state, cd)
+            location = selector.chooseRecent()
+        else:
+            sel_idx = locations.index(triggered_value)
+            selector = Location_Builder(triggered_value, cd)
+            location = selector.chooseRecent()
+
+        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
             idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <------------------[0, 4, 8] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
 
         print("Rendering Map #{}".format(int(key)))
@@ -1110,7 +1023,7 @@ for i in range(1, 3):
         #Filter by state
         if location:
             if location[0] == 'state_mask':
-                flag, states, label, sel_idx = location
+                flag, states, label = location
                 if states != 'all':
                     states = json.loads(states)
                     state_mask = state_arrays.copy()
@@ -1246,22 +1159,59 @@ for i in range(1, 3):
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children'),
-                   Input('location_store', 'children'),
-                   Input('click_sync', 'children')],
+                   Input('click_sync', 'children'),
+                   Input('map_1', 'clickData'),
+                   Input('map_2', 'clickData'),
+                   Input('map_1', 'selectedData'),
+                   Input('map_2', 'selectedData'),
+                   Input('county_1', 'value'),
+                   Input('county_2', 'value'),
+                   Input('update_graphs_1', 'n_clicks'),
+                   Input('update_graphs_2', 'n_clicks')
+                   ],
                   [State('key_{}'.format(i), 'children'),
-                   State('function_choice', 'value')])
-    def makeSeries(submit, signal, choice, choice_store, location,
-                   sync, key, function):
+                   State('function_choice', 'value'),
+                   State('state_1', 'value'),
+                   State('state_2', 'value')])
+    def makeSeries(submit, signal, choice, choice_store, sync, click1, click2,
+                   select1, select2, county1, county2, 
+                   update1, update2, 
+                   key,
+                   function, state1, state2):
         '''
         Each callback is called even if this isn't synced...It would require
           a whole new set of callbacks to avoid the lag from that. Also, the
           synced click process is too slow...what can be done?
         '''
-        # Get the appropriate selection
-        sel_idx = location[3]
-        if 'On' not in sync:
-            idx = int(key) - 1  # Graph ID
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # [0, 4, 8, 12] for the full panel
+        # New location selection strategy
+        locations = [click1, click2, select1, select2, county1, county2,
+                      state1, state2]
+        updates = [update1, update2]
+        context = dash.callback_context
+        if not context.triggered:
+            location = [39, 97, 'Boulder County, CO']
+        else:
+            triggered_value = context.triggered[0]['value']
+
+        if triggered_value is None:
+            raise PreventUpdate
+
+        if type(triggered_value) is int and triggered_value < 6190:  # <------- It's an update button
+            update_idx = updates.index(triggered_value) - 2  # <--------------- We need the position of the most recent update...
+            if locations[update_idx] is None:
+                raise PreventUpdate
+            state = locations[update_idx] # <---------------------------------- ...to be -2 or -1 to serve as the index to the selected state
+            sel_idx = locations.index(state)
+            selector = Location_Builder(state, cd)
+            location = selector.chooseRecent()       
+        else:
+            sel_idx = locations.index(triggered_value)
+            selector = Location_Builder(triggered_value, cd)
+            location = selector.chooseRecent()
+
+        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
+            idx = int(key) - 1
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
 
         # Create signal for the global_store
