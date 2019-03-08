@@ -1448,7 +1448,7 @@ for i in range(1, 3):
                                                   color="#000000")))
                 data.append(trace)
             data.append(dict(x=dates, y=list(np.repeat(np.nan, len(dates))),  # <---Empty trace for second y-axis
-                            yaxis='y2', hoverinfo='x', showlegend=False))
+                             yaxis='y2', hoverinfo='x', showlegend=False))
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)

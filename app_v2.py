@@ -59,6 +59,9 @@ else:
 warnings.filterwarnings("ignore")
 
 ######################## Default Values #######################################
+default_function = 'oarea'
+default_years = [2005, 2019]
+
 # Default click before the first click for any map
 default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
                              'marker.color': 0, 'pointIndex': 0,
@@ -478,7 +481,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                                      children=['Study Period Year Range']),
                              html.Div([dcc.RangeSlider(
                                                      id='year_slider',
-                                                     value=[1990, max_year],
+                                                     value=default_years,
                                                      min=1900,
                                                      max=max_year,
                                                      updatemode='drag',
@@ -874,14 +877,15 @@ for i in range(1, 3):
         try:
             date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
             date = dt.datetime.strftime(date, '%b, %Y')
-            hover['points'][3]['y'] = hover['points'][3]['y'] * 15
+            # print(str(hover))
+            # hover['points'][3]['y'] = hover['points'][3]['y'] * 15
             ds = ['{0:.2f}'.format(hover['points'][i]['y']) for i in range(6)]
-            coverage_df = pd.DataFrame({'D0 (Dry)': ds[0],
-                                        'D1 (Moderate)': ds[1],
-                                        'D2 (Severe)': ds[2],
-                                        'DSCI':ds[3],
-                                        'D3 (Extreme)': ds[4],
-                                        'D4 (Exceptional)': ds[5]},
+            coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
+                                        'D1 - D4 (Moderate)': ds[1],
+                                        'D2 - D4 (Severe)': ds[2],
+                                        'DSCI':ds[5],
+                                        'D3 - D4 (Extreme)': ds[3],
+                                        'D4 (Exceptional)': ds[4]},
                                        index=[0])
             children=[html.H6([date],
                               style={'text-align': 'left'}),
@@ -892,40 +896,40 @@ for i in range(1, 3):
                        style_cell={'textAlign': 'center'},
                        style_header={'fontWeight': 'bold'},
                        style_header_conditional=[
-                               {'if': {'column_id': 'D0 (Dry)'},
+                               {'if': {'column_id': 'D0 - D4 (Dry)'},
                                        'backgroundColor': '#ffff00',
                                        'color': 'black'},
-                               {'if': {'column_id': 'D1 (Moderate)'},
+                               {'if': {'column_id': 'D1 - D4 (Moderate)'},
                                            'backgroundColor': '#fcd37f',
                                            'color': 'black'},
-                               {'if': {'column_id': 'D2 (Severe)'},
+                               {'if': {'column_id': 'D2 - D4 (Severe)'},
                                       'backgroundColor': '#ffaa00',
                                       'color': 'black'},
                                {'if': {'column_id': 'DSCI'},
                                       'backgroundColor': '#27397F',
                                       'color': 'white',
                                       'width': '75'},
-                               {'if': {'column_id': 'D3 (Extreme)'},
+                               {'if': {'column_id': 'D3 - D4 (Extreme)'},
                                       'backgroundColor': '#e60000',
                                       'color': 'white'},
                                {'if': {'column_id': 'D4 (Exceptional)'},
                                        'backgroundColor': '#730000',
                                        'color': 'white'}],
                        style_data_conditional=[
-                               {'if': {'column_id': 'D0 (Dry)'},
+                               {'if': {'column_id': 'D0 - D4 (Dry)'},
                                        'backgroundColor': '#ffffa5',
                                        'color': 'black'},
-                               {'if': {'column_id': 'D1 (Moderate)'},
+                               {'if': {'column_id': 'D1 - D4 (Moderate)'},
                                        'backgroundColor': '#ffe5af',
                                        'color': 'black'},
-                               {'if': {'column_id': 'D2 (Severe)'},
+                               {'if': {'column_id': 'D2 - D4 (Severe)'},
                                        'backgroundColor': '#ffc554',
                                        'color': 'black'},
                                {'if': {'column_id': 'DSCI'},
                                       'backgroundColor': '#5c678e',
                                       'color': 'white',
                                       'width': '75'},
-                               {'if': {'column_id': 'D3 (Extreme)'},
+                               {'if': {'column_id': 'D3 - D4 (Extreme)'},
                                        'backgroundColor': '#dd6666',
                                        'color': 'white'},
                                {'if': {'column_id': 'D4 (Exceptional)'},
@@ -1233,12 +1237,10 @@ for i in range(1, 3):
                                                     dates, reproject=True)
 
             # for i in range(5):  # 5 drought categories
-            ts_series = droughtArea(arrays, choice, inclusive=False)
+            ts_series, dsci = droughtArea(arrays, choice, inclusive=False)
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
-        colors = ['#ffff00','#fcd37f', '#ffaa00', '#27397F', '#e60000',
-                  '#730000']
 
         # The y-axis depends on the chosen function
         if 'p' in function and function != 'oarea':
@@ -1279,22 +1281,25 @@ for i in range(1, 3):
                                 cmin=dmin,
                                 cmax=dmax,
                                 line=dict(width=0.2, color="#000000")))]
-        else:
+        else:         
+            colors = ['rgb(255, 255, 0)','rgb(252, 211, 127)',
+                      'rgb(255, 170, 0)', 'rgb(230, 0, 0)', 'rgb(115, 0, 0)']
+            # dsci = ts_series.pop(3)
+            dsci_col = 'rgb(39, 57, 127)',
             data = []
-            for i in range(6):
-                trace = dict(
-                            type='scatter',
-                            fill='tozeroy',
-                            showlegend=False,
-                            x=dates,
-                            y=ts_series[i],
-                            hoverinfo='x',
-                            marker=dict(color=colors[i],
-                                        line=dict(width=.01,
-                                                  color="#000000")))
+            for i in range(5):
+                trace = dict(type='scatter', fill='tozeroy', mode='none',
+                             showlegend=False, x=dates, y=ts_series[i],
+                             hoverinfo='x', fillcolor=colors[i])
                 data.append(trace)
-            data.append(dict(x=dates, y=list(np.repeat(np.nan, len(dates))),  # <---Empty trace for second y-axis
-                            yaxis='y2', hoverinfo='x', showlegend=False))
+            data.insert(5, dict(x=dates, y=dsci, #fillcolor=dsci_col,
+                                # type='line',
+                                # fill='tozeroy',
+                                yaxis='y2',
+                                hoverinfo='x',
+                                showlegend=False,
+                                line=dict(color='rgba(39, 57, 127, 0.75)',
+                                          width=4)))
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
@@ -1311,12 +1316,12 @@ for i in range(1, 3):
                                         '(point estimates not available)')
             layout_copy['xaxis'] = dict(type='date')
             layout_copy['yaxis2'] = dict(title='Drought Severity<br>Coverage Index (DSCI)',
-                                          range=[0, 1500],
-                                          anchor='x',
-                                          overlaying='y',
-                                          side='right',
-                                          position=0.15,
-                                          font=dict(size=8))
+                                         range=[0, 1000],
+                                         anchor='x',
+                                         overlaying='y',
+                                         side='right',
+                                         position=0.15,
+                                         font=dict(size=8))
             layout_copy['margin'] = dict(l=55, r=80, b=25, t=90, pad=10)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type

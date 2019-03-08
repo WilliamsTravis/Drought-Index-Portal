@@ -144,6 +144,9 @@ def droughtArea(arrays, choice, inclusive=False):
 
     For now this requires original values, percentiles even out too quickly
     '''
+    # Flip if this is EDDI
+    if 'eddi' in choice:
+        arrays = arrays*-1
 
     # Drought Categories
     print("calculating drought area...")
@@ -167,15 +170,25 @@ def droughtArea(arrays, choice, inclusive=False):
     cat_key = [key for key in drought_cats.keys() if key in choice][0]
     cats = drought_cats[cat_key]
 
+    # We want an ndarray for each category
+    ##################### Testing Zone ########################################
+    # For testing
+    # from netCDF4 import Dataset
+    # data = Dataset('f:/data/droughtindices/netcdfs/pdsi.nc')
+    # arrays = data.variables['value'][:].data
+    # arrays[arrays==-9999] = np.nan
+    # del data
+    # d = [-4, -5]
+    # a = arrays.copy()
+    ###########################################################################
+
     # Total number of pixels
     mask = arrays[0] * 0 + 1
     total_area = np.nansum(mask)
 
-    # We want an ndarray for each category
-    # @jit  # <---------------------------------------------------------------- Possible way to speed this up, but not quite that simple
-    def rangeFilter(a, d, inclusive):
+    def singleFilter(array, d, inclusive=False):
         '''
-        There is somem question about the Drought Severity Coverage Index. The
+        There is some question about the Drought Severity Coverage Index. The
         NDMC does not use inclusive drought categories though NIDIS appeared to
         in the "Historical Character of US Northern Great Plains Drought"
         study. In an effort to match NIDIS' sample chart, we are using the
@@ -184,34 +197,30 @@ def droughtArea(arrays, choice, inclusive=False):
         should really defer to NDMC. We could also add an option to display
         inclusive vs non-inclusive drought severity coverages.
         '''
-        # Filter above or below thresholds
-        # ac = a.copy()
-        if inclusive is False:
-            ac[(ac >= d[0]) | (ac < d[1])] = np.nan
+        if inclusive:
+            mask = array<d[0]
         else:
-            a[a > d[0]] = np.nan
-        area = a*0+1
-        ps = [(np.nansum(b)/total_area) * 100 for b in area]
+            mask = (array<d[0]) & (array>d[1])
+        return array[mask]
+
+    # For each array
+    def filter(arrays, d, total_area, inclusive=False):
+        values = np.array([singleFilter(a, d, inclusive=inclusive) for
+                            a in arrays])
+        ps = np.array([(len(b)/total_area) * 100 for b in values])
         return ps
 
     print("starting offending loops...")
-    p = {}
-    for i in range(5):  # <---------------------------------------------------- Slowest part of whole app
-        d = cats[i]
-        ps = rangeFilter(arrays, d, inclusive=True)
-        p[i] = ps
+    pnincs = np.array([filter(arrays, cats[i], total_area) for i in range(5)])
+    DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
+    # DSCI = DSCI/15  # <-------------------------------------------------------- until I get it on it's own scale
+    pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]  # <------------------------ ~60 microseconds with 18 year record (compare to 150 milliseconds to start over :)
+    del pnincs
+    # pincs.insert(3, list(DSCI))
 
-    DSCI = np.array([np.array(p[key]) for key in p.keys()])
-    DSCI = np.array([DSCI[i]*(i+1) for i in range(5)])
-    DSCI = np.sum(DSCI, axis=0)
-    DSCI = DSCI/15
-    p = [i for key, i in p.items()]
-    p.insert(3, list(DSCI))
-
-    # Return a list of five layers, the signal might need to be adjusted
-    # for inclusive
+    # Return the list of five layers
     print("drought area calculations complete.")
-    return p
+    return pincs, DSCI
 
 
 def im(array):
