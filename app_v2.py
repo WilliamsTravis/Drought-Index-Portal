@@ -73,6 +73,9 @@ source_signal = [[[2000, 2017], [1, 12]], 'Viridis', 'no']
 source_choice = 'pdsi'
 source_function = 'pmean'
 
+# For scaling
+ranges = pd.read_csv('data/tables/index_ranges.csv')
+
 ############### The DASH application and server ###############################
 app = dash.Dash(__name__)
 
@@ -985,16 +988,18 @@ for i in range(1, 3):
 
 
     @app.callback(Output("map_{}".format(i), 'figure'),
-                  [Input('choice_{}'.format(i), 'value'),
+                  [Input('choice_1', 'value'),
+                   Input('choice_2', 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
                    Input('location_store', 'children')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def makeGraph(choice, map_type, signal, location, function, key, sync):
+    def makeGraph(choice1, choice2, map_type, signal, location, function, key, sync):
         # Prevent update from location unless it is a state filter
-        if location[0] != 'state_mask':
+        trig = dash.callback_context.triggered[0]['prop_id']
+        if trig == 'location_store.children' and location[0] != 'state_mask':
             raise PreventUpdate
 
         # Check which element the selection came from
@@ -1015,9 +1020,34 @@ for i in range(1, 3):
         # Collect and adjust signal
         [[year_range, month_range], colorscale, reverse_override] = signal
 
+        # Figure which choice is this panel's and which the other
+        key = int(key) - 1
+        choices = [choice1, choice2]
+        choice = choices[key]
+        choice2 = choices[~key]
+
         # Get/cache data
         [array, arrays, dates, colorscale,
          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+
+        # Individual array min/max
+        amax = np.nanmax(array)
+        amin = np.nanmin(array)
+
+
+        # Now, we want to use the same base value range
+        if function == 'pmean':
+            # Get the data for the other panel for its value range
+            array2 = retrieve_data(signal, function, choice2)[0]
+            amax2 = np.nanmax(array2)
+            amin2 = np.nanmin(array2)        
+            amax = np.nanmax([amax, amax2])        
+            amin = np.nanmin([amin, amin2])
+        # if function == 'omean':  # <----------------------------------------- This might require a pre-made chart from probability distributions, much like strike level matching. Other theory behind comparing different index values?
+        #     abmax = ranges['max'][ranges['index'] == choice]
+        #     abmin = ranges['min'][ranges['index'] == choice]
+        #     abmax2 = ranges['max'][ranges['index'] == choice2]
+        #     abmin2 = ranges['min'][ranges['index'] == choice2]
 
         #Filter by state
         if location:
@@ -1040,9 +1070,6 @@ for i in range(1, 3):
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                         psutil.virtual_memory().percent))
 
-        # Individual array min/max
-        amax = np.nanmax(array)
-        amin = np.nanmin(array)
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
@@ -1229,7 +1256,6 @@ for i in range(1, 3):
         elif 'min' in function or 'max' in function:
             dmin = dmin
             dmax = dmax
-
         elif function == 'oarea':
             yaxis = dict(title='Percent Area (%)',
                           range=[0, 100],

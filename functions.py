@@ -572,6 +572,7 @@ class Index_Maps():
         with xr.open_dataset(array_path) as data:
             data = data.sel(time=slice(d1, d2))
             indexlist = data
+            # indexlist.value.data = indexlist.value.data.astype(np.float16)
             del data
 
         return indexlist
