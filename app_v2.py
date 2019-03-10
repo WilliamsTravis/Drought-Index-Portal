@@ -765,7 +765,7 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
-@cache2.memoize()
+# @cache2.memoize()
 def getDroughtArea(arrays, choice):
     return droughtArea(arrays, choice)
 
