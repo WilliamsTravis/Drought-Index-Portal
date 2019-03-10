@@ -365,7 +365,22 @@ def divMaker(id_num, index='noaa'):
                  html.Div([dcc.Graph(id='series_{}'.format(id_num),
                                      config={'showSendToCloud': True})]),
                  html.Div(id='coverage_div_{}'.format(id_num),
-                          style={'margin-bottom': '50'}),
+                          style={'margin-bottom': '25'}),
+                 html.Button(
+                         id='dsci_button_{}'.format(id_num),
+                         title=('The Drought Severity ' +
+                          'Coverage Index (DSCI) is a way to aggregate the ' +
+                          'five drought severity classifications into a '+
+                          'single number. It is calculated taking the ' +
+                          'percentage of an area in each drought category, ' +
+                          'weighting each by their severity, and adding ' +
+                          'them together:                                  ' +
+                          '%D0*1 + %D1*2 + %D2*3 + %D3*4 + %D4*5'),
+                          type='button',
+                          n_clicks=2,
+                          children=['Show DSCI: Off'],
+                          # style={'dsiplay': 'none'}
+                          ),
                  html.Hr(),
             ], className='six columns')
     return div
@@ -834,25 +849,6 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
 
 # In[] Any callback with multiple instances goes here
 for i in range(1, 3):
-    # @app.callback(Output('update_graphs_{}'.format(i), 'style'),
-    #               [Input('location_tab_{}'.format(i), 'value')])
-    # def displayStateSubmit(selection_type):
-    #     if selection_type != 'state':
-    #         style={'width': '20%',
-    #                 'background-color': '#C7D4EA',
-    #                 'font-family': 'Times New Roman',
-    #                 'padding': '0px',
-    #                 'margin-top': '26',
-    #                 'display': 'none'}
-    #     else:
-    #         style={'width': '20%',
-    #                 'background-color': '#C7D4EA',
-    #                 'font-family': 'Times New Roman',
-    #                 'padding': '0px',
-    #                 'margin-top': '26'}
-    #     return style
-
-
     @app.callback([Output('county_div_{}'.format(i), 'style'),
                    Output('state_div_{}'.format(i), 'style')],
                   [Input('location_tab_{}'.format(i), 'value')],
@@ -868,8 +864,9 @@ for i in range(1, 3):
         return county_style, state_style
 
     @app.callback(Output('coverage_div_{}'.format(i), 'children'),
-                  [Input('series_{}'.format(i), 'hoverData')])
-    def hoverCoverage(hover):
+                  [Input('series_{}'.format(i), 'hoverData'),
+                   Input('dsci_button_{}'.format(i), 'n_clicks')])
+    def hoverCoverage(hover, click):
         '''
         The tooltips on the drought severity coverage area graph were
         overlapping, so this outputs the hover data to a chart below instead.
@@ -878,15 +875,26 @@ for i in range(1, 3):
             date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
             date = dt.datetime.strftime(date, '%b, %Y')
             # print(str(hover))
-            # hover['points'][3]['y'] = hover['points'][3]['y'] * 15
-            ds = ['{0:.2f}'.format(hover['points'][i]['y']) for i in range(6)]
-            coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
-                                        'D1 - D4 (Moderate)': ds[1],
-                                        'D2 - D4 (Severe)': ds[2],
-                                        'DSCI':ds[5],
-                                        'D3 - D4 (Extreme)': ds[3],
-                                        'D4 (Exceptional)': ds[4]},
-                                       index=[0])
+            if click % 2 == 0:
+                ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
+                      i in range(5)]
+                coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
+                                            'D1 - D4 (Moderate)': ds[1],
+                                            'D2 - D4 (Severe)': ds[2],
+                                            'D3 - D4 (Extreme)': ds[3],
+                                            'D4 (Exceptional)': ds[4]},
+                                           index=[0])
+
+            else:
+                ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
+                      i in range(6)]
+                coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
+                                            'D1 - D4 (Moderate)': ds[1],
+                                            'D2 - D4 (Severe)': ds[2],
+                                            'D3 - D4 (Extreme)': ds[3],
+                                            'D4 (Exceptional)': ds[4],
+                                            'DSCI':ds[5]},
+                                           index=[0])
             children=[html.H6([date],
                               style={'text-align': 'left'}),
                       dash_table.DataTable(
@@ -939,18 +947,29 @@ for i in range(1, 3):
             raise PreventUpdate
         return children
 
-    @app.callback(Output('coverage_div_{}'.format(i), 'style'),
-                  [Input('submit', 'n_clicks')],
+    @app.callback([Output('dsci_button_{}'.format(i), 'style'),
+                   Output('dsci_button_{}'.format(i), 'children')],
+                  [Input('submit', 'n_clicks'),
+                   Input('dsci_button_{}'.format(i), 'n_clicks')],
                   [State('function_choice', 'value')])
-    def displayCoverage(click, function):
+    def displayDSCI(click1, click2, function):
         if function == 'oarea':
-            style={'margin-bottom': '10',
-                   'width': '85%',
-                   'text-align': 'center',
-                   'margin': '0 auto'}
+            if click2 % 2 == 0:
+                style = {'background-color': '#a8b3c4',
+                         'border-radius': '4px',
+                         'font-family': 'Times New Roman'}
+                children = 'Show DSCI: Off'
+            else:
+                style = {'background-color': '#c7d4ea',
+                         'border-radius': '4px',
+                         'font-family': 'Times New Roman'}
+                children = 'Show DSCI: On'
         else:
-            style={'display': 'none'}
-        return style
+            style = {'display': 'none'}
+            children = 'Show DSCI: Off'
+
+        return style, children
+
 
     @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
                   [Input('location_store', 'children')],
@@ -1196,11 +1215,12 @@ for i in range(1, 3):
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children'),
                    Input('click_sync', 'children'),
-                   Input('location_store', 'children')],
+                   Input('location_store', 'children'),
+                   Input('dsci_button_{}'.format(i), 'n_clicks')],
                   [State('key_{}'.format(i), 'children'),
                    State('function_choice', 'value')])
-    def makeSeries(submit, signal, choice, choice_store, sync, location, key,
-                    function):
+    def makeSeries(submit, signal, choice, choice_store, sync, location,
+                   show_dsci, key, function):
 
         # Check which element the selection came from
         sel_idx = location[-1]
@@ -1234,7 +1254,7 @@ for i in range(1, 3):
         else:
             bar_type = 'overlay'
             timeseries, arrays, label = areaSeries(location, arrays,
-                                                    dates, reproject=True)
+                                                   dates, reproject=True)
 
             # for i in range(5):  # 5 drought categories
             ts_series, dsci = droughtArea(arrays, choice, inclusive=False)
@@ -1284,22 +1304,18 @@ for i in range(1, 3):
         else:         
             colors = ['rgb(255, 255, 0)','rgb(252, 211, 127)',
                       'rgb(255, 170, 0)', 'rgb(230, 0, 0)', 'rgb(115, 0, 0)']
-            # dsci = ts_series.pop(3)
-            dsci_col = 'rgb(39, 57, 127)',
+            line_width = 1 + ((1/(year_range[1] - year_range[0])) * 50)
             data = []
             for i in range(5):
                 trace = dict(type='scatter', fill='tozeroy', mode='none',
                              showlegend=False, x=dates, y=ts_series[i],
                              hoverinfo='x', fillcolor=colors[i])
                 data.append(trace)
-            data.insert(5, dict(x=dates, y=dsci, #fillcolor=dsci_col,
-                                # type='line',
-                                # fill='tozeroy',
-                                yaxis='y2',
-                                hoverinfo='x',
-                                showlegend=False,
-                                line=dict(color='rgba(39, 57, 127, 0.75)',
-                                          width=4)))
+            if show_dsci % 2 != 0:
+                data.insert(5, dict(x=dates, y=dsci, yaxis='y2', hoverinfo='x',
+                                    showlegend=False,
+                                    line=dict(color='rgba(39, 57, 127, 0.85)',
+                                              width=line_width)))
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
@@ -1315,8 +1331,8 @@ for i in range(1, 3):
                                         "<Br>" + 'Contiguous US ' +
                                         '(point estimates not available)')
             layout_copy['xaxis'] = dict(type='date')
-            layout_copy['yaxis2'] = dict(title='Drought Severity<br>Coverage Index (DSCI)',
-                                         range=[0, 1000],
+            layout_copy['yaxis2'] = dict(title='<br>DSCI',
+                                         range=[0, 500],
                                          anchor='x',
                                          overlaying='y',
                                          side='right',

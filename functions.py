@@ -213,10 +213,8 @@ def droughtArea(arrays, choice, inclusive=False):
     print("starting offending loops...")
     pnincs = np.array([filter(arrays, cats[i], total_area) for i in range(5)])
     DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-    # DSCI = DSCI/15  # <-------------------------------------------------------- until I get it on it's own scale
     pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]  # <------------------------ ~60 microseconds with 18 year record (compare to 150 milliseconds to start over :)
     del pnincs
-    # pincs.insert(3, list(DSCI))
 
     # Return the list of five layers
     print("drought area calculations complete.")
