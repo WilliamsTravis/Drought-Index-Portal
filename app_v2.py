@@ -60,7 +60,7 @@ warnings.filterwarnings("ignore")
 
 ######################## Default Values #######################################
 default_function = 'oarea'
-default_years = [2005, 2019]
+default_years = [1985, 2019]
 
 # Default click before the first click for any map
 default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
@@ -101,9 +101,11 @@ app.config['suppress_callback_exceptions'] = True
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
                       'CACHE_THRESHOLD': 2})
-
+cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
+                       'CACHE_DIR': 'data/cache2',
+                       'CACHE_THRESHOLD': 2})
 cache.init_app(server)
-
+cache2.init_app(server)
 
 ####################### Options ###############################################
 # Drought Index Options
@@ -371,7 +373,7 @@ def divMaker(id_num, index='noaa'):
                          title=('The Drought Severity ' +
                           'Coverage Index (DSCI) is a way to aggregate the ' +
                           'five drought severity classifications into a '+
-                          'single number. It is calculated taking the ' +
+                          'single number. It is calculated by taking the ' +
                           'percentage of an area in each drought category, ' +
                           'weighting each by their severity, and adding ' +
                           'them together:                                  ' +
@@ -460,21 +462,19 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                 html.Button(id='toggle_options',
                             children='Toggle Options: Off',
                             type='button',
-                            title='Click to collapse the options above'),
+                            title='Click to collapse the options above',
+                            style={'display': 'none'}),
                 html.Button(id="desc_button",
                             children="Project Description: Off",
                             title=("Toggle this on and off to show a " +
                                    "description of the project with " +
                                    "some instructions."),
-                            style={'background-color': '#c7d4ea',
-                                   'border-radius': '2px'}),
+                            style={'display': 'none'}),
                 html.Button(id="click_sync",
                             children="Location Syncing: On",
                             title=("Toggle on and off to sync the location " +
                                    "of the time series between each map"),
-                            style={'background-color': '#c7d4ea',
-                                   'border-radius': '2px',
-                                   'margin-bottom': '30'})],
+                            style={'display': 'none'})],
                 style={'margin-bottom': '30',
                        'text-align': 'center'}),
 
@@ -765,6 +765,9 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
+@cache2.memoize()
+def getDroughtArea(arrays, choice):
+    return droughtArea(arrays, choice)
 
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
@@ -1256,8 +1259,8 @@ for i in range(1, 3):
             timeseries, arrays, label = areaSeries(location, arrays,
                                                    dates, reproject=True)
 
-            # for i in range(5):  # 5 drought categories
-            ts_series, dsci = droughtArea(arrays, choice, inclusive=False)
+            # for i in range(5):  # 5 drought categories  <-------------------- Cache this output?
+            ts_series, dsci = getDroughtArea(arrays, choice)
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]

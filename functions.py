@@ -170,18 +170,6 @@ def droughtArea(arrays, choice, inclusive=False):
     cat_key = [key for key in drought_cats.keys() if key in choice][0]
     cats = drought_cats[cat_key]
 
-    # We want an ndarray for each category
-    ##################### Testing Zone ########################################
-    # For testing
-    # from netCDF4 import Dataset
-    # data = Dataset('f:/data/droughtindices/netcdfs/pdsi.nc')
-    # arrays = data.variables['value'][:].data
-    # arrays[arrays==-9999] = np.nan
-    # del data
-    # d = [-4, -5]
-    # a = arrays.copy()
-    ###########################################################################
-
     # Total number of pixels
     mask = arrays[0] * 0 + 1
     total_area = np.nansum(mask)
