@@ -766,12 +766,8 @@ def retrieve_data(signal, function, choice):
     return delivery
 
 @cache2.memoize()
-def getDroughtArea(location, arrays, choice, dates):
-    timeseries, arrays, label = areaSeries(location, arrays,
-                                           dates, reproject=True)
-    pincs, DSCI = droughtArea(arrays, choice)
-    del arrays
-    return pincs, DSCI, label
+def getDroughtArea(arrays, choice):
+    return droughtArea(arrays, choice)
 
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
@@ -1260,10 +1256,10 @@ for i in range(1, 3):
             bar_type = 'bar'
         else:
             bar_type = 'overlay'
-            # timeseries, arrays, label = areaSeries(location, arrays,
-            #                                        dates, reproject=True)
-            ts_series, dsci, label = getDroughtArea(location, arrays,
-                                                    choice, dates)
+            timeseries, arrays, label = areaSeries(location, arrays,
+                                                   dates, reproject=True)
+
+            ts_series, dsci = getDroughtArea(arrays, choice)
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
