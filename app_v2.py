@@ -101,11 +101,11 @@ app.config['suppress_callback_exceptions'] = True
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
                       'CACHE_THRESHOLD': 2})
-cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
-                       'CACHE_DIR': 'data/cache2',
-                       'CACHE_THRESHOLD': 2})
+# cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
+#                        'CACHE_DIR': 'data/cache2',
+#                        'CACHE_THRESHOLD': 2})
 cache.init_app(server)
-cache2.init_app(server)
+# cache2.init_app(server)
 
 ####################### Options ###############################################
 # Drought Index Options
