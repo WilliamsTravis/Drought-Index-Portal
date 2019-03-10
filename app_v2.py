@@ -1340,7 +1340,7 @@ for i in range(1, 3):
                                          side='right',
                                          position=0.15,
                                          font=dict(size=8))
-            layout_copy['margin'] = dict(l=55, r=80, b=25, t=90, pad=10)
+            layout_copy['margin'] = dict(l=55, r=55, b=25, t=90, pad=10)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
