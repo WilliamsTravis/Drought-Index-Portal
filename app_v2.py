@@ -101,11 +101,11 @@ app.config['suppress_callback_exceptions'] = True
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
                       'CACHE_THRESHOLD': 2})
-# cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
-#                        'CACHE_DIR': 'data/cache2',
-#                        'CACHE_THRESHOLD': 2})
+cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
+                        'CACHE_DIR': 'data/cache2',
+                        'CACHE_THRESHOLD': 2})
 cache.init_app(server)
-# cache2.init_app(server)
+cache2.init_app(server)
 
 ####################### Options ###############################################
 # Drought Index Options
@@ -765,7 +765,7 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
-# @cache2.memoize()
+@cache2.memoize()
 def getDroughtArea(arrays, choice):
     return droughtArea(arrays, choice)
 
@@ -868,86 +868,91 @@ for i in range(1, 3):
 
     @app.callback(Output('coverage_div_{}'.format(i), 'children'),
                   [Input('series_{}'.format(i), 'hoverData'),
-                   Input('dsci_button_{}'.format(i), 'n_clicks')])
-    def hoverCoverage(hover, click):
+                   Input('dsci_button_{}'.format(i), 'n_clicks'),
+                   Input('submit', 'n_clicks')],
+                  [State('function_choice', 'value')])
+    def hoverCoverage(hover, click1, click2, function):
         '''
         The tooltips on the drought severity coverage area graph were
         overlapping, so this outputs the hover data to a chart below instead.
         '''
-        try:
-            date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
-            date = dt.datetime.strftime(date, '%b, %Y')
-            # print(str(hover))
-            if click % 2 == 0:
-                ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
-                      i in range(5)]
-                coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
-                                            'D1 - D4 (Moderate)': ds[1],
-                                            'D2 - D4 (Severe)': ds[2],
-                                            'D3 - D4 (Extreme)': ds[3],
-                                            'D4 (Exceptional)': ds[4]},
-                                           index=[0])
-
-            else:
-                ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
-                      i in range(6)]
-                coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
-                                            'D1 - D4 (Moderate)': ds[1],
-                                            'D2 - D4 (Severe)': ds[2],
-                                            'D3 - D4 (Extreme)': ds[3],
-                                            'D4 (Exceptional)': ds[4],
-                                            'DSCI':ds[5]},
-                                           index=[0])
-            children=[html.H6([date],
-                              style={'text-align': 'left'}),
-                      dash_table.DataTable(
-                       data=coverage_df.to_dict('rows'),
-                       columns=[
-                          {"name": i, "id": i} for i in coverage_df.columns],
-                       style_cell={'textAlign': 'center'},
-                       style_header={'fontWeight': 'bold'},
-                       style_header_conditional=[
-                               {'if': {'column_id': 'D0 - D4 (Dry)'},
-                                       'backgroundColor': '#ffff00',
-                                       'color': 'black'},
-                               {'if': {'column_id': 'D1 - D4 (Moderate)'},
-                                           'backgroundColor': '#fcd37f',
+        if function == 'oarea':
+            try:
+                date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
+                date = dt.datetime.strftime(date, '%b, %Y')
+                # print(str(hover))
+                if click1 % 2 == 0:
+                    ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
+                          i in range(5)]
+                    coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
+                                                'D1 - D4 (Moderate)': ds[1],
+                                                'D2 - D4 (Severe)': ds[2],
+                                                'D3 - D4 (Extreme)': ds[3],
+                                                'D4 (Exceptional)': ds[4]},
+                                               index=[0])
+    
+                else:
+                    ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
+                          i in range(6)]
+                    coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
+                                                'D1 - D4 (Moderate)': ds[1],
+                                                'D2 - D4 (Severe)': ds[2],
+                                                'D3 - D4 (Extreme)': ds[3],
+                                                'D4 (Exceptional)': ds[4],
+                                                'DSCI':ds[5]},
+                                               index=[0])
+                children=[html.H6([date],
+                                  style={'text-align': 'left'}),
+                          dash_table.DataTable(
+                           data=coverage_df.to_dict('rows'),
+                           columns=[
+                              {"name": i, "id": i} for i in coverage_df.columns],
+                           style_cell={'textAlign': 'center'},
+                           style_header={'fontWeight': 'bold'},
+                           style_header_conditional=[
+                                   {'if': {'column_id': 'D0 - D4 (Dry)'},
+                                           'backgroundColor': '#ffff00',
                                            'color': 'black'},
-                               {'if': {'column_id': 'D2 - D4 (Severe)'},
-                                      'backgroundColor': '#ffaa00',
-                                      'color': 'black'},
-                               {'if': {'column_id': 'DSCI'},
-                                      'backgroundColor': '#27397F',
-                                      'color': 'white',
-                                      'width': '75'},
-                               {'if': {'column_id': 'D3 - D4 (Extreme)'},
-                                      'backgroundColor': '#e60000',
-                                      'color': 'white'},
-                               {'if': {'column_id': 'D4 (Exceptional)'},
-                                       'backgroundColor': '#730000',
-                                       'color': 'white'}],
-                       style_data_conditional=[
-                               {'if': {'column_id': 'D0 - D4 (Dry)'},
-                                       'backgroundColor': '#ffffa5',
-                                       'color': 'black'},
-                               {'if': {'column_id': 'D1 - D4 (Moderate)'},
-                                       'backgroundColor': '#ffe5af',
-                                       'color': 'black'},
-                               {'if': {'column_id': 'D2 - D4 (Severe)'},
-                                       'backgroundColor': '#ffc554',
-                                       'color': 'black'},
-                               {'if': {'column_id': 'DSCI'},
-                                      'backgroundColor': '#5c678e',
-                                      'color': 'white',
-                                      'width': '75'},
-                               {'if': {'column_id': 'D3 - D4 (Extreme)'},
-                                       'backgroundColor': '#dd6666',
-                                       'color': 'white'},
-                               {'if': {'column_id': 'D4 (Exceptional)'},
-                                       'backgroundColor': '#a35858',
-                                       'color': 'white'}])]
-        except:
-            raise PreventUpdate
+                                   {'if': {'column_id': 'D1 - D4 (Moderate)'},
+                                               'backgroundColor': '#fcd37f',
+                                               'color': 'black'},
+                                   {'if': {'column_id': 'D2 - D4 (Severe)'},
+                                          'backgroundColor': '#ffaa00',
+                                          'color': 'black'},
+                                   {'if': {'column_id': 'DSCI'},
+                                          'backgroundColor': '#27397F',
+                                          'color': 'white',
+                                          'width': '75'},
+                                   {'if': {'column_id': 'D3 - D4 (Extreme)'},
+                                          'backgroundColor': '#e60000',
+                                          'color': 'white'},
+                                   {'if': {'column_id': 'D4 (Exceptional)'},
+                                           'backgroundColor': '#730000',
+                                           'color': 'white'}],
+                           style_data_conditional=[
+                                   {'if': {'column_id': 'D0 - D4 (Dry)'},
+                                           'backgroundColor': '#ffffa5',
+                                           'color': 'black'},
+                                   {'if': {'column_id': 'D1 - D4 (Moderate)'},
+                                           'backgroundColor': '#ffe5af',
+                                           'color': 'black'},
+                                   {'if': {'column_id': 'D2 - D4 (Severe)'},
+                                           'backgroundColor': '#ffc554',
+                                           'color': 'black'},
+                                   {'if': {'column_id': 'DSCI'},
+                                          'backgroundColor': '#5c678e',
+                                          'color': 'white',
+                                          'width': '75'},
+                                   {'if': {'column_id': 'D3 - D4 (Extreme)'},
+                                           'backgroundColor': '#dd6666',
+                                           'color': 'white'},
+                                   {'if': {'column_id': 'D4 (Exceptional)'},
+                                           'backgroundColor': '#a35858',
+                                           'color': 'white'}])]
+            except:
+                raise PreventUpdate
+        else:
+            children = None
         return children
 
     @app.callback([Output('dsci_button_{}'.format(i), 'style'),
