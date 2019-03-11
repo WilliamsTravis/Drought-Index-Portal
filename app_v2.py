@@ -823,7 +823,7 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         triggered_value = context.triggered[0]['value']
         
         print('Triggered Prop ID ' + str(context.triggered[0]['prop_id']))
-        
+
         # The update graph button activates state selections
         if 'update_graph' in context.triggered[0]['prop_id']:
             # When you switch from county to state, there is no initial value -- This is also the initializing condition, by chance 
@@ -836,7 +836,7 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
                 update_idx = updates.index(triggered_value) - 2  # <----------- We need the position of the most recent update...
                 if locations[update_idx] is None:
                     raise PreventUpdate
-                triggered_value = locations[update_idx] # <-------------------- ...to be -2 or -1 to serve as the index to the selected state
+                triggered_value = locations[update_idx]  # <------------------- ...to be -2 or -1 to serve as the index to the selected state
                 sel_idx = locations.index(triggered_value)
         else:
             sel_idx = locations.index(triggered_value)
@@ -848,6 +848,7 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         except:
             print('empty location')
             raise PreventUpdate
+        print('locationPicker selection: ' + str(location))
         return location
 
 
@@ -1031,6 +1032,7 @@ for i in range(1, 3):
     def makeGraph(choice1, choice2, map_type, signal, location, function, key, sync):
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
+        print("Map Trigger: " + str(trig))
         if trig == 'location_store.children' and location[0] != 'state_mask':
             raise PreventUpdate
 
@@ -1230,6 +1232,9 @@ for i in range(1, 3):
                    State('function_choice', 'value')])
     def makeSeries(submit, signal, choice, choice_store, sync, location,
                    show_dsci, key, function):
+        # Troubleshooting limited selection problem
+        trig = dash.callback_context.triggered[0]['prop_id']
+        print("Series Trigger: " + str(trig))
 
         # Check which element the selection came from
         sel_idx = location[-1]
