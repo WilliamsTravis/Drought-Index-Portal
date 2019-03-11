@@ -44,7 +44,6 @@ def areaSeries(location, arrays, dates, reproject=False):
     arrays = a time series of arrays falling into each of 5 drought categories
     inclusive = whether or to categorize drought by including all categories
     '''
-    print("areaSeries location: " + str(location))
     if type(location[0]) is int:
         print("Location is singular")
         y, x, label, idx = location
@@ -222,8 +221,6 @@ def isInt(string):
         return True
     except:
         return False
-
-
 
 
 def makeMap(maps, function):

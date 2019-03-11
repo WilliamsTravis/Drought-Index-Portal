@@ -823,7 +823,6 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         triggered_value = context.triggered[0]['value']
         
         print('Triggered Prop ID ' + str(context.triggered[0]['prop_id']))
-        print('Triggered Value ' + str(triggered_value))
         
         # The update graph button activates state selections
         if 'update_graph' in context.triggered[0]['prop_id']:
@@ -848,7 +847,7 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
             location.append(sel_idx)
         except:
             print('empty location')
-            pass
+            raise PreventUpdate
         return location
 
 
