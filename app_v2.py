@@ -844,9 +844,11 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         
         selector = Location_Builder(triggered_value, cd)
         location = selector.chooseRecent()
-        location.append(sel_idx)
-        print('clickPicker picks: ' + str(location))
-        
+        try:
+            location.append(sel_idx)
+        except:
+            print('empty location')
+            pass
         return location
 
 
