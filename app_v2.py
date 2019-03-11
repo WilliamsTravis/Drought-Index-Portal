@@ -1255,7 +1255,7 @@ for i in range(1, 3):
 
         # If the function is oarea, we plot five overlapping timeseries
         if function != 'oarea':
-            print("LOCATION: " + str(location))
+            # print("LOCATION: " + str(location))
             timeseries, arrays, label = areaSeries(location, arrays, dates,
                                                     reproject=False)
             bar_type = 'bar'
