@@ -821,8 +821,10 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         updates = [update1, update2]
         context = dash.callback_context
         triggered_value = context.triggered[0]['value']
-        
-        print('Triggered Prop ID ' + str(context.triggered[0]['prop_id']))
+        triggered_id = context.triggered[0]['prop_id']
+        print('Triggered Prop ID ' + str(triggered_id))
+        if 'selectedData' in triggered_id:
+            print('Selected Data Point Length: ' + str(len(triggered_value['points'])))
 
         # The update graph button activates state selections
         if 'update_graph' in context.triggered[0]['prop_id']:
@@ -831,7 +833,6 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
                 print("Triggered selection is update button and value is None Defaulting to CONUS")
                 triggered_value = 'all'
                 sel_idx = 0
-            
             else:
                 update_idx = updates.index(triggered_value) - 2  # <----------- We need the position of the most recent update...
                 if locations[update_idx] is None:
@@ -848,7 +849,7 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         except:
             print('empty location')
             raise PreventUpdate
-        print('locationPicker selection: ' + str(location))
+        # print('locationPicker selection: ' + str(location))
         return location
 
 
