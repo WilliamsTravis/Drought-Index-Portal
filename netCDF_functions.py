@@ -172,10 +172,10 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
               year2=2019, month2=12, epsg=4326, percentiles=False,
               wmode='w'):
     '''
-    Take multiple multiband netcdfs with messed up dates, multiple tiffs with
-    desired geometries and writes to a single netcdf as a single time series. This
+    Take multiple multiband netcdfs with unordered dates and multiple tiffs with
+    desired geometries and write to a single netcdf as a single time series. This
     has a lot of options, only meant for the app.
-    
+
     As an expediency, if there isn't an nc file that means it's eddi and the
     dates are in the file name.
     '''
@@ -267,7 +267,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
 
         # okay, that was just in case the dates wanted to bounce around
         date_tifs = OrderedDict(sorted(date_tifs.items()))
-    
+
         # Now that everything is in the right order, split them back up
         days = np.array(list(date_tifs.keys()))
         arrays = np.array(list(date_tifs.values()))
@@ -282,7 +282,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
         for t in tfiles:
             data = gdal.Open(t)
             array = data.ReadAsArray()
-            arrays.append(array) 
+            arrays.append(array)
         arrays = np.array(arrays)
 
     # Filter out dates

@@ -1,6 +1,9 @@
 /data/cache
 
+/data/cache2
+
 /env
+
 *.log
 
 *.pot
