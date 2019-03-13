@@ -5,9 +5,9 @@
     Target Functionality:
     So using either crontab and letting it
     go on the virtual machine, or finding a hybrid approach, every month this
-    will pull the asc file from the WestWide Drought Tracker, transform it, and
-    append it to the netcdf file of original values. It will also need to
-    rebuild the entire percentile netcdf because that is rank based.
+    will pull the netcdf files from the WestWide Drought Tracker, transform
+    them, and append to the netcdf file of original values. It will also need
+    to rebuild the entire percentile netcdf because that is rank based.
 
 
     Production notes:
@@ -17,7 +17,7 @@
         image. Also, the netcdfs built using my functions appear to have coordinates
         at the grid center, which is different than previous geotiffs I created, however,
         the maps are rendered properly (point in lower left corner)
-
+        - This currently does not work in linux
         - An error reading wwdt data included artifacts for future dates.
 
 Created on Fri Feb  10 14:33:38 2019
@@ -49,8 +49,7 @@ else:
     sys.path.extend(['/root/Sync/Ubuntu-Practice-Machine/'])
     data_path = '/root/Sync'
 
-from functions import  percentileArrays
-from netCDF_functions import toNetCDF2, toNetCDF3
+from functions import  percentileArrays, toNetCDF2
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 

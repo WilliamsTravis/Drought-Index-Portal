@@ -824,13 +824,15 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         triggered_id = context.triggered[0]['prop_id']
         print('Triggered Prop ID ' + str(triggered_id))
         if 'selectedData' in triggered_id:
-            print('Selected Data Point Length: ' + str(len(triggered_value['points'])))
+            print('Selected Data Point Length: ' +
+                  str(len(triggered_value['points'])))
 
         # The update graph button activates state selections
         if 'update_graph' in context.triggered[0]['prop_id']:
             # When you switch from county to state, there is no initial value -- This is also the initializing condition, by chance 
             if triggered_value is None:
-                print("Triggered selection is update button and value is None Defaulting to CONUS")
+                print("Triggered selection is update button and value is None \
+                      Defaulting to CONUS")
                 triggered_value = 'all'
                 sel_idx = 0
             else:
