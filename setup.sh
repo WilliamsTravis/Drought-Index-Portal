@@ -22,7 +22,7 @@ then
     echo -- Ok, got it, installing everything into $PWD
     echo -- Updating apt-get and python
 
-    sudo apt-get update && sudo atp-get upgrade
+    sudo apt-get update && sudo apt-get upgrade
     sudo apt-get install nginx
     sudo apt-get install software-properties-common
     sudo add-apt-repository ppa:deadsnakes/ppa
