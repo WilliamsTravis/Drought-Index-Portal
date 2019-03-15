@@ -42,11 +42,10 @@ import xarray as xr
 
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    sys.path.extend(['C:/Users/User/github/Ubuntu-Practice-Machine',
-                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
+    os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
 else:
-    sys.path.extend(['/root/Sync/Ubuntu-Practice-Machine/'])
+    os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
 from functions import  percentileArrays, toNetCDF2
@@ -101,8 +100,8 @@ print(str(today) + '\n')
 for index in indices:
     # We need the key 'value' to point to local data
     nc_path = os.path.join(data_path,
-                             'data/droughtindices/netcdfs/',
-                             index_map[index] + '.nc')
+                           'data/droughtindices/netcdfs/',
+                           index_map[index] + '.nc')
     wwdt_index_url = wwdt_url + '/' + index
 
     if os.path.exists(nc_path):  # Create a netcdf and append to file

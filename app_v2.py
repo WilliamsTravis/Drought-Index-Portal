@@ -40,7 +40,7 @@ from osgeo import gdal
 import warnings
 import xarray as xr
 
-# Set Working Directory
+# Set Working Directory - works if it's the same as the file location
 frame = getframeinfo(currentframe()).filename
 path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)

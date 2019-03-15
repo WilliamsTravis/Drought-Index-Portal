@@ -49,8 +49,8 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine/')
     data_path = '/root/Sync'
 
-from functions import Index_Maps, readRaster, percentileArrays, im, isInt
-from netCDF_functions import toNetCDF2, toNetCDF3
+from functions import percentileArrays, toNetCDF2
+
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
