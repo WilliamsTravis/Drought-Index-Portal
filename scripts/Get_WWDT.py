@@ -34,11 +34,11 @@ import os
 from osgeo import gdal
 import pandas as pd
 import requests
+from socket import timeout
 import sys
 from tqdm import tqdm
 from urllib.error import HTTPError, URLError
 import urllib
-from socket import timeout
 import xarray as xr
 
 # Check if we are working in Windows or Linux to find the data directory
@@ -46,6 +46,7 @@ if sys.platform == 'win32':
     os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
 else:
+    sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
@@ -58,12 +59,12 @@ wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM'
 local_path = os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt/')
 if not os.path.exists(local_path):
     os.mkdir(local_path)
-indices = ['spi1', 'spi2', 'spi3', 'spi6', 
-          # 'spei1', 'spei2', 'spei3', 'spei6',
+indices = ['spi1', 'spi2', 'spi3', 'spi6',
+           'spei1', 'spei2', 'spei3', 'spei6',
            'pdsi', 'scpdsi', 'pzi'
            ]
 local_indices = ['spi1', 'spi2', 'spi3', 'spi6',
-                # 'spei1', 'spei2', 'spei3', 'spei6',
+                 'spei1', 'spei2', 'spei3', 'spei6',
                  'pdsi', 'pdsisc', 'pdsiz'
                  ]
 
@@ -134,7 +135,7 @@ for index in indices:
             all_links = soup.find_all('a')
             link_text = [str(l) for l in all_links]
             netcdfs = [l.split('"')[1] for l in link_text if '.nc' in l]
-    
+
             # how to get single month files?
             month_ncs = [l for l in netcdfs if len(l.split('_')) == 4]
             years = [int(l.split('_')[1]) for l in month_ncs]
@@ -142,7 +143,7 @@ for index in indices:
             final_months = [int(l.split('_')[2]) for l in month_ncs if
                             str(final_year) in l]
             final_month = max(final_months)
-    
+
             # Now, get the range of dates
             t2 = pd.datetime(final_year, final_month, 15)
             available_dates = pd.date_range(*(pd.to_datetime([t1, t2]) +  # <-- Why end of month? Could be useful for another data set, I guess, and doesn't really matter yet
@@ -171,7 +172,7 @@ for index in indices:
 
                     # They save their dates on day 15
                     date = pd.datetime(d.year, d.month, 15)
-    
+
                     # Get file
                     try:
                         urllib.request.urlretrieve(url, source_path)
@@ -180,17 +181,17 @@ for index in indices:
                                       file, error, url)
                     except timeout:
                         logging.error('Socket timed out: %s', url)
-    
+
                     # now transform that file
                     out_path = os.path.join(local_path, 'temp.tif')
                     if os.path.exists(out_path):
                         os.remove(out_path)
-    
+
                     ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4326',
                                    xRes=0.25, yRes=0.25,
                                    outputBounds=[-130, 20, -55, 50])
                     del ds
-    
+
 
                     # Open old data set
                     # old = Dataset(nc_path, 'r')
@@ -219,17 +220,17 @@ for index in indices:
                     new_data = np.ma.stack(old_data, axis=0)
                     np.ma.set_fill_value(new_data, -9999)
                     old.variables['value'][:] = new_data[:]
-    
+
                     # Close dataset write changes to file
                     old.set_auto_mask(False)
                     old.set_fill_off()
-                    old.close()      
+                    old.close()
 
 
             # # Now recreate the entire percentile data set
             # print('Reranking percentiles...')
             # pc_nc = index_nc.copy()
-        
+
             # # let's rank this according to the 1900 to present time period
             # percentiles = percentileArrays(pc_nc.value.data)
             # pc_nc.value.data = percentiles
@@ -240,7 +241,7 @@ for index in indices:
             #                         index_map[index] + '.nc')
             # os.remove(pc_path)
             # pc_nc.to_netcdf(pc_path)
-            
+
     else:
         ############## If we need to start over #######################
         print(nc_path + " not detected, building new data set...")
