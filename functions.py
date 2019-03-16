@@ -97,7 +97,7 @@ def areaSeries(location, arrays, dates, reproject=False):
             loc_mask[loc_mask<9999] = np.nan
             loc_mask = loc_mask * 0 + 1
             arrays = arrays * loc_mask
-        
+
         # Timeseries of mean values
         timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
 
@@ -154,7 +154,7 @@ def coordinateDictionaries(source):
         # Dictionaires with coordinates and array index positions
         londict = dict(zip(lons, xs))
         latdict = dict(zip(lats, ys))
-        
+
         return londict, latdict, res
 
 def droughtArea(arrays, choice, inclusive=False):
@@ -294,9 +294,9 @@ def percentileArrays(arrays):
         pct = rankdata(lst)/len(lst)
         return pct
 
-    mask = arrays[0] * 0 + 1
+    # mask = arrays[0] * 0 + 1
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
-    pcts = pcts*mask
+    # pcts = pcts*mask
     return pcts
 
 
@@ -392,7 +392,7 @@ def toNetCDF(file, ncfile, savepath, index, epsg=4326, wmode='w'):
     # Appending the CRS information
     # EPSG information
     refs = osr.SpatialReference()
-    refs.ImportFromEPSG(epsg)    
+    refs.ImportFromEPSG(epsg)
     crs = nco.createVariable('crs', 'c')
     variable.setncattr('grid_mapping', 'crs')
     crs.geographic_crs_name = 'WGS 84'  # is this buried in refs anywhere?
@@ -448,7 +448,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
 
     As an expediency, if there isn't an nc file that means it's eddi and the
     dates are in the file name.
-    
+
     Test parameters for toNetCDF2
         tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/*tif')
         ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/*nc')
