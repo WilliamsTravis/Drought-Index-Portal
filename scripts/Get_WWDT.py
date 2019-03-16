@@ -70,6 +70,9 @@ if not os.path.exists(os.path.join(data_path,
                           'data/droughtindices/netcdfs/percentiles'))
 if not os.path.exists(local_path):
     os.mkdir(local_path)
+if not os.path.exists(os.path.join(data_path,
+                                   'data/droughtindices/netcdfs/wwdt/tifs')):
+    os.mkdir(os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt/tifs'))
 
 indices = ['spi1', 'spi2', 'spi3', 'spi6',
            'spei1', 'spei2', 'spei3', 'spei6',
