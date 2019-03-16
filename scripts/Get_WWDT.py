@@ -50,7 +50,7 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions import  percentileArrays, toNetCDF2, im
+from functions import toNetCDF2, im
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
@@ -216,7 +216,7 @@ for index in indices:
                     date = dt.datetime(d.year, d.month, day=15)
                     days = date - dt.datetime(1900, 1, 1)
                     days = np.float64(days.days)
-                    old_times = old.variables['time'][:]  # <------------------ days since 1900-1-1
+                    old_times = old.variables['time'][:]
                     new_times = np.ma.append(old_times, days)
                     old.variables['time'][:] = new_times[:]
 
@@ -321,24 +321,6 @@ for index in indices:
         toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1895,
                   month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=True)
-
-        # # Now, for areal calculations, we'll need a projected version
-        # inpath = savepath
-        # outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
-        #                         index_map[index] + '.tif')
-        # if os.path.exists(outpath):
-        #     os.remove(outpath)
-        # ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
-        #                dstSRS='EPSG:102008')
-
-        # # The format is off, so let's build another netcdf from the tif above
-        # tfile = outpath
-        # ncfile = savepath
-        # savepath = os.path.join(data_path,
-        #                         'data/droughtindices/netcdfs/albers',
-        #                         index_map[index] + '.nc')
-        # toNetCDF3(tfile, ncfile, savepath, index, epsg=102008,
-        #           wmode='w', percentiles=False)
 
 print("Update Complete.")
 print("####################################################")

@@ -40,16 +40,15 @@ import sys
 from tqdm import tqdm
 import xarray as xr
 
-# Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    sys.path.extend(['C:/Users/User/github/Ubuntu-Practice-Machine',
-                     'C:/Users/travi/github/Ubuntu-Practice-Machine'])
+    os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
 else:
-    os.chdir('/root/Sync/Ubuntu-Practice-Machine/')
+    sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
+    os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions import percentileArrays, toNetCDF2
+from functions import toNetCDF2, isInt
 
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
@@ -57,10 +56,18 @@ os.environ['GDAL_PAM_ENABLED'] = 'NO'
 # In[] Data source and target directory
 ftp_path = 'ftp://ftp.cdc.noaa.gov/Projects/EDDI/CONUS_archive/data'
 save_folder = os.path.join(data_path, 'data/droughtindices/temps')
+if not os.path.exists(os.path.join(data_path, 'data')):
+    os.mkdir(os.path.join(data_path, 'data'))
+if not os.path.exists(os.path.join(data_path, 'data/droughtindices')):
+    os.mkdir(os.path.join(data_path, 'data/droughtindices'))
 if not os.path.exists(save_folder):
     os.makedirs(save_folder)
-# mask = readRaster(os.path.join(data_path, 'data/droughtindices/prfgrid.tif'),
-#                   1, -9999)[0]
+if not os.path.exists(os.path.join(data_path, 'data/droughtindices/netcdfs')):
+    os.mkdir(os.path.join(data_path, 'data/droughtindices/netcdfs'))
+if not os.path.exists(os.path.join(data_path,
+                                   'data/droughtindices/netcdfs/percentiles')):
+    os.mkdir(os.path.join(data_path,
+                          'data/droughtindices/netcdfs/percentiles'))
 
 # In[] Today's date, month, and year
 todays_date = dt.datetime.today()
@@ -137,22 +144,21 @@ for index in indices:
 
     if os.path.exists(original_path):   # Create a netcdf and append to file
         with xr.open_dataset(original_path) as data:
-            indexlist = data.load()
+            dates = pd.DatetimeIndex(data.time.data)
             data.close()
         
         # Extract dates
-        dates = pd.DatetimeIndex(indexlist.time.data)
         d1 = dates[0]
         d2 = dates[-1]
     
         # Get a list of the dates already in the netcdf file
         existing_dates = pd.date_range(d1, d2, freq="M")
         
-        # Now break the old dataset apart
-        old = [indexlist.value[i] for i in range(len(indexlist.value))]
+        # # Now break the old dataset apart
+        # old = [indexlist.value[i] for i in range(len(indexlist.value))]
         
-        # Is this a new or old data set?
-        new_file = False
+        # # Is this a new or old data set?
+        # new_file = False
 
     else:
         ############## If we need to start over #######################
@@ -224,25 +230,6 @@ for index in indices:
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir_perc,
                   index=index, year1=1980, month1=1, year2=todays_date.year,
                   month2=12, epsg=4326, percentiles=True, wmode='w')
-
-        # Now we need projected rasters, we can do this from the nc above
-        # Warp to albers equal area conic as a geotiff because ncdf flips axis
-        # inpath = ncdir
-        # outpath = os.path.join(data_path, 'data/droughtindices/netcdfs/albers',
-        #                        index + '.tif')
-        # if os.path.exists(outpath):
-        #     os.remove(outpath)
-        # ds = gdal.Warp(outpath, inpath, srcSRS='EPSG:4326', dstNodata = -9999,
-        #                dstSRS='EPSG:102008')
-        # del ds
-
-        # # The format is off, so let's build another netcdf from the tif above
-        # tfile = outpath
-        # ncfile = ncdir
-        # savepath = os.path.join(
-        #         data_path, 'data/droughtindices/netcdfs/albers', index + '.nc')
-        # toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, wmode='w',
-        #           percentiles=False)
 
 # Close connection with FTP server
 ftp.quit()
