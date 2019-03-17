@@ -5,13 +5,12 @@
 
 # 1) Add <export PATH=$PATH:/bin> to .profile or .bash_profile
 # 2) Make this file executable using <chmod u+x setup.sh>
-# 3) Ideally, run the line <./setup.sh> and wait!
+# 3) Ideally, run the line <./setup.sh> and answer questions.
 
 # Things to do:
 
 # 1) Turn paths into variables. Use this site:
-	# <https://www.taniarascia.com/how-to-create-and-use-bash-scripts/>
-# 2) Plenty more I'm sure...
+	# <https://www.taniarascia.com/how-to-create-and-usebash-scripts/>
 
 echo -- Is this where want to install everything, y/n?
 
@@ -19,17 +18,27 @@ read response
 
 if [ $response = y ] || [ $response = Y ] || [ $response = yes ] || [ $response = Yes ]
 then
-    echo -- Okay, installing virtual enviornment, a web server, and a web server gateway interface
+    echo -- Ok, got it, installing everything into $PWD
+    echo -- Updating apt-get and python
 
-    apt-get update && apt-get upgrade
-    apt-get install nginx
-    pip3.6 install gunicorn
-    pip3.6 install virtualenv
+    sudo apt-get update && sudo apt-get upgrade
+    sudo apt-get install nginx
+    sudo apt-get install software-properties-common
+    sudo add-apt-repository ppa:deadsnakes/ppa
+    sudo apt-get update
+    sudo apt-get install python3.6 python3.6-dev supervisor
     sudo add-apt-repository -y ppa:ubuntugis/ppa
     sudo apt install gdal-bin python-gdal python3-gdal
-    sudo virtualenv env
-    source env/bin/activate
-    pip install -r requirements
+    curl https://bootstrap.pypa.io/get-pip.py | sudo python3.6
+    pip3.6 install gunicorn
+    sudo pip3.6 install virtualenv
+    sudo apt-get install gcc  # might be needed for some python packages
+    # virtualenv venv   # Not working exactly
+    # source /venv/bin/activate  # There has to be a way
+    pip3.6 install dash dash_core_components dash_html_components dash_table_experiments
+    pip3.6 install flask_caching netcdf4 numpy pandas psutil scipy tqdm xarray
+    pip3.6 install beautifulsoup4 matplotlib
+
 fi
 
 

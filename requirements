@@ -2,6 +2,7 @@ beautifulsoup4
 dash
 descartes
 flask_caching
+gunicorn
 joblib
 matplotlib
 netcdf4
@@ -14,4 +15,4 @@ salem
 scipy
 shapely
 tqdm
-xarray
+xarray==0.11.2

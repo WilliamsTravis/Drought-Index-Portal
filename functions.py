@@ -26,13 +26,9 @@ import xarray as xr
 # Check if windows or linux
 if sys.platform == 'win32':
     data_path = 'f:/'
-    # sys.path.extend(['Z:/Sync/Ubuntu-Practice-Machine/',
-    #                  'C:/Users/travi/github/Ubuntu-Practice-Machine',
-    #                  'C:/Users/User/github/Ubuntu-Practice-Machine'])
 else:
     home_path = '/root/Sync'
     data_path = '/root/Sync'
-    # os.chdir(os.path.join(home_path, 'Ubuntu-Practice-Machine'))
 
 
 ####### Variables #############################################################
@@ -852,8 +848,7 @@ class Index_Maps():
         self.colorscale = colorscale
         self.reverse = reverse
         self.choice = choice
-        self.grid = np.load(os.path.join(data_path,
-                                         "data/prfgrid.npz"))["grid"]
+        self.grid = np.load("data/npy/prfgrid.npz")["grid"]
         self.mask = self.grid * 0 + 1
 
 

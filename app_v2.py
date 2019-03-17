@@ -3,13 +3,7 @@
 An Application to visualize time series of drought indices (or others soon).
 
 Production notes:
-    - Time series colors are still relative, and don't show for a single date.
-    - For the second axis that is supposed to display the DSCI, it's actually
-       not attached. I wonder how to attach the DSCI to that axis and keep it
-       centered between D2 and D3? Is it possible to give each its own axis??
-    - For the areal calculations: we'll need some jostling
-        1) It is doable to include both county and state with prexisting
-           rasters and shapefiles in albers equal area conic.
+	- There is a nonetype error when deselecting.
 
 Created on Fri Jan 4 12:39:23 2019
 
@@ -198,9 +192,6 @@ colorscales = ['Default', 'Blackbody', 'Bluered', 'Blues', 'Earth', 'Electric',
                'RdWhBu (NOAA PSD Scale)', 'RdYlGnBu', 'BrGn']
 color_options = [{'label': c, 'value': c} for c in colorscales]
 
-# Get Max/Min data frame for time series colorscale  
-index_ranges = pd.read_csv('data/tables/index_ranges.csv')
-
 # We need one external colorscale for a hard set drought area chart
 RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
           [0.20, 'rgb(255,170,0)'], [0.30, 'rgb(252,211,127)'],
@@ -232,10 +223,9 @@ for y in yearmarks:
     if y % 5 != 0:
         yearmarks[y] = ""
 
-
 ################## Map Section ################################################
 # A source data set for geometry and crs information (not fully there yet)
-source_path = os.path.join(data_path, "data/droughtindices/source_array.nc")  
+source_path = "data/rasters/source_array.nc"
 
 # For translating geographic coordinates to numpy coordinates and back
 cd = Coordinate_Dictionaries(source_path)
