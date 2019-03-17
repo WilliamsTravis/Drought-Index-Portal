@@ -434,8 +434,8 @@ def toNetCDF(file, ncfile, savepath, index, epsg=4326, wmode='w'):
     nco.close()
 
 
-def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
-              year2=2019, month2=12, epsg=4326, percentiles=False,
+def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
+              year2, month2, epsg=4326, percentiles=False,
               wmode='w'):
     '''
     Take multiple multiband netcdfs with unordered dates and multiple tiffs with
@@ -511,7 +511,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
     # Attributes
     # Global Attrs
     nco.title = title_map[index]
-    nco.subtitle = "Monthly Index values since 1948-01-01"
+    nco.subtitle = "Monthly Index values since 1895-01-01"
     nco.description = ('Monthly gridded data at 0.25 decimal degree' +
                        ' (15 arc-minute resolution, calibrated to 1895-2010 ' +
                        ' for the continental United States.'),
@@ -565,11 +565,11 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1=1948, month1=1,
         arrays = np.array(arrays)
 
     # Filter out dates
-    base = dt.datetime(1900, 1, 15)
-    start = dt.datetime(year1, month1, 15) #<----------------------------------Careful about this day figure
+    base = dt.datetime(1900, 1, 1)
+    start = dt.datetime(year1, month1, 15) # <--------------------------------- Careful about this day figure
     day1 = start - base
     day1 = day1.days
-    end = dt.datetime(year2, month2, 15)  # This is also important because of empty slots in the wwdt data
+    end = dt.datetime(year2, month2, 15)  # <---------------------------------- This is also important because of empty slots in the wwdt data
     day2 = end - base
     day2 = day2.days
     idx = len(days) - len(days[np.where(days > day1)])
@@ -698,6 +698,61 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
     # Done
     nco.close()
 
+
+def toNetCDFPercentile(src_path, dst_path):
+    with Dataset(src_path) as src, Dataset(dst_path, 'w') as dst:
+
+        # copy attributes
+        for name in src.ncattrs():
+            print(name)
+            dst.setncattr(name, src.getncattr(name))
+
+        # Some attributes need to change
+        dst.setncattr('subtitle', 'Monthly percentile values ' +
+                                    'since 1895')
+        dst.setncattr('standard_name', 'percentile')
+
+        # set dimensions
+        nlat = src.dimensions['lat'].size
+        nlon = src.dimensions['lon'].size
+        dst.createDimension('lat', nlat)
+        dst.createDimension('lon', nlon)
+        dst.createDimension('time', None)
+
+        # set variables
+        latitudes = dst.createVariable('lat',  'f4', ('lat',))
+        longitudes = dst.createVariable('lon',  'f4', ('lon',))
+        times = dst.createVariable('time', 'f8', ('time',))
+        variable = dst.createVariable('value', 'f4',
+                                      ('time', 'lat', 'lon'),
+                                      fill_value=-9999)
+        crs = dst.createVariable('crs', 'c')
+        variable.setncattr('grid_mapping', 'crs')
+        
+        # Set coordinate system attributes
+        src_crs = src.variables['crs']
+        for name in src_crs.ncattrs():
+            print(name)
+            crs.setncattr(name, src_crs.getncattr(name))   
+
+        # Variable Attrs
+        times.units = 'days since 1900-01-01'
+        times.standard_name = 'time'
+        times.calendar = 'gregorian'
+        latitudes.units = 'degrees_north'
+        latitudes.standard_name = 'latitude'
+        longitudes.units = 'degrees_east'
+        longitudes.standard_name = 'longitude'
+
+        # Set most values
+        latitudes[:] = src.variables['lat'][:]
+        longitudes[:] =  src.variables['lon'][:]
+        times[:] =  src.variables['time'][:]
+
+        # finally rank and transform values into percentiles
+        values = src.variables['value'][:]
+        percentiles = percentileArrays(values)
+        variable[:] = percentiles
 
 # WGS
 def wgsToAlbers(arrays):

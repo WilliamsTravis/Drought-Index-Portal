@@ -148,7 +148,7 @@ function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
                          {'label': 'Minimum', 'value': 'omin'},
-                         # {'label': 'Coefficient of Variation', 'value': 'ocv'},
+                    # {'label': 'Coefficient of Variation', 'value': 'ocv'},
                          {'label': 'Drought Severity Area', 'value':'oarea'}]
 
 function_names = {'pmean': 'Average Percentiles',
@@ -213,7 +213,7 @@ max_year = pd.Timestamp(max_date).year
 max_month = pd.Timestamp(max_date).month
 
 # Create the date options
-years = [int(y) for y in range(1900, max_year + 1)]
+years = [int(y) for y in range(1895, max_year + 1)]
 yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
@@ -487,7 +487,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                              html.Div([dcc.RangeSlider(
                                                      id='year_slider',
                                                      value=default_years,
-                                                     min=1900,
+                                                     min=1895,
                                                      max=max_year,
                                                      updatemode='drag',
                                                      marks=yearmarks)],
@@ -594,7 +594,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
         # html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],  # <----------- Consider only including two until we free more memory/get better machine
         #          className='row'),
 
-        # Signals  # <--------------------------------------------------------- Destruction Zone! Most of these aren't needed with the dash updates
+        # Signals
         html.Div(id='signal', style={'display': 'none'}),
         html.Div(id='key_1', children='1', style={'display': 'none'}),
         html.Div(id='key_2', children='2', style={'display': 'none'}),
@@ -755,7 +755,7 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
-@cache2.memoize()
+@cache2.memoize()  # <--------------------------------------------------------- Cached for DCSI, done here to add more data when more memory is available
 def getDroughtArea(arrays, choice):
     return droughtArea(arrays, choice)
 

@@ -2,27 +2,47 @@
 """
     Updating WWDT Data on a monthly basis.
 
-    Target Functionality:
-    So using either crontab and letting it
-    go on the virtual machine, or finding a hybrid approach, every month this
-    will pull the netcdf files from the WestWide Drought Tracker, transform
-    them, and append to the netcdf file of original values. It will also need
-    to rebuild the entire percentile netcdf because that is rank based.
-
+    Run this using crontab once a month this to pull netcdf files from the
+    WestWide Drought Tracker site, transform them to fit in the app, and either
+    append them to an existing file, or build the data set from scratch. This
+    also rebuilds each percentile netcdf entirely because those are rank based.
 
     Production notes:
-        - This doesn't work if the files exist! Turn off crontab scheduler!
-        - The geographic coordinate systems work for the most part. I had to use
-        'degrees_south' for the latitude unit attribute to avoid flipping the
-        image. Also, the netcdfs built using my functions appear to have coordinates
-        at the grid center, which is different than previous geotiffs I created, however,
-        the maps are rendered properly (point in lower left corner)
-        - This currently does not work in linux
-        - An error reading wwdt data included artifacts for future dates.
+        - The geographic coordinate systems work for the most part. I had to
+          use 'degrees_south' for the latitude unit attribute to avoid flipping
+          the image. Also, the netcdfs built using my functions appear to have
+          coordinates at the grid center, which is different than previous
+          geotiffs I created, however, the maps are rendered properly (point in
+          lower left corner), and I believe that's because of the binning step.
+        - There appears to tbe a directory bug when starting over, but only for
+          wwdt on the virtual machines...this may have been fixed, need to
+          check.
+        - There are a few ways to make this a little more efficient but I left
+          a few redundancies in just to make sure everything is kept in the
+          right order, chronologically.
+        - Also, if a download fails I'm leaving it be. It should correct itself
+          in the next month. This could be improved by redownloading in an
+          exception, but I would want advice on how best to handle the case
+          where the link/server is down.
+        - Also, at the moment, this script only checks the original index files
+          so if there's a problem with only the percentiles it won't be
+          noticed.
+
+    crontab:
+        - to setup a scheduler do this (1:30am on the 2nd of each month):
+            1) enter <crontab -e>
+
+            2) insert (but with spaces at these line breaks):
+              <30 01 02 * *   
+               /root/Sync/Ubuntu-Practice-Machine/env/bin/python3
+               /root/Sync/Ubuntu-Practice-Machine/scripts/Get_WWDT.py >> 
+               cronlog.log>
+                
+            3) ctrl + x
 
 Created on Fri Feb  10 14:33:38 2019
 
-@author: User
+@author: user
 """
 from bs4 import BeautifulSoup
 from glob import glob
@@ -50,7 +70,7 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions import toNetCDF2, im
+from functions import toNetCDF2, toNetCDFPercentile
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
@@ -74,14 +94,10 @@ if not os.path.exists(os.path.join(data_path,
                                    'data/droughtindices/netcdfs/wwdt/tifs')):
     os.mkdir(os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt/tifs'))
 
-indices = ['spi1', 'spi2', 'spi3', 'spi6',
-           'spei1', 'spei2', 'spei3', 'spei6',
-           'pdsi', 'scpdsi', 'pzi'
-           ]
-local_indices = ['spi1', 'spi2', 'spi3', 'spi6',
-                 'spei1', 'spei2', 'spei3', 'spei6',
-                 'pdsi', 'pdsisc', 'pdsiz'
-                 ]
+indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3', 'spei6',
+           'pdsi', 'scpdsi', 'pzi']
+local_indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3',
+                 'spei6', 'pdsi', 'pdsisc', 'pdsiz']
 
 index_map = {indices[i]: local_indices[i] for i in range(len(indices))}
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
@@ -178,7 +194,7 @@ for index in indices:
                 print(print_statement.format(len(needed_dates),
                                              needed_dates[0]))
 
-                for d in tqdm(needed_dates, redirect_stdout=True):
+                for d in tqdm(needed_dates, position=0):
 
                     # build paths
                     file = '{}_{}_{}_PRISM.nc'.format(index, d.year, d.month)
@@ -207,55 +223,34 @@ for index in indices:
                                    outputBounds=[-130, 20, -55, 50])
                     del ds
 
-
                     # Open old data set
-                    # old = Dataset(nc_path, 'r')
-                    old = Dataset(nc_path, 'a')
+                    old = Dataset(nc_path, 'r+')
+                    times = old.variables['time']
+                    values = old.variables['value']
+                    n = times.shape[0]
 
-                    # Append new date to time dimension
+                    # Convert new date to days
                     date = dt.datetime(d.year, d.month, day=15)
-                    days = date - dt.datetime(1900, 1, 1)
+                    days = date - dt.datetime(1895, 1, 1)
                     days = np.float64(days.days)
-                    old_times = old.variables['time'][:]
-                    new_times = np.ma.append(old_times, days)
-                    old.variables['time'][:] = new_times[:]
 
-                    # Append new data to value dimension
-                    # Read it in extract the array
+                    # Convert new data to array
                     base_data = gdal.Open(out_path)
                     array = base_data.ReadAsArray()
                     del base_data
-                    # array[array == -9999.] = np.nan
-                    array = np.ma.masked_where(array==-9999, array)
-                    np.ma.set_fill_value(array, -9999)
-                    old_data = list(old.variables['value'][:])  # <------------------ masked_arrays are causing problems some where. An extra empty data array with a non value for the time
-                    old_data.append(array)
-                    # new_data = np.array(old_data)
-                    # new_data[new_data == -9999] = np.nan
-                    new_data = np.ma.stack(old_data, axis=0)
-                    np.ma.set_fill_value(new_data, -9999)
-                    old.variables['value'][:] = new_data[:]
 
-                    # Close dataset write changes to file
-                    old.set_auto_mask(False)
-                    old.set_fill_off()
+                    # Write changes to file and close
+                    times[n] = days
+                    values[n] = array
                     old.close()
 
-
-            # # Now recreate the entire percentile data set
-            # print('Reranking percentiles...')
-            # pc_nc = index_nc.copy()
-
-            # # let's rank this according to the 1900 to present time period
-            # percentiles = percentileArrays(pc_nc.value.data)
-            # pc_nc.value.data = percentiles
-            # pc_nc.attrs['long_name'] = 'Monthly percentile values since 1895'
-            # pc_nc.attrs['standard_name'] = 'percentile'
-            # pc_path = os.path.join(data_path,
-            #                        'data/droughtindices/netcdfs/percentiles',
-            #                         index_map[index] + '.nc')
-            # os.remove(pc_path)
-            # pc_nc.to_netcdf(pc_path)
+                # Now recreate the entire percentile data set
+                print('Reranking percentiles...')
+                pc_path = os.path.join(data_path,
+                                     'data/droughtindices/netcdfs/percentiles',
+                                     index_map[index] + '.nc')    
+                os.remove(pc_path)
+                toNetCDFPercentile(nc_path, pc_path)                    
 
     else:
         ############## If we need to start over #######################
@@ -309,9 +304,9 @@ for index in indices:
         savepath = os.path.join(data_path, 'data/droughtindices/netcdfs/',
                                 index_map[index] + '.nc')
 
-        # This function smooshes everything into one netcdf file
+        # This function smooshes everything into one netcdf file  # <---------- This is one year short to test the append mode above
         toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1895,
-                  month1=1, year2=todays_date.year, month2=todays_date.month,
+                  month1=1, year2=todays_date.year - 1, month2=todays_date.month,
                   wmode='w', percentiles=False)
 
         # We are also including percentiles, so lets build another dataset
@@ -319,7 +314,7 @@ for index in indices:
                                      'data/droughtindices/netcdfs/percentiles',
                                      index_map[index] + '.nc')
         toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1895,
-                  month1=1, year2=todays_date.year, month2=todays_date.month,
+                  month1=1, year2=todays_date.year - 1, month2=todays_date.month,
                   wmode='w', percentiles=True)
 
 print("Update Complete.")
