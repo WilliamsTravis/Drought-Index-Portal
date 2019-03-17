@@ -3,7 +3,13 @@
 An Application to visualize time series of drought indices (or others soon).
 
 Production notes:
-	- There is a nonetype error when deselecting.
+    - Time series colors are still relative, and don't show for a single date.
+    - For the second axis that is supposed to display the DSCI, it's actually
+       not attached. I wonder how to attach the DSCI to that axis and keep it
+       centered between D2 and D3? Is it possible to give each its own axis??
+    - For the areal calculations: we'll need some jostling
+        1) It is possible to include both county and state with prexisting
+           rasters and shapefiles in albers equal area conic.
 
 Created on Fri Jan 4 12:39:23 2019
 
@@ -31,17 +37,18 @@ import numpy as np
 import pandas as pd
 import psutil
 from osgeo import gdal
+import time
 import warnings
 import xarray as xr
 
-# Set Working Directory - works if it's the same as the file location
+# Set Working Directory
 frame = getframeinfo(currentframe()).filename
 path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions
-from functions import Index_Maps, makeMap, areaSeries, droughtArea
-from functions import Coordinate_Dictionaries, Location_Builder
+from functions import Index_Maps, coordinateDictionaries, makeMap, areaSeries
+from functions import droughtArea
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -52,28 +59,7 @@ else:
 # What to do with the mean of empty slice warning?
 warnings.filterwarnings("ignore")
 
-######################## Default Values #######################################
-default_function = 'oarea'
-default_years = [1985, 2019]
-
-# Default click before the first click for any map
-default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
-                             'marker.color': 0, 'pointIndex': 0,
-                             'pointNumber': 0, 'text': 'Boulder County, CO'}]}
-
-# Default for click store (includes an index for most recent click)
-default_clicks = [list(np.repeat(default_click.copy(), 4)), 0]
-default_clicks = json.dumps(default_clicks)
-
-# For testing
-source_signal = [[[2000, 2017], [1, 12]], 'Viridis', 'no']
-source_choice = 'pdsi'
-source_function = 'pmean'
-
-# For scaling
-ranges = pd.read_csv('data/tables/index_ranges.csv')
-
-############### The DASH application and server ###############################
+# In[] Create the DASH App object
 app = dash.Dash(__name__)
 
 # Go to stylesheet, styled after a DASH example (how to serve locally?)
@@ -91,18 +77,14 @@ server = app.server
 # Disable exceptions (attempt to speed things up)
 app.config['suppress_callback_exceptions'] = True
 
-# Create a simple file storeage cache, holds unique outputs of Index_Maps
+# Create a simple file storeage cache, holds unique outputz of Index_Maps()
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
                       'CACHE_THRESHOLD': 2})
-cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
-                        'CACHE_DIR': 'data/cache2',
-                        'CACHE_THRESHOLD': 2})
-cache.init_app(server)
-cache2.init_app(server)
 
-####################### Options ###############################################
-# Drought Index Options
+cache.init_app(server)
+
+# Drought and Climate Indices (looking to include any raster time series)
 indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'PDSI-Self Calibrated', 'value': 'pdsisc'},
            {'label': 'Palmer Z Index', 'value': 'pdsiz'},
@@ -140,7 +122,7 @@ indexnames = {'pdsi': 'Palmer Drought Severity Index',
               'eddi3': 'Evaporative Demand Drought Index - 3 month',
               'eddi6': 'Evaporative Demand Drought Index - 6 month'}
 
-# Function options (Percentile & Index Values)
+# Function options
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
                          {'label': 'Maximum', 'value': 'pmax'},
                          {'label': 'Minimum', 'value': 'pmin'}]
@@ -148,7 +130,7 @@ function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
                          {'label': 'Minimum', 'value': 'omin'},
-                         # {'label': 'Coefficient of Variation', 'value': 'ocv'},
+                         {'label': 'Coefficient of Variation', 'value': 'ocv'},
                          {'label': 'Drought Severity Area', 'value':'oarea'}]
 
 function_names = {'pmean': 'Average Percentiles',
@@ -157,10 +139,46 @@ function_names = {'pmean': 'Average Percentiles',
                   'omean': 'Average Index Values',
                   'omax': 'Maximum Index Value',
                   'omin': 'Minimum Index Value',
-                  # 'ocv': 'Coefficient of Variation',
+                  'ocv': 'Coefficient of Variation',
                   'oarea': 'Average Index Values'}
 
-# County Data Frame and options  # <------------------------------------------- Clean this up, automate csv building from source
+################## Move to Maps Section #######################################
+# Set up initial signal and raster to scatterplot conversion
+# A source grid for scatterplot maps - will need more for optional resolution
+source = xr.open_dataarray(os.path.join(data_path,
+                                        "data/droughtindices/source_array.nc"))
+
+# This converts array coordinates into array positions
+londict, latdict, res = coordinateDictionaries(source)
+londict_rev = {y: x for x, y in londict.items()}
+latdict_rev = {y: x for x, y in latdict.items()}
+
+# Some more support functions <------------------------------------------------ Create class, include coordinateDictionaries, grid, and other conversion functions
+def pointToGrid(point):
+    lon = point['points'][0]['lon']
+    lat = point['points'][0]['lat']
+    x = londict[lon]
+    y = latdict[lat]
+    gridid = grid.copy()[y, x]
+    return gridid
+
+# Let's say we also a list of gridids
+def gridToPoint(grid, gridid):
+    y, x = np.where(grid == gridid)
+    lon = londict_rev[int(x[0])]
+    lat = latdict_rev[int(y[0])]
+    point = {'points': [{'lon': lon, 'lat': lat}]}
+    return point
+
+###############################################################################
+
+#################### Clean Up #################################################
+# For the county names - need to get a more complete data set
+grid = np.load("data/npy/prfgrid.npz")["grid"]
+mask = grid * 0 + 1
+state_arrays = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
+
+# County Data Frame and options
 counties_df = pd.read_csv('data/tables/counties3.csv')
 c_df = pd.read_csv('data/tables/unique_counties.csv')
 rows = [r for idx, r in c_df.iterrows()]
@@ -177,7 +195,50 @@ rows = [r for idx, r in states_df.iterrows()]
 state_options = [{'label': r['STUSAB'], 'value': r['FIPS State']} for
                   r in rows]
 
-# Map type options
+# This is to associate grid ids with points, only once
+# point_dict = {gridid: gridToPoint(grid, gridid) for  # Takes too long
+#               gridid in grid[~np.isnan(grid)]}
+# np.save('data/point_dict.npy', point_dict)
+point_dict = np.load('data/npy/point_dict.npy').item()
+grid_dict = {json.dumps(y): x for x, y in point_dict.items()}
+
+# county_dict = {r['grid']: r['place'] for idx, r in counties_df.iterrows()}
+# np.save('data/county_dict.npy', county_dict)
+county_dict = np.load('data/npy/county_dict.npy').item()
+
+# Get Max/Min data frame for time series colorscale
+index_ranges = pd.read_csv('data/tables/index_ranges.csv')
+
+###############################################################################
+# For when EDDI before 1980 is selected
+with np.load("data/npy/NA_overlay.npz") as data:  # <-------------------------- Redo this to look more professional
+    na = data.f.arr_0
+    data.close()
+
+# Make the color scale stand out
+for i in range(na.shape[0]):
+    na[i] = na[i]*i
+
+# Default click before the first click for any map  # <------------------------ Perhaps include the gridid in the click data?
+default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
+                             'marker.color': 0, 'pointIndex': 0,
+                             'pointNumber': 0, 'text': 'Boulder County, CO'}]}
+
+# Default for click store (includes an index for most recent click)
+default_clicks = [list(np.repeat(default_click.copy(), 4)), 0]
+default_clicks = json.dumps(default_clicks)
+
+
+# In[] The map
+# Mapbox Access
+mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
+                       'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
+
+# For testing
+source_signal = [[[2000, 2017], [1, 12]], 'Viridis', 'no']
+source_choice = 'pdsi'
+
+# Map types
 maptypes = [{'label': 'Light', 'value': 'light'},
             {'label': 'Dark', 'value': 'dark'},
             {'label': 'Basic', 'value': 'basic'},
@@ -185,14 +246,13 @@ maptypes = [{'label': 'Light', 'value': 'light'},
             {'label': 'Satellite', 'value': 'satellite'},
             {'label': 'Satellite Streets', 'value': 'satellite-streets'}]
 
-# Color scale options
 colorscales = ['Default', 'Blackbody', 'Bluered', 'Blues', 'Earth', 'Electric',
                'Greens', 'Greys', 'Hot', 'Jet', 'Picnic', 'Portland',
                'Rainbow', 'RdBu', 'Reds', 'Viridis', 'RdWhBu',
                'RdWhBu (NOAA PSD Scale)', 'RdYlGnBu', 'BrGn']
 color_options = [{'label': c, 'value': c} for c in colorscales]
 
-# We need one external colorscale for a hard set drought area chart
+# I need one external colorscale
 RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
           [0.20, 'rgb(255,170,0)'], [0.30, 'rgb(252,211,127)'],
           [0.40, 'rgb(255, 255, 0)'], [0.45, 'rgb(255, 255, 255)'],
@@ -200,8 +260,7 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
           [0.70, 'rgb(12,164,235)'], [0.80, 'rgb(0,125,255)'],
           [0.90, 'rgb(10,55,166)'], [1.00, 'rgb(5,16,110)']]
 
-# Date Options
-# Check the latest available date
+# Year Marks for Slider
 with xr.open_dataset(
         os.path.join(data_path,
                      'data/droughtindices/netcdfs/spi1.nc')) as data:
@@ -211,45 +270,17 @@ max_date = sample_nc.time.data[-1]
 del sample_nc
 max_year = pd.Timestamp(max_date).year
 max_month = pd.Timestamp(max_date).month
-
-# Create the date options
 years = [int(y) for y in range(1900, max_year + 1)]
 yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
-
-# Only display every 5 years for space
 for y in yearmarks:
     if y % 5 != 0:
         yearmarks[y] = ""
 
-################## Map Section ################################################
-# A source data set for geometry and crs information (not fully there yet)
-source_path = "data/rasters/source_array.nc"
 
-# For translating geographic coordinates to numpy coordinates and back
-cd = Coordinate_Dictionaries(source_path)
-source = cd.source
-
-# For filtering by state, or defaulting to CONUS
-mask = cd.grid * 0 + 1
-state_arrays = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
-
-# NA map for when EDDI before 1980 is selected
-with np.load("data/npy/NA_overlay.npz") as data:  # <-------------------------- Redo this to look more professional
-    na = data.f.arr_0
-    data.close()
-
-# Make the NA map color scale stand out
-for i in range(na.shape[0]):
-    na[i] = na[i]*i
-
-# Mapbox Access
-mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
-                       'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
-
-# Mapbox initial layout
-# (Check this out! https://paulcbauer.shinyapps.io/plotlylayout/)
+########################### Map Section #######################################
+# Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
 layout = dict(
     autosize=True,
     height=500,
@@ -259,7 +290,12 @@ layout = dict(
                    size='20',
                    family='Time New Roman',
                    fontweight='bold'),
-    margin=dict(l=55, r=35, b=65, t=90, pad=4),
+    margin=dict(
+        l=55,
+        r=35,
+        b=65,
+        t=90,
+        pad=4),
     hovermode="closest",
     plot_bgcolor="#083C04",
     paper_bgcolor="#0D347C",
@@ -268,11 +304,15 @@ layout = dict(
     mapbox=dict(
         accesstoken=mapbox_access_token,
         style="satellite-streets",
-        center=dict(lon=-95.7, lat=37.1),
-        zoom=2))
+        center=dict(
+            lon=-95.7,
+            lat=37.1),
+        zoom=2,
+    )
+)
+###############################################################################
 
-
-################### Temporary CSS Items #######################################
+# In[]: Create App Layout
 # For css later  <------------------------------------------------------------- Move all styling to css
 tab_height = '25px'
 tab_style = {'height': tab_height, 'padding': '0'}
@@ -286,7 +326,6 @@ unselected_style = {'border-top-left-radius': '3px',
                     'padding': '0px 24px',
                     'border-bottom': '1px solid #d6d6d6'}
 
-################### Application Layout ########################################
 # Create a Div maker
 def divMaker(id_num, index='noaa'):
     div = html.Div([
@@ -306,43 +345,22 @@ def divMaker(id_num, index='noaa'):
                                    'float': 'left'}),
                     html.Div([
                             dcc.Tabs(id='location_tab_{}'.format(id_num),
-                                     value='county',
-                                     style=tab_style,
-                                     children=[
-                                         dcc.Tab(value='county',
-                                                 label='County',
-                                                 style=tablet_style,
-                                                 selected_style=tablet_style),
-                                         dcc.Tab(value='state',
-                                                 label='State/States',
-                                                 style=tablet_style,
-                                                 selected_style=tablet_style
-                                                 )]),
-                                html.Div(id='location_div_{}'.format(id_num),
-                                         children=[
-                                            html.Div(
-                                             id='county_div_{}'.format(id_num),
-                                             children=
-                                               [dcc.Dropdown(
-                                                 id='county_{}'.format(id_num),
-                                                 options=county_options,
-                                                 clearable=False,
-                                                 multi=False,
-                                                 value=24098)]),
-                                            html.Div(
-                                             id='state_div_{}'.format(id_num),
-                                             children=
-                                               [dcc.Dropdown(
-                                                 id='state_{}'.format(id_num),
-                                                 options=state_options,
-                                                 clearable=False,
-                                                 multi=True,
-                                                 placeholder=('Contiguous ' +
-                                                              'United States'),
-                                                 value=None)],
-                                               style={'display': 'none'})])],
+                                      value='county',
+                                      style=tab_style,
+                                      children=[
+                                          dcc.Tab(value='county',
+                                                  label='County',
+                                                  style=tablet_style,
+                                                  selected_style=tablet_style),
+                                          dcc.Tab(value='state',
+                                                  label='State/States',
+                                                  style=tablet_style,
+                                                  selected_style=tablet_style
+                                                  )]),
+                                html.Div(id='location_div_{}'.format(id_num))],
                                 style={'width': '50%',
-                                       'float': 'left'}),
+                                       'float': 'left',
+                                       'display': ''}),
                         html.Button(id='update_graphs_{}'.format(id_num),
                                     children=['Update Graphs'],
                                     style={'width': '20%',
@@ -353,33 +371,24 @@ def divMaker(id_num, index='noaa'):
                                            })],
                         className='row'),
                  dcc.Graph(id='map_{}'.format(id_num),
-                           config={'showSendToCloud': True}),
+                           config={
+                                    'sendDataToCloud': True
+                                   # 'showLink': True,
+                                   # 'sendData': True
+                                   }),
                  html.Div([dcc.Graph(id='series_{}'.format(id_num),
-                                     config={'showSendToCloud': True})]),
+                                     config={
+                                              # 'showLink': True,
+                                             # 'sendData': True
+                                             })]),
                  html.Div(id='coverage_div_{}'.format(id_num),
-                          style={'margin-bottom': '25'}),
-                 html.Button(
-                         id='dsci_button_{}'.format(id_num),
-                         title=('The Drought Severity ' +
-                          'Coverage Index (DSCI) is a way to aggregate the ' +
-                          'five drought severity classifications into a '+
-                          'single number. It is calculated by taking the ' +
-                          'percentage of an area in each drought category, ' +
-                          'weighting each by their severity, and adding ' +
-                          'them together:                                  ' +
-                          '%D0*1 + %D1*2 + %D2*3 + %D3*4 + %D4*5'),
-                          type='button',
-                          n_clicks=2,
-                          children=['Show DSCI: Off'],
-                          # style={'dsiplay': 'none'}
-                          ),
+                          style={'margin-bottom': '50'}),
                  html.Hr(),
             ], className='six columns')
     return div
 
-app.layout = html.Div([  # <--------------------------------------------------- Line all brackets and parens up
+app.layout = html.Div([   # <-------------------------------------------------- Line all brackets and parens up
                html.Div([
-
                 # Sponsers
                 html.A(html.Img(
                     src = ("https://github.com/WilliamsTravis/" +
@@ -391,9 +400,11 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                         'width': '100',
                         'float': 'right',
                         'position': 'static'
-                           }),
+                           },
+                                ),
                         href="https://www.colorado.edu/earthlab/",
-                        target="_blank"),
+                        target="_blank"
+                        ),
                 html.A(html.Img(
                     src = ('https://github.com/WilliamsTravis/Pasture-' +
                            'Rangeland-Forage/blob/master/data/' +
@@ -404,9 +415,11 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                         'width': '150',
                         'float': 'right',
                         'position': 'static',
-                        }),
+                        },
+                            ),
                         href = "http://wwa.colorado.edu/",
-                        target = "_blank"),
+                        target = "_blank"
+                            ),
                  html.A(html.Img(
                     src =( "https://github.com/WilliamsTravis/Pasture-" +
                           "Rangeland-Forage/blob/master/data/" +
@@ -417,9 +430,11 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                         'width': '200',
                         'float': 'right',
                         'position': 'relative',
-                        }),
+                        },
+                            ),
                         href = "https://www.drought.gov/drought/",
-                        target = "_blank"),
+                        target = "_blank"
+                        ),
                  html.A(html.Img(
                     src = ("https://github.com/WilliamsTravis/Pasture-" +
                            "Rangeland-Forage/blob/master/data/" +
@@ -431,11 +446,14 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                         'float': 'right',
                         'position': 'relative',
                         'margin-right': '20',
-                        }),
+                        },
+                            ),
                         href = "https://cires.colorado.edu/",
                         target = "_blank"
-                        )],
-                className = 'row'),
+                        ),
+                ],
+                className = 'row'
+                ),
 
         # Title
         html.Div([html.H1('Drought Index Comparison Portal'),
@@ -452,23 +470,24 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                 html.Button(id='toggle_options',
                             children='Toggle Options: Off',
                             type='button',
-                            title='Click to collapse the options above',
-                            style={'display': 'none'}),
+                            title='Click to collapse the options above'),
                 html.Button(id="desc_button",
                             children="Project Description: Off",
                             title=("Toggle this on and off to show a " +
                                    "description of the project with " +
                                    "some instructions."),
-                            style={'display': 'none'}),
+                            style={'background-color': '#c7d4ea',
+                                   'border-radius': '2px'}),
                 html.Button(id="click_sync",
                             children="Location Syncing: On",
                             title=("Toggle on and off to sync the location " +
                                    "of the time series between each map"),
-                            style={'display': 'none'})],
+                            style={'background-color': '#c7d4ea',
+                                   'border-radius': '2px',
+                                   'margin-bottom': '30'})],
                 style={'margin-bottom': '30',
                        'text-align': 'center'}),
 
-    # Description
         html.Div([
             html.Div([dcc.Markdown(id='description')],
                      style={'text-align':'center',
@@ -486,7 +505,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                                      children=['Study Period Year Range']),
                              html.Div([dcc.RangeSlider(
                                                      id='year_slider',
-                                                     value=default_years,
+                                                     value=[1990, max_year],
                                                      min=1900,
                                                      max=max_year,
                                                      updatemode='drag',
@@ -525,7 +544,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                                         options=maptypes)],
                                  className='two columns'),
 
-                        # Functions
+                        # Function
                         html.Div([
                                  html.H3("Function"),
                                  dcc.Tabs(
@@ -594,29 +613,44 @@ app.layout = html.Div([  # <--------------------------------------------------- 
         # html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],  # <----------- Consider only including two until we free more memory/get better machine
         #          className='row'),
 
-        # Signals  # <--------------------------------------------------------- Destruction Zone! Most of these aren't needed with the dash updates
+        # Signals
         html.Div(id='signal', style={'display': 'none'}),
+        html.Div(id='click_store',
+                 children=default_clicks,
+                 style={'display': 'none'}),
         html.Div(id='key_1', children='1', style={'display': 'none'}),
         html.Div(id='key_2', children='2', style={'display': 'none'}),
+        html.Div(id='time_1', style={'display': 'none'}),
+        html.Div(id='time_2', style={'display': 'none'}),
+        html.Div(id='selection_time_1', style={'display': 'none'}),
+        html.Div(id='selection_time_2', style={'display': 'none'}),
+        html.Div(id='county_time_1', style={'display': 'none'}),
+        html.Div(id='county_time_2', style={'display': 'none'}),
+        html.Div(id='state_time_1', style={'display': 'none'}),
+        html.Div(id='state_time_2', style={'display': 'none'}),
         html.Div(id='location_store', style={'display': 'none'}),
         html.Div(id='choice_store', style={'display': 'none'}),
 
-        ],
-    className='ten columns offset-by-one') # The end!
+        # The end!
+        ], className='ten columns offset-by-one')
 
 
-################ App Callbacks ################################################
-# Option Callbacks
-@app.callback([Output('month_slider', 'style'),
-               Output('month_slider_holder', 'children'),
-               Output('date_range', 'children')],
+################ Options ######################################################
+# Allow users to select a month range if the year slider is set to one year
+@app.callback(Output('month_slider', 'style'),  # <---------------------------- Can we output the entire object with one callback?
+              [Input('year_slider', 'value')])
+def monthStyle(year_range):
+    if year_range[0] == year_range[1]:
+          style={}
+    else:
+          style={'display': 'none'}
+    return style
+
+# If users select the most recent, adjust available months
+@app.callback(Output('month_slider_holder', 'children'),
               [Input('year_slider', 'value')])
 def monthSlider(year_range):
-    '''
-    If users select the most recent, adjust available months
-    '''
     if year_range[0] == year_range[1]:
-        style={}
         if year_range[1] == max_year:
             month2 = max_month
             marks = {key: value for key, value in monthmarks.items() if
@@ -624,32 +658,34 @@ def monthSlider(year_range):
         else:
             month2 = 12
             marks = monthmarks
-        slider = [dcc.RangeSlider(id='month',
-                                  value=[1, month2],
-                                  min=1, max=month2,
-                                  updatemode='drag',
-                                  marks=marks)]
-        string = 'Study Period Year Range: {}'.format(year_range[0])
-
+        slider = dcc.RangeSlider(id='month',
+                                 value=[1, month2],
+                                 min=1, max=month2,
+                                 updatemode='drag',
+                                 marks=marks)
     else:
-        style={'display': 'none'}
-        slider = [dcc.RangeSlider(id='month',
-                                  value=[1, 12],
-                                  min=1, max=12,
-                                  updatemode='drag',
-                                  marks=monthmarks)]
-        string = 'Study Period Year Range: {} - {}'.format(year_range[0],
-                                                           year_range[1])
 
-    return style, slider, string
+        slider = dcc.RangeSlider(id='month',
+                                 value=[1, 12],
+                                 min=1, max=12,
+                                 updatemode='drag',
+                                 marks=monthmarks)
+    return [slider]
 
+# Output text of the year range/single year selection
+@app.callback(Output('date_range', 'children'),
+              [Input('year_slider', 'value')])
+def printYearRange(years):
+    if years[0] != years[1]:
+        string = 'Study Period Year Range: {} - {}'.format(years[0], years[1])
+    else:
+        string = 'Study Period Year Range: {}'.format(years[0])
+    return string
 
+# Output text of the month range/single month selection
 @app.callback(Output('month_range', 'children'),
               [Input('month', 'value')])
 def printMonthRange(months):
-    '''
-    Output text of the month range/single month selection
-    '''
     if months[0] != months[1]:
         string = 'Month Range: {} - {}'.format(monthmarks[months[0]],
                                                monthmarks[months[1]])
@@ -657,97 +693,141 @@ def printMonthRange(months):
         string = 'Month Range: {}'.format(monthmarks[months[0]])
     return string
 
-
-@app.callback([Output('options', 'style'),
-               Output('toggle_options', 'style'),
-               Output('toggle_options', 'children')],
+# Toggle options on/off  <---------------------------------------------------- combine each button into one callback and improve style
+@app.callback(Output('options', 'style'),
               [Input('toggle_options', 'n_clicks')])
 def toggleOptions(click):
-    '''
-    Toggle options on/off
-    '''
     if not click:
         click = 0
     if click % 2 == 0:
-        div_style = {'display': 'none'}
-        button_style = {'background-color': '#a8b3c4',
-                        'border-radius': '4px',
-                        'font-family': 'Times New Roman'}
+        style = {'display': 'none'}
+    else:
+        style = {}
+    return style
+
+# Change the color of on/off options button
+@app.callback(Output('toggle_options', 'style'),
+              [Input('toggle_options', 'n_clicks')])
+def toggleToggleColor(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        style = {'background-color': '#a8b3c4',
+                 'border-radius': '4px',
+                 'font-family': 'Times New Roman',}
+    else:
+        style = {'background-color': '#c7d4ea',
+                 'border-radius': '4px',
+                 'font-family': 'Times New Roman',}
+    return style
+
+# Change the text of on/off options
+@app.callback(Output('toggle_options', 'children'),
+              [Input('toggle_options', 'n_clicks')])
+def toggleOptionsLabel(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
         children = "Display Options: Off"
     else:
-        div_style = {}
-        button_style = {'background-color': '#c7d4ea',
-                        'border-radius': '4px',
-                        'font-family': 'Times New Roman'}
         children = "Display Options: On"
-    return div_style, button_style, children
+    return children
 
-
-@app.callback([Output('click_sync', 'style'),
-               Output('click_sync', 'children')],
+# change the color of on/off location syncing button  - for css
+@app.callback(Output('click_sync', 'style'),
               [Input('click_sync', 'n_clicks')])
-def toggleSyncButton(click):
-    '''
-    change the color of on/off location syncing button  - for css
-    '''
+def toggleSyncColor(click):
     if not click:
         click = 0
     if click % 2 == 0:
-        children = "Location Syncing: On"
         style = {'background-color': '#c7d4ea',
                  'border-radius': '4px',
                  'font-family': 'Times New Roman',  # Specified in css?
                  }
     else:
-        children = "Location Syncing: Off"
         style = {'background-color': '#a8b3c4',
                  'border-radius': '4px',
                  'font-family': 'Times New Roman',}
-    return style, children
+    return style
 
-
-@app.callback([Output('description', 'children'),
-               Output('desc_button', 'style'),
-               Output('desc_button', 'children')],
-              [Input('desc_button', 'n_clicks')])
-def toggleDescription(click):
-    '''
-    Toggle description on/off
-    '''
+# change the text of on/off location syncing button
+@app.callback(Output('click_sync', 'children'),
+              [Input('click_sync', 'n_clicks')])
+def toggleSyncLabel(click):
     if not click:
         click = 0
     if click % 2 == 0:
-        desc_children = ""
+        children = "Location Syncing: On"
+    else:
+        children = "Location Syncing: Off"
+    return children
+
+# Toggle description on/off
+@app.callback(Output('description', 'children'),
+              [Input('desc_button', 'n_clicks')])
+def toggleDescription(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = ""
+    else:
+        children = open('data/tables/description.txt').read()
+    return children
+
+# Change color of on/off description button
+@app.callback(Output('desc_button', 'style'),
+              [Input('desc_button', 'n_clicks')])
+def toggleDescColor(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
         style = {'background-color': '#a8b3c4',
                   'border-radius': '4px',
-                  'font-family': 'Times New Roman'}
-        button_children = "Description: Off"
-
+                  'font-family': 'Times New Roman',}
     else:
-        desc_children = open('data/tables/description.txt').read()
         style = {'background-color': '#c7d4ea',
                  'border-radius': '4px',
-                 'font-family': 'Times New Roman'}
-        button_children = "Description: On"
+                 'font-family': 'Times New Roman',}
+    return style
 
-    return desc_children, style, button_children
+# Change text of on/off description button
+@app.callback(Output('desc_button', 'children'),
+              [Input('desc_button', 'n_clicks')])
+def toggleDescLabel(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = "Description: Off"
+    else:
+        children = "Description: On"
+    return children
 
-
-@app.callback([Output('function_choice', 'options'),
-               Output('function_choice', 'value')],
+@app.callback(Output('function_choice', 'options'),
               [Input('function_type', 'value')])
 def functionOptions(function_type):
     '''
-    Use the Percentile/Index tab to decide which functions options to
+    This uses the Percentile/Index tab to decide which functions options to
     display.
     '''
     if function_type == 'perc':
-        return function_options_perc, 'pmean'
+        return function_options_perc
     else:
-        return function_options_orig, 'omean'
+        return function_options_orig
 
 
-# Function callbacks
+@app.callback(Output('function_choice', 'value'),
+              [Input('function_type', 'value')])
+def functionValue(function_type):
+    '''
+    This uses the Percentile/Index tab to decide which functions options to
+    display.
+    '''
+    if function_type == 'perc':
+        return 'pmean'
+    else:
+        return 'omean'
+
+# In[]: App callbacks
 @cache.memoize() # To be replaced with something more efficient
 def retrieve_data(signal, function, choice):
     [time_range, colorscale, reverse_override] = signal
@@ -755,9 +835,122 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
-@cache2.memoize()
-def getDroughtArea(arrays, choice):
-    return droughtArea(arrays, choice)
+@app.callback(Output('location_store', 'children'),
+              [Input('time_1', 'children'),
+               Input('time_2', 'children'),
+               Input('selection_time_1', 'children'),
+               Input('selection_time_2', 'children'),
+               Input('county_time_1', 'children'),
+               Input('county_time_2', 'children'),
+               Input('map_1', 'clickData'),
+               Input('map_2', 'clickData'),
+               Input('map_1', 'selectedData'),
+               Input('map_2', 'selectedData'),
+               Input('county_1', 'value'),
+               Input('county_2', 'value'),
+               Input('update_graphs_1', 'n_clicks'),
+               Input('update_graphs_2', 'n_clicks')],
+              [State('state_time_1', 'children'),
+               State('state_time_2', 'children'),
+               State('state_1', 'value'),
+               State('state_2', 'value'),
+               State('location_store', 'children')])
+def locationPicker(cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
+                   cl1, cl2, sl1, sl2, co1, co2, click1, click2,
+                   st_time1, st_time2, st1, st2, old_location):
+    '''
+    Because there is no time stamp on these selections, we are making one
+    ourselves. This is the list of selections (in various formats) and the list
+    of times they were selected. The function will return the most recent
+    selection to be used across all elements if syncing is on.
+
+    It would be best if the selection as in a standard format. Perhaps just
+    x, y coords and a label.
+
+    Also, to help unsync, I'm adding an index position of the click to the
+    location object.
+    '''
+    times = np.array([cl_time1, cl_time2, sl_time1, sl_time2, co_time1, co_time2,
+                     st_time1, st_time2])
+    sels = np.array([cl1, cl2, sl1, sl2, co1, co2, st1, st2])
+    times = [times[i] for i in range(len(sels)) if sels[i] is not None]
+    sels = [sels[i] for i in range(len(sels)) if sels[i] is not None]
+    print("clickPicker times: " + str(times))
+    print("clickPicker choices: " + str(sels))
+    idx = times.index(np.nanmax(times))
+    location = sels[idx]
+    print("clickPicker final choice: " + str(location))
+
+    # 1: Selection is a grid ID  # <------------------------------------------- Move to function
+    if type(location) is int and len(str(location)) >= 3:
+        county = counties_df['place'][counties_df.grid == location].item()
+        y, x = np.where(grid == location)
+        location = [int(y), int(x), county, idx]
+
+    # 2: location is a list of states
+    elif type(location) is list:
+        # Empty, default to CONUS
+        if len(location) == 0:
+            location = ['state_mask', 'all', 'Contiguous United States', idx]
+
+        elif len(location) == 1 and location[0] == 'all':
+            location = ['state_mask', 'all', 'Contiguous United States', idx]
+
+        # Single or multiple, not all or empty, state or list of states
+        elif len(location) >= 1:
+            # Return the mask, a flag, and the state names
+            state = list(states_df['STUSAB'][
+                         states_df['FIPS State'].isin(location)])
+            if len(state) < 4:
+                state = [states_df['STATE_NAME'][
+                         states_df['STUSAB'] == s].item() for s in state]
+            states = ", ".join(state)
+            location = ['state_mask', str(location), states, idx]
+
+    # Selection is the default 'all' states
+    elif type(location) is str:
+        location = ['state_mask', 'all', 'Contiguous United States', idx]
+
+    # 4: Location is a point object
+    elif type(location) is dict:
+        if len(location['points']) == 1:
+            lon = location['points'][0]['lon']
+            lat = location['points'][0]['lat']
+            x = londict[lon]
+            y = latdict[lat]
+            gridid = grid[y, x]
+            counties = counties_df['place'][counties_df.grid == gridid]
+            county = counties.unique()
+            if len(county) == 0:
+                label = ""
+            else:
+                label = county[0]
+            location = [y, x, label, idx]
+
+        elif len(location['points']) > 1:
+            selections = location['points']
+            y = list([latdict[d['lat']] for d in selections])
+            x = list([londict[d['lon']] for d in selections])
+            counties = np.array([d['text'][:d['text'].index(':')] for
+                                 d in selections])
+            county_df = counties_df[counties_df['place'].isin(
+                                    list(np.unique(counties)))]
+
+            # Use gradient to print NW and SE most counties as a range
+            NW = county_df['place'][
+                    county_df['gradient'] == min(county_df['gradient'])].item()
+            SE = county_df['place'][
+                    county_df['gradient'] == max(county_df['gradient'])].item()
+            if NW != SE:
+                label = NW + " to " + SE
+            else:
+                label = NW
+            location = [str(y), str(x), label, idx]
+    else:
+        location = [50, 50, 'No Selection Found', idx]
+    if location == old_location:
+        raise PreventUpdate
+    return location
 
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
@@ -766,7 +959,6 @@ def getDroughtArea(arrays, choice):
 def choiceStore(choice1, choice2):
     return (json.dumps([choice1, choice2]))
 
-
 # Store data in the cache and hide the signal to activate it in the hidden div
 @app.callback(Output('signal', 'children'),
               [Input('submit', 'n_clicks')],
@@ -774,205 +966,175 @@ def choiceStore(choice1, choice2):
                State('reverse', 'value'),
                State('year_slider', 'value'),
                State('month', 'value')])
-def submitSignal(click, colorscale, reverse, year_range, month_range):
-    '''
-    Collect and hide the options signal in the hidden div.
-    '''
+def submitSignal(click, colorscale, reverse, year_range,
+                 month_range):
     if not month_range:
         month_range = [1, 1]
     signal = [[year_range, month_range], colorscale, reverse]
     return json.dumps(signal)
 
 
-@app.callback(Output('location_store', 'children'),
-              [Input('map_1', 'clickData'),
-               Input('map_2', 'clickData'),
-               Input('map_1', 'selectedData'),
-               Input('map_2', 'selectedData'),
-               Input('county_1', 'value'),
-               Input('county_2', 'value'),
-               Input('update_graphs_1', 'n_clicks'),
-               Input('update_graphs_2', 'n_clicks')],
-              [State('state_1', 'value'),
-               State('state_2', 'value')])
-def locationPicker(click1, click2, select1, select2, county1, county2, update1, 
-                   update2, state1, state2):
-        '''
-        With the context strategy it is still useful to have an independent
-        selection filter callback. Because there are many types of buttons and
-        clicks that could trigger a graph update we would have to parse through
-        each input to check if it is a location. It's still much nicer than
-        setting up a dozen hidden divs, timing callbacks, and writing long
-        lines of logic to determine which was most recently updated.
-        '''
-        # package the selections for indexing
-        locations = [click1, click2, select1, select2, county1, county2,
-                     state1, state2]
-        updates = [update1, update2]
-        context = dash.callback_context
-        triggered_value = context.triggered[0]['value']
-        triggered_id = context.triggered[0]['prop_id']
-        print('Triggered Prop ID ' + str(triggered_id))
-        if 'selectedData' in triggered_id:
-            print('Selected Data Point Length: ' +
-                  str(len(triggered_value['points'])))
-
-        # The update graph button activates state selections
-        if 'update_graph' in context.triggered[0]['prop_id']:
-            # When you switch from county to state, there is no initial value -- This is also the initializing condition, by chance 
-            if triggered_value is None:
-                print("Triggered selection is update button and value is None \
-                      Defaulting to CONUS")
-                triggered_value = 'all'
-                sel_idx = 0
-            else:
-                update_idx = updates.index(triggered_value) - 2  # <----------- We need the position of the most recent update...
-                if locations[update_idx] is None:
-                    raise PreventUpdate
-                triggered_value = locations[update_idx]  # <------------------- ...to be -2 or -1 to serve as the index to the selected state
-                sel_idx = locations.index(triggered_value)
-        else:
-            sel_idx = locations.index(triggered_value)
-        
-        selector = Location_Builder(triggered_value, cd)
-        location = selector.chooseRecent()
-        try:
-            location.append(sel_idx)
-        except:
-            print('empty location')
-            raise PreventUpdate
-        # print('locationPicker selection: ' + str(location))
-        return location
-
-
 # In[] Any callback with multiple instances goes here
 for i in range(1, 3):
-    @app.callback([Output('county_div_{}'.format(i), 'style'),
-                   Output('state_div_{}'.format(i), 'style')],
+    @app.callback(Output('update_graphs_{}'.format(i), 'style'),
+                  [Input('location_tab_{}'.format(i), 'value')])
+    def displayStateSubmit(selection_type):
+        if selection_type != 'state':
+            style={'width': '20%',
+                   'background-color': '#C7D4EA',
+                   'font-family': 'Times New Roman',
+                   'padding': '0px',
+                   'margin-top': '26',
+                   'display': 'none'}
+        else:
+            style={'width': '20%',
+                   'background-color': '#C7D4EA',
+                   'font-family': 'Times New Roman',
+                   'padding': '0px',
+                   'margin-top': '26'}
+        return style
+
+    @app.callback(Output('time_{}'.format(i), 'children'),
+                  [Input('map_{}'.format(i), 'clickData')])
+    def clickTime(click):
+        clicktime = time.time()
+        return(clicktime)
+
+    @app.callback(Output('county_time_{}'.format(i), 'children'),
+                  [Input('county_{}'.format(i), 'value')])
+    def countyTime(county):
+        ctime = time.time()
+        return(ctime)
+
+    @app.callback(Output('state_time_{}'.format(i), 'children'),
+                  [Input('state_{}'.format(i), 'value')])
+    def stateTime(state):
+        stime = time.time()
+        return(stime)
+
+    @app.callback(Output('selection_time_{}'.format(i), 'children'),
+                  [Input('map_{}'.format(i), 'selectedData')])
+    def selectionTime(selection):
+        selected_time = time.time()
+        return(selected_time)
+
+    @app.callback(Output('location_div_{}'.format(i), 'children'),
                   [Input('location_tab_{}'.format(i), 'value')],
                   [State('key_{}'.format(i), 'children')])
     def displayLocOptions(tab_choice, key):
         key = int(key)
         if tab_choice == 'county':
-            county_style = {}
-            state_style = {'display': 'none'}
+            children = [html.Div([dcc.Dropdown(
+                                       id='county_{}'.format(key),
+                                       options=county_options,
+                                       clearable=False,
+                                       multi=False,
+                                       value=24098)]),
+                        html.Div([dcc.Dropdown(
+                                       id='state_{}'.format(key),
+                                       options=state_options,
+                                       clearable=False,
+                                       multi=True,
+                                       placeholder='Contiguous United States',
+                                       value=None)],
+                                 style={'display': 'none'})]
         else:
-            county_style = {'display': 'none'}
-            state_style = {}
-        return county_style, state_style
-
-    @app.callback(Output('coverage_div_{}'.format(i), 'children'),
-                  [Input('series_{}'.format(i), 'hoverData'),
-                   Input('dsci_button_{}'.format(i), 'n_clicks'),
-                   Input('submit', 'n_clicks')],
-                  [State('function_choice', 'value')])
-    def hoverCoverage(hover, click1, click2, function):
-        '''
-        The tooltips on the drought severity coverage area graph were
-        overlapping, so this outputs the hover data to a chart below instead.
-        '''
-        if function == 'oarea':
-            try:
-                date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
-                date = dt.datetime.strftime(date, '%b, %Y')
-                # print(str(hover))
-                if click1 % 2 == 0:
-                    ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
-                          i in range(5)]
-                    coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
-                                                'D1 - D4 (Moderate)': ds[1],
-                                                'D2 - D4 (Severe)': ds[2],
-                                                'D3 - D4 (Extreme)': ds[3],
-                                                'D4 (Exceptional)': ds[4]},
-                                               index=[0])
-    
-                else:
-                    ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
-                          i in range(6)]
-                    coverage_df = pd.DataFrame({'D0 - D4 (Dry)': ds[0],
-                                                'D1 - D4 (Moderate)': ds[1],
-                                                'D2 - D4 (Severe)': ds[2],
-                                                'D3 - D4 (Extreme)': ds[3],
-                                                'D4 (Exceptional)': ds[4],
-                                                'DSCI':ds[5]},
-                                               index=[0])
-                children=[html.H6([date],
-                                  style={'text-align': 'left'}),
-                          dash_table.DataTable(
-                           data=coverage_df.to_dict('rows'),
-                           columns=[
-                              {"name": i, "id": i} for i in coverage_df.columns],
-                           style_cell={'textAlign': 'center'},
-                           style_header={'fontWeight': 'bold'},
-                           style_header_conditional=[
-                                   {'if': {'column_id': 'D0 - D4 (Dry)'},
-                                           'backgroundColor': '#ffff00',
-                                           'color': 'black'},
-                                   {'if': {'column_id': 'D1 - D4 (Moderate)'},
-                                               'backgroundColor': '#fcd37f',
-                                               'color': 'black'},
-                                   {'if': {'column_id': 'D2 - D4 (Severe)'},
-                                          'backgroundColor': '#ffaa00',
-                                          'color': 'black'},
-                                   {'if': {'column_id': 'DSCI'},
-                                          'backgroundColor': '#27397F',
-                                          'color': 'white',
-                                          'width': '75'},
-                                   {'if': {'column_id': 'D3 - D4 (Extreme)'},
-                                          'backgroundColor': '#e60000',
-                                          'color': 'white'},
-                                   {'if': {'column_id': 'D4 (Exceptional)'},
-                                           'backgroundColor': '#730000',
-                                           'color': 'white'}],
-                           style_data_conditional=[
-                                   {'if': {'column_id': 'D0 - D4 (Dry)'},
-                                           'backgroundColor': '#ffffa5',
-                                           'color': 'black'},
-                                   {'if': {'column_id': 'D1 - D4 (Moderate)'},
-                                           'backgroundColor': '#ffe5af',
-                                           'color': 'black'},
-                                   {'if': {'column_id': 'D2 - D4 (Severe)'},
-                                           'backgroundColor': '#ffc554',
-                                           'color': 'black'},
-                                   {'if': {'column_id': 'DSCI'},
-                                          'backgroundColor': '#5c678e',
-                                          'color': 'white',
-                                          'width': '75'},
-                                   {'if': {'column_id': 'D3 - D4 (Extreme)'},
-                                           'backgroundColor': '#dd6666',
-                                           'color': 'white'},
-                                   {'if': {'column_id': 'D4 (Exceptional)'},
-                                           'backgroundColor': '#a35858',
-                                           'color': 'white'}])]
-            except:
-                raise PreventUpdate
-        else:
-            children = None
+            children = [html.Div([dcc.Dropdown(
+                                       id='county_{}'.format(key),
+                                       options=county_options,
+                                       clearable=False,
+                                       multi=False,
+                                       value=None)],
+                                 style={'display': 'none'}),
+                        html.Div([dcc.Dropdown(
+                                       id='state_{}'.format(key),
+                                       options=state_options,
+                                       clearable=False,
+                                       multi=True,
+                                       placeholder='Contiguous United States',
+                                       value='all')])]
         return children
 
-    @app.callback([Output('dsci_button_{}'.format(i), 'style'),
-                   Output('dsci_button_{}'.format(i), 'children')],
-                  [Input('submit', 'n_clicks'),
-                   Input('dsci_button_{}'.format(i), 'n_clicks')],
+    @app.callback(Output('coverage_div_{}'.format(i), 'children'),
+                  [Input('series_{}'.format(i), 'hoverData')])
+    def hoverCoverage(hover):
+        try:
+            # print(str(hover))
+            date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
+            date = dt.datetime.strftime(date, '%b, %Y')
+            hover['points'][3]['y'] = hover['points'][3]['y'] * 15
+            ds = ['{0:.2f}'.format(hover['points'][i]['y']) for i in range(6)]
+            coverage_df = pd.DataFrame({'D0 (Dry)': ds[0],
+                                        'D1 (Moderate)': ds[1],
+                                        'D2 (Severe)': ds[2],
+                                        'DSCI':ds[3],
+                                        'D3 (Extreme)': ds[4],
+                                        'D4 (Exceptional)': ds[5]},
+                                       index=[0])
+            children=[html.H6([date],
+                              style={'text-align': 'left'}),
+                      dash_table.DataTable(
+                       data=coverage_df.to_dict('rows'),
+                       columns=[
+                          {"name": i, "id": i} for i in coverage_df.columns],
+                       style_cell={'textAlign': 'center'},
+                       style_header={'fontWeight': 'bold'},
+                       style_header_conditional=[
+                               {'if': {'column_id': 'D0 (Dry)'},
+                                       'backgroundColor': '#ffff00',
+                                       'color': 'black'},
+                               {'if': {'column_id': 'D1 (Moderate)'},
+                                           'backgroundColor': '#fcd37f',
+                                           'color': 'black'},
+                               {'if': {'column_id': 'D2 (Severe)'},
+                                      'backgroundColor': '#ffaa00',
+                                      'color': 'black'},
+                               {'if': {'column_id': 'DSCI'},
+                                      'backgroundColor': '#27397F',
+                                      'color': 'white',
+                                      'width': '75'},
+                               {'if': {'column_id': 'D3 (Extreme)'},
+                                      'backgroundColor': '#e60000',
+                                      'color': 'white'},
+                               {'if': {'column_id': 'D4 (Exceptional)'},
+                                       'backgroundColor': '#730000',
+                                       'color': 'white'}],
+                       style_data_conditional=[
+                               {'if': {'column_id': 'D0 (Dry)'},
+                                       'backgroundColor': '#ffffa5',
+                                       'color': 'black'},
+                               {'if': {'column_id': 'D1 (Moderate)'},
+                                       'backgroundColor': '#ffe5af',
+                                       'color': 'black'},
+                               {'if': {'column_id': 'D2 (Severe)'},
+                                       'backgroundColor': '#ffc554',
+                                       'color': 'black'},
+                               {'if': {'column_id': 'DSCI'},
+                                      'backgroundColor': '#5c678e',
+                                      'color': 'white',
+                                      'width': '75'},
+                               {'if': {'column_id': 'D3 (Extreme)'},
+                                       'backgroundColor': '#dd6666',
+                                       'color': 'white'},
+                               {'if': {'column_id': 'D4 (Exceptional)'},
+                                       'backgroundColor': '#a35858',
+                                       'color': 'white'}])]
+        except:
+            raise PreventUpdate
+        return children
+
+    @app.callback(Output('coverage_div_{}'.format(i), 'style'),
+                  [Input('submit', 'n_clicks')],
                   [State('function_choice', 'value')])
-    def displayDSCI(click1, click2, function):
+    def displayCoverage(click, function):
         if function == 'oarea':
-            if click2 % 2 == 0:
-                style = {'background-color': '#a8b3c4',
-                         'border-radius': '4px',
-                         'font-family': 'Times New Roman'}
-                children = 'Show DSCI: Off'
-            else:
-                style = {'background-color': '#c7d4ea',
-                         'border-radius': '4px',
-                         'font-family': 'Times New Roman'}
-                children = 'Show DSCI: On'
+            style={'margin-bottom': '10',
+                   'width': '85%',
+                   'text-align': 'center',
+                   'margin': '0 auto'}
         else:
-            style = {'display': 'none'}
-            children = 'Show DSCI: Off'
-
-        return style, children
-
+            style={'display': 'none'}
+        return style
 
     @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
                   [Input('location_store', 'children')],
@@ -990,11 +1152,11 @@ for i in range(1, 3):
         to prevent update if not syncing
         '''
 
-        # Check which element the selection came from
-        sel_idx = location[-1]
-        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
-            idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
+        # Get the appropriate selection
+        sel_idx = location[3]
+        if 'On' not in sync:
+            idx = int(key) - 1  # Graph ID
+            if sel_idx not in idx + np.array([0, 2, 4]):  # [0, 4, 8] for the full panel
                 raise PreventUpdate
         try:
             if type(location[0]) is int:
@@ -1012,28 +1174,19 @@ for i in range(1, 3):
         except:
             raise PreventUpdate
 
-
     @app.callback(Output("map_{}".format(i), 'figure'),
-                  [Input('choice_1', 'value'),
-                   Input('choice_2', 'value'),
+                  [Input('choice_{}'.format(i), 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
                    Input('location_store', 'children')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def makeGraph(choice1, choice2, map_type, signal, location, function, key, sync):
-        # Prevent update from location unless it is a state filter
-        trig = dash.callback_context.triggered[0]['prop_id']
-        print("Map Trigger: " + str(trig))
-        if trig == 'location_store.children' and location[0] != 'state_mask':
-            raise PreventUpdate
-
-        # Check which element the selection came from
-        sel_idx = location[-1]
-        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
+    def makeGraph(choice, map_type, signal, location, function, key, sync):
+        if 'On' not in sync:
+            sel_idx = location[3]
             idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <------------------[0, 4, 8] for the full panel
                 raise PreventUpdate
 
         print("Rendering Map #{}".format(int(key)))
@@ -1047,39 +1200,14 @@ for i in range(1, 3):
         # Collect and adjust signal
         [[year_range, month_range], colorscale, reverse_override] = signal
 
-        # Figure which choice is this panel's and which the other
-        key = int(key) - 1
-        choices = [choice1, choice2]
-        choice = choices[key]
-        choice2 = choices[~key]
-
         # Get/cache data
         [array, arrays, dates, colorscale,
          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
-        # Individual array min/max
-        amax = np.nanmax(array)
-        amin = np.nanmin(array)
-
-
-        # Now, we want to use the same base value range
-        if function == 'pmean':
-            # Get the data for the other panel for its value range
-            array2 = retrieve_data(signal, function, choice2)[0]
-            amax2 = np.nanmax(array2)
-            amin2 = np.nanmin(array2)        
-            amax = np.nanmax([amax, amax2])        
-            amin = np.nanmin([amin, amin2])
-        # if function == 'omean':  # <----------------------------------------- This might require a pre-made chart from probability distributions, much like strike level matching. Other theory behind comparing different index values?
-        #     abmax = ranges['max'][ranges['index'] == choice]
-        #     abmin = ranges['min'][ranges['index'] == choice]
-        #     abmax2 = ranges['max'][ranges['index'] == choice2]
-        #     abmin2 = ranges['min'][ranges['index'] == choice2]
-
         #Filter by state
         if location:
             if location[0] == 'state_mask':
-                flag, states, label, idx = location
+                flag, states, label, sel_idx = location
                 if states != 'all':
                     states = json.loads(states)
                     state_mask = state_arrays.copy()
@@ -1097,6 +1225,9 @@ for i in range(1, 3):
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                         psutil.virtual_memory().percent))
 
+        # Individual array min/max
+        amax = np.nanmax(array)
+        amin = np.nanmin(array)
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
@@ -1115,15 +1246,15 @@ for i in range(1, 3):
         # Now all this
         dfs = xr.DataArray(source, name="data")
         pdf = dfs.to_dataframe()
-        step = cd.res
+        step = res
         to_bin = lambda x: np.floor(x / step) * step
         pdf["latbin"] = pdf.index.get_level_values('y').map(to_bin)
         pdf["lonbin"] = pdf.index.get_level_values('x').map(to_bin)
-        pdf['gridx'] = pdf['lonbin'].map(cd.londict)
-        pdf['gridy'] = pdf['latbin'].map(cd.latdict)
+        pdf['gridx'] = pdf['lonbin'].map(londict)
+        pdf['gridy'] = pdf['latbin'].map(latdict)
 
         # For hover information
-        grid2 = np.copy(cd.grid)
+        grid2 = np.copy(grid)
         grid2[np.isnan(grid2)] = 0
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, counties_df, how='inner')
@@ -1149,28 +1280,21 @@ for i in range(1, 3):
             date_print = "{}, {}".format(monthmarks[m1], y1)
 
         # The y-axis depends on the chosen function
-        if 'p' in function and 'mean' in function:
-            # The maximum distance from 50
-            delta = max([amax - 50, 50 - amin])
-    
-            # The same distance above and below 50
-            amin = 50 - delta
-            amax = 50 + delta
-
-        elif 'min' in function or 'max' in function:
-            amin = amin
-            amax = amax
-
-        elif 'o' in function and 'mean' in function and function != 'oarea':
-            alimit = max([abs(amax), abs(amin)])
-            amax = alimit
-            amin = alimit * -1
-
+        if 'p' in function:
+            yaxis = dict(title='Percentiles',
+                          range=[0, 100])
+        elif 'o' in function and 'cv' not in function and function != 'oarea':
+            dmin = index_ranges['min'][index_ranges['index'] == choice]
+            dmax = index_ranges['max'][index_ranges['index'] == choice]
+            yaxis = dict(range=[dmin, dmax],
+                          title='Index')
         elif function == 'oarea':
-            alimit = max([abs(amax), abs(amin)])
-            amax = alimit
-            amin = alimit * -1
+            dmin = 0
+            dmax = 100
             colorscale = RdWhBu
+            yaxis = dict(title='Index')
+        else:
+            yaxis = dict(title='C.V.')
 
         # Create the scattermapbox object
         data = [
@@ -1188,7 +1312,7 @@ for i in range(1, 3):
                     color=df['data'],
                     cmax=amax,
                     cmin=amin,
-                    opacity=1.0,
+                    opacity=0.85,
                     size=5,
                     colorbar=dict(
                         textposition="auto",
@@ -1205,6 +1329,7 @@ for i in range(1, 3):
             style=map_type,
             center=dict(lon=-95.7, lat=37.1),
             zoom=2)
+        layout_copy['yaxis'] = yaxis
         layout_copy['title'] = (indexnames[choice] + '<br>' +
                                 function_names[function] + ': ' +
                                 date_print)
@@ -1218,22 +1343,22 @@ for i in range(1, 3):
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children'),
-                   Input('click_sync', 'children'),
                    Input('location_store', 'children'),
-                   Input('dsci_button_{}'.format(i), 'n_clicks')],
+                   Input('click_sync', 'children')],
                   [State('key_{}'.format(i), 'children'),
                    State('function_choice', 'value')])
-    def makeSeries(submit, signal, choice, choice_store, sync, location,
-                   show_dsci, key, function):
-        # Troubleshooting limited selection problem
-        trig = dash.callback_context.triggered[0]['prop_id']
-        print("Series Trigger: " + str(trig))
-
-        # Check which element the selection came from
-        sel_idx = location[-1]
-        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update (not syncing)
-            idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
+    def makeSeries(submit, signal, choice, choice_store, location,
+                   sync, key, function):
+        '''
+        Each callback is called even if this isn't synced...It would require
+          a whole new set of callbacks to avoid the lag from that. Also, the
+          synced click process is too slow...what can be done?
+        '''
+        # Get the appropriate selection
+        sel_idx = location[3]
+        if 'On' not in sync:
+            idx = int(key) - 1  # Graph ID
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # [0, 4, 8, 12] for the full panel
                 raise PreventUpdate
 
         # Create signal for the global_store
@@ -1245,7 +1370,7 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
         # There's a lot of color scale switching in the default settings...
         # ...so sorry any one who's trying to figure this out, I will fix this
@@ -1254,40 +1379,41 @@ for i in range(1, 3):
 
         # If the function is oarea, we plot five overlapping timeseries
         if function != 'oarea':
-            # print("LOCATION: " + str(location))
+            print("LOCATION: " + str(location))
             timeseries, arrays, label = areaSeries(location, arrays, dates,
-                                                    reproject=False)
+                                                   reproject=False)
             bar_type = 'bar'
         else:
             bar_type = 'overlay'
             timeseries, arrays, label = areaSeries(location, arrays,
                                                    dates, reproject=True)
 
-            ts_series, dsci = getDroughtArea(arrays, choice)
+            # for i in range(5):  # 5 drought categories
+            ts_series = droughtArea(arrays, choice, inclusive=False)  # <------ Check the order of this list
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
+        colors = ['#ffff00','#fcd37f', '#ffaa00', '#27397F', '#e60000',
+                  '#730000']
 
         # The y-axis depends on the chosen function
         if 'p' in function and function != 'oarea':
             yaxis = dict(title='Percentiles',
-                          range=[0, 100])
+                         range=[0, 100])
         elif 'o' in function and 'cv' not in function and function != 'oarea':
             yaxis = dict(range=[dmin, dmax],
-                          title='Index')
+                         title='Index')
             sd = np.nanstd(arrays)
             if 'eddi' in choice:
                 sd = sd*-1
             dmin = 3*sd
             dmax = 3*sd*-1
-    
-        elif 'min' in function or 'max' in function:
-            dmin = dmin
-            dmax = dmax
         elif function == 'oarea':
             yaxis = dict(title='Percent Area (%)',
-                          range=[0, 100],
-                          hovermode='y')
+                         range=[0, 100],
+                         hovermode='y')
+        else:
+            yaxis = dict(title='C.V.')
 
         # Trying to free up space for more workers
         del array
@@ -1307,21 +1433,22 @@ for i in range(1, 3):
                                 cmin=dmin,
                                 cmax=dmax,
                                 line=dict(width=0.2, color="#000000")))]
-        else:         
-            colors = ['rgb(255, 255, 0)','rgb(252, 211, 127)',
-                      'rgb(255, 170, 0)', 'rgb(230, 0, 0)', 'rgb(115, 0, 0)']
-            line_width = 1 + ((1/(year_range[1] - year_range[0])) * 50)
+        else:
             data = []
-            for i in range(5):
-                trace = dict(type='scatter', fill='tozeroy', mode='none',
-                             showlegend=False, x=dates, y=ts_series[i],
-                             hoverinfo='x', fillcolor=colors[i])
+            for i in range(6):
+                trace = dict(
+                            type='scatter',
+                            fill='tozeroy',
+                            showlegend=False,
+                            x=dates,
+                            y=ts_series[i],  # <-------------------------------The order of seems to be changing
+                            hoverinfo='x',
+                            marker=dict(color=colors[i],
+                                        line=dict(width=.01,
+                                                  color="#000000")))
                 data.append(trace)
-            if show_dsci % 2 != 0:
-                data.insert(5, dict(x=dates, y=dsci, yaxis='y2', hoverinfo='x',
-                                    showlegend=False,
-                                    line=dict(color='rgba(39, 57, 127, 0.85)',
-                                              width=line_width)))
+            data.append(dict(x=dates, y=list(np.repeat(np.nan, len(dates))),  # <---Empty trace for second y-axis
+                             yaxis='y2', hoverinfo='x', showlegend=False))
 
         # Copy and customize Layout
         layout_copy = copy.deepcopy(layout)
@@ -1337,19 +1464,19 @@ for i in range(1, 3):
                                         "<Br>" + 'Contiguous US ' +
                                         '(point estimates not available)')
             layout_copy['xaxis'] = dict(type='date')
-            layout_copy['yaxis2'] = dict(title='<br>DSCI',
-                                         range=[0, 500],
+            layout_copy['yaxis2'] = dict(title='Drought Severity<br>Coverage Index (DSCI)',
+                                         range=[0, 1500],
                                          anchor='x',
                                          overlaying='y',
                                          side='right',
                                          position=0.15,
                                          font=dict(size=8))
-            layout_copy['margin'] = dict(l=55, r=55, b=25, t=90, pad=10)
+            layout_copy['margin'] = dict(l=55, r=80, b=25, t=90, pad=10)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
-                                      y=-.5, markers=dict(size=10),
-                                      font=dict(size=10))
+                                     y=-.5, markers=dict(size=10),
+                                     font=dict(size=10))
         layout_copy['titlefont']['color'] = '#636363'
         layout_copy['font']['color'] = '#636363'
 
