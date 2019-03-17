@@ -1263,7 +1263,8 @@ for i in range(1, 3):
             timeseries, arrays, label = areaSeries(location, arrays,
                                                    dates, reproject=True)
 
-            ts_series, dsci = getDroughtArea(arrays, choice)
+            # ts_series, dsci = getDroughtArea(arrays, choice)
+            ts_series, dsci = droughtArea(arrays, choice)
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
@@ -1280,7 +1281,7 @@ for i in range(1, 3):
                 sd = sd*-1
             dmin = 3*sd
             dmax = 3*sd*-1
-    
+
         elif 'min' in function or 'max' in function:
             dmin = dmin
             dmax = dmax
@@ -1307,7 +1308,7 @@ for i in range(1, 3):
                                 cmin=dmin,
                                 cmax=dmax,
                                 line=dict(width=0.2, color="#000000")))]
-        else:         
+        else:
             colors = ['rgb(255, 255, 0)','rgb(252, 211, 127)',
                       'rgb(255, 170, 0)', 'rgb(230, 0, 0)', 'rgb(115, 0, 0)']
             line_width = 1 + ((1/(year_range[1] - year_range[0])) * 50)
