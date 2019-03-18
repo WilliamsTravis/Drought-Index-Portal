@@ -220,11 +220,10 @@ def droughtArea(arrays, choice, inclusive=False):
     pnincs = np.array([filter(arrays, cats[i], total_area) for i in range(5)])
     DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
     pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]  # <------------------------ ~60 microseconds with 18 year record (compare to 150 milliseconds to start over :)
-    del pnincs
 
     # Return the list of five layers
     print("drought area calculations complete.")
-    return pincs, DSCI
+    return pincs, pnincs, DSCI
 
 
 def im(array):
@@ -572,7 +571,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     end = dt.datetime(year2, month2, 15)  # <---------------------------------- This is also important because of empty slots in the wwdt data
     day2 = end - base
     day2 = day2.days
-    idx = len(days) - len(days[np.where(days > day1)])
+    idx = len(days) - len(days[np.where(days >= day1)])
     idx2 = len(days[np.where(days <= day2)])
     days = days[idx:idx2]
     arrays = arrays[idx:idx2]
@@ -758,7 +757,7 @@ def toNetCDFPercentile(src_path, dst_path):
 def wgsToAlbers(arrays):
     dates = range(len(arrays))
     wgs_proj = Proj(init='epsg:4326')
-    wgrid = salem.Grid(nxny=(300, 120), dxdy=(0.25, -0.25),
+    wgrid = salem.Grid(nxny=(300, 120), dxdy=(0.25, -0.25),  # <--------------- customize this for different resolutions.
                        x0y0=(-130, 50), proj=wgs_proj)
     lats = np.unique(wgrid.xy_coordinates[1])
     lats = lats[::-1]

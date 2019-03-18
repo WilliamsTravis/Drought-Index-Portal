@@ -266,7 +266,7 @@ for index in indices:
             else:
                 logging.info('Access successful.')
 
-        # Get some of the attributes from one of the new data sets
+        # Get the dates from one of the new data sets
         for i in tqdm(range(1, 13), position=0):
             # DL each monthly file
             source_path = os.path.join(local_path, 'temp_{}.nc'.format(i))

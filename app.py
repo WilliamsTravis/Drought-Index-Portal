@@ -23,6 +23,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
 import datetime as dt
+from collections import OrderedDict
 from flask_caching import Cache
 import gc
 from inspect import currentframe, getframeinfo
@@ -31,6 +32,7 @@ import numpy as np
 import pandas as pd
 import psutil
 from osgeo import gdal
+import urllib
 import warnings
 import xarray as xr
 
@@ -201,7 +203,7 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
           [0.90, 'rgb(10,55,166)'], [1.00, 'rgb(5,16,110)']]
 
 # Date Options
-# Check the latest available date
+# Check the latest available date, assuming every data set is synced up
 with xr.open_dataset(
         os.path.join(data_path,
                      'data/droughtindices/netcdfs/spi1.nc')) as data:
@@ -224,18 +226,18 @@ for y in yearmarks:
         yearmarks[y] = ""
 
 ################## Map Section ################################################
-# A source data set for geometry and crs information (not fully there yet)
+# A source data set for geometry and crs information (not fully there yet) 
 source_path = "data/rasters/source_array.nc"
 
 # For translating geographic coordinates to numpy coordinates and back
 cd = Coordinate_Dictionaries(source_path)
-source = cd.source
+source = cd.source   # <------------------------------------------------------- To allow for different resolutions, this should all be done in a callback
 
 # For filtering by state, or defaulting to CONUS
 mask = cd.grid * 0 + 1
 state_arrays = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
 
-# NA map for when EDDI before 1980 is selected
+# NA map for when empty maps are selected
 with np.load("data/npy/NA_overlay.npz") as data:  # <-------------------------- Redo this to look more professional
     na = data.f.arr_0
     data.close()
@@ -371,9 +373,12 @@ def divMaker(id_num, index='noaa'):
                           type='button',
                           n_clicks=2,
                           children=['Show DSCI: Off'],
-                          # style={'dsiplay': 'none'}
                           ),
                  html.Hr(),
+                 html.A('Download Timeseries Data',
+                        id='download_link_{}'.format(id_num),
+                        download='timeseries_{}.csv'.format(id_num),
+                        href="", target='_blank'),
             ], className='six columns')
     return div
 
@@ -845,6 +850,16 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         return location
 
 
+def generate_table(df, max_rows=10):
+    return html.Table(
+        # Header
+        [html.Tr([html.Th(col) for col in df.columns])] +
+
+        # Body
+        [html.Tr([
+            html.Td(df.iloc[i][col]) for col in df.columns
+        ]) for i in range(min(len(df), max_rows))])
+
 # In[] Any callback with multiple instances goes here
 for i in range(1, 3):
     @app.callback([Output('county_div_{}'.format(i), 'style'),
@@ -1113,7 +1128,7 @@ for i in range(1, 3):
         del arrays
 
         # Now all this
-        dfs = xr.DataArray(source, name="data")
+        dfs = xr.DataArray(source, name="data")  # <--------------------------- Here, we can change this source for different resolutions.
         pdf = dfs.to_dataframe()
         step = cd.res
         to_bin = lambda x: np.floor(x / step) * step
@@ -1213,7 +1228,8 @@ for i in range(1, 3):
         return figure
 
 
-    @app.callback(Output('series_{}'.format(i), 'figure'),
+    @app.callback([Output('series_{}'.format(i), 'figure'),
+                   Output('download_link_{}'.format(i), 'href')],
                   [Input('submit', 'n_clicks'),
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
@@ -1245,7 +1261,7 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-          dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
 
         # There's a lot of color scale switching in the default settings...
         # ...so sorry any one who's trying to figure this out, I will fix this
@@ -1254,17 +1270,47 @@ for i in range(1, 3):
 
         # If the function is oarea, we plot five overlapping timeseries
         if function != 'oarea':
-            # print("LOCATION: " + str(location))
+            print("LOCATION: " + str(location))
             timeseries, arrays, label = areaSeries(location, arrays, dates,
                                                     reproject=False)
+
+            # Save to file for download option
+            df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
+                        d in dates]
+            columns = OrderedDict({'month': df_dates, choice: list(timeseries), 
+                                    'function': function_names[function],
+                                    'location': location[2]})
+            df = pd.DataFrame(columns)
+            # df = df.to_csv('data/tables/timeseries/timeseries_' + key + '.csv',
+            #                  encoding='utf-8', index=False)
+            df_str = df.to_csv(encoding='utf-8', index=False)
+            href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
             bar_type = 'bar'
         else:
             bar_type = 'overlay'
             timeseries, arrays, label = areaSeries(location, arrays,
                                                    dates, reproject=True)
 
-            # ts_series, dsci = getDroughtArea(arrays, choice)
-            ts_series, dsci = droughtArea(arrays, choice)
+            # ts_series, dsci = getDroughtArea(arrays, choice)  # <------------ For caching later, when we have more space
+            ts_series, ts_series_ninc, dsci = droughtArea(arrays, choice)
+
+            # Save to file for download option
+            df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
+                        d in dates]
+            columns = OrderedDict({'month': df_dates,
+                                   choice + '_d0': list(ts_series_ninc[0]),
+                                   choice + '_d1': list(ts_series_ninc[1]),
+                                   choice + '_d2': list(ts_series_ninc[2]),
+                                   choice + '_d3': list(ts_series_ninc[3]),
+                                   choice + '_d4': list(ts_series_ninc[4]),
+                                   choice + '_dsci': list(dsci),
+                                   'function': 'Percent Area',
+                                   'location':  location[2]})
+            df = pd.DataFrame(columns)
+            # df.to_csv('data/tables/timeseries/timeseries_' + key + '.csv',
+            #           encoding='utf-8', index=False)
+            df_str = df.to_csv(encoding='utf-8', index=False)
+            href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
 
         # Format dates
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
@@ -1356,7 +1402,7 @@ for i in range(1, 3):
 
         figure = dict(data=data, layout=layout_copy)
 
-        return figure
+        return figure, href
 
 # In[] Run Application through the server
 if __name__ == '__main__':

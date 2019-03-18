@@ -28,6 +28,7 @@ from tqdm import tqdm
 import xarray as xr
 
 if sys.platform == 'win32':
+    sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
     os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
 else:
@@ -48,18 +49,6 @@ if not os.path.exists(temp_folder):
     os.makedirs(temp_folder)
 if not os.path.exists(pc_folder):
     os.makedirs(pc_folder)
-
-# In[] Today's date, month, and year
-todays_date = dt.datetime.today()
-today = np.datetime64(todays_date)
-print("##")
-print("#####")
-print("############")
-print("#######################")
-print("#######################################")
-print("####################################################")
-print("\nRunning Get_EDDI.py:")
-print(str(today) + '\n')
 
 # In[] Index options
 indices = ['eddi1', 'eddi2', 'eddi3', 'eddi6']
@@ -107,6 +96,17 @@ def getEDDI(scale, date, temp_folder, write=False):
         local_file.close()
         return os.path.join(temp_folder, 'temp.asc')
 
+# In[] Today's date, month, and year
+todays_date = dt.datetime.today()
+today = np.datetime64(todays_date)
+print("##")
+print("#####")
+print("############")
+print("#######################")
+print("#######################################")
+print("####################################################")
+print("\nRunning Get_EDDI.py:")
+print(str(today) + '\n')
 
 # In[] Get time series of currently available values
 # Connect to FTP 
@@ -124,7 +124,7 @@ for index in indices:
 
 
     ####### If we are only missing some dates #################################
-    if os.path.exists(original_path):   # Create a netcdf and append to file
+    if os.path.exists(original_path):
         with xr.open_dataset(original_path) as data:
             dates = pd.DatetimeIndex(data.time.data)
             data.close()
@@ -254,7 +254,7 @@ for index in indices:
 
             # We will save each to a geotiff so we can use the netcdf builders
             # These will be overwritten for space
-            file_name = ('eddi_' + str(date.year) +
+            file_name = ('temp_' + str(date.year) +
                          '{:02d}'.format(date.month) + '.tif')
             tif_path = os.path.join(temp_folder, file_name)
 
@@ -276,14 +276,14 @@ for index in indices:
         ncdir = os.path.join(data_path, "data/droughtindices/netcdfs/",
                               index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,  # these are two years short to test append mode above
-                  year1=1980, month1=1, year2=todays_date.year - 2, month2=12,
+                  year1=1980, month1=1, year2=todays_date.year - 1, month2=12,
                   epsg=4326, percentiles=False, wmode='w')
 
         # Now lets get the percentile values
         ncdir_perc = os.path.join(data_path, "data/droughtindices/netcdfs/" +
                                    "percentiles", index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir_perc,
-                  index=index, year1=1980, month1=1, year2=todays_date.year - 2,
+                  index=index, year1=1980, month1=1, year2=todays_date.year - 1,
                   month2=12, epsg=4326, percentiles=True, wmode='w')
 
 # Close connection with FTP server
