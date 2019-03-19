@@ -198,7 +198,7 @@ for index in indices:
 
                 # Convert new date to days
                 date = dt.datetime(date.year, date.month, day=15)
-                days = date - dt.datetime(1895, 1, 1)
+                days = date - dt.datetime(1900, 1, 1)
                 days = np.float64(days.days)
 
                 # Convert new data to array
@@ -273,6 +273,7 @@ for index in indices:
         # netcdf file. I should tweak toNetCDF2 to accept either I think.
         # Pardon this expediency
         tfiles = glob(os.path.join(temp_folder, '*tif'))
+        tfiles.sort()
         nc_path = os.path.join(data_path, "data/droughtindices/netcdfs/",
                               index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=nc_path, index=index,
