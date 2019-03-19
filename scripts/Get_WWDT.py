@@ -303,7 +303,7 @@ for index in indices:
 
         # This function smooshes everything into one netcdf file  # <---------- This is one year short to test the append mode above
         toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1895,
-                  month1=1, year2=todays_date.year, month2=todays_date.month,
+                  month1=1, year2=todays_date.year - 1, month2=todays_date.month,
                   wmode='w', percentiles=False)
 
         # We are also including percentiles, so lets build another dataset
@@ -311,7 +311,7 @@ for index in indices:
                                'data/droughtindices/netcdfs/percentiles',
                                index_map[index] + '.nc')
         toNetCDF2(tfiles, ncfiles, pc_path, index, epsg=4326, year1=1895,
-                  month1=1, year2=todays_date.year, month2=todays_date.month,
+                  month1=1, year2=todays_date.year - 1, month2=todays_date.month,
                   wmode='w', percentiles=True)
 
 print("Update Complete.")

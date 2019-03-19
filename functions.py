@@ -437,12 +437,12 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
               year2, month2, epsg=4326, percentiles=False,
               wmode='w'):
     '''
-    Take multiple multiband netcdfs with unordered dates and multiple tiffs with
-    desired geometries and write to a single netcdf as a single time series. This
-    has a lot of options, only meant for the app.
+    Take multiple multiband netcdfs with unordered dates and multiple tiffs
+    with desired geometries and write to a single netcdf as a single time
+    series. This has a lot of options and is only meant for the app.
 
-    As an expediency, if there isn't an nc file that means it's eddi and the
-    dates are in the file name.
+    As an expediency, if there isn't an nc file it defaults to reading dates
+    from the file names.
 
     Test parameters for toNetCDF2
         tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/*tif')
@@ -532,55 +532,51 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
 
     # Now getting the data, which is not in order because of how wwdt does it
     # We need to associate each day with its array
-    # try:
-    test = Dataset(ncfiles[0])
-    test.close()
-    print("Using netcdf dates..")
-    date_tifs = {}
-    for i in range(len(ncfiles)):
-        nc = Dataset(ncfiles[i])
-        days = nc.variables['day'][:]  # This is in days since 1900
-        rasters = gdal.Open(tfiles[i])
-        arrays = rasters.ReadAsArray()
-        print('Length Days: ' + str(len(days)))
-        print('Shape Arrays: ' + str(arrays.shape))
-        for y in range(len(arrays)):
-            date_tifs[days[y]] = arrays[y]  # <-------------------------------- I believe this is whats breaking the WWDT script, different length arrays.
+    try:
+        test = Dataset(ncfiles[0])
+        test.close()
+        print("Combining data using netcdf dates..")
+        date_tifs = {}
+        for i in range(len(ncfiles)):
+            nc = Dataset(ncfiles[i])
+            days = nc.variables['day'][:]  # This is in days since 1900
+            rasters = gdal.Open(tfiles[i])
+            arrays = rasters.ReadAsArray()
+            for y in range(len(arrays)):
+                date_tifs[days[y]] = arrays[y]  # <-------------------------------- I believe this is whats breaking the WWDT script, different length arrays.
+    
+        # okay, that was just in case the dates wanted to bounce around
+        date_tifs = OrderedDict(sorted(date_tifs.items()))
+    
+        # Now that everything is in the right order, split them back up
+        days = np.array(list(date_tifs.keys()))
+        arrays = np.array(list(date_tifs.values()))
 
-    # okay, that was just in case the dates wanted to bounce around
-    date_tifs = OrderedDict(sorted(date_tifs.items()))
-
-    # Now that everything is in the right order, split them back up
-    days = np.array(list(date_tifs.keys()))
-    arrays = np.array(list(date_tifs.values()))
-    print(str(arrays.shape))
-
-    # except Exception as e:
-    #     print(str(e))
-    #     print('Using filename dates...')
-    #     datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
-    #     dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
-    #              d in datestrings]
-    #     deltas = [d - dt.datetime(1900, 1, 1) for d in dates]
-    #     days = np.array([d.days for d in deltas])
-    #     arrays = []
-    #     for t in tfiles:
-    #         data = gdal.Open(t)
-    #         array = data.ReadAsArray()
-    #         arrays.append(array)
-    #     arrays = np.array(arrays)
-    #     print(str(arrays.shape))
+    except Exception as e:
+        print(str(e))
+        print('Combininb data using filename dates...')
+        datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
+        dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
+                  d in datestrings]
+        deltas = [d - dt.datetime(1900, 1, 1) for d in dates]
+        days = np.array([d.days for d in deltas])
+        arrays = []
+        for t in tfiles:
+            data = gdal.Open(t)
+            array = data.ReadAsArray()
+            arrays.append(array)
+        arrays = np.array(arrays)
 
     # Filter out dates
     base = dt.datetime(1900, 1, 1)
-    start = dt.datetime(year1, month1, 15) # <--------------------------------- Careful about this day figure
+    start = dt.datetime(year1, month1, 1) # <--------------------------------- Careful about this day figure
     day1 = start - base
     day1 = day1.days
-    end = dt.datetime(year2, month2, 15)  # <---------------------------------- This is also important because of empty slots in the wwdt data
+    end = dt.datetime(year2, month2, 1)  # <---------------------------------- This is also important because of empty slots in the wwdt data, specify the current date in the call
     day2 = end - base
     day2 = day2.days
     idx = len(days) - len(days[np.where(days >= day1)])
-    idx2 = len(days[np.where(days <= day2)])
+    idx2 = len(days[np.where(days < day2)])
     days = days[idx:idx2]
     arrays = arrays[idx:idx2]
 
@@ -715,7 +711,7 @@ def toNetCDFPercentile(src_path, dst_path):
 
         # Some attributes need to change
         dst.setncattr('subtitle', 'Monthly percentile values ' +
-                                    'since 1895')
+                                  'since 1895')
         dst.setncattr('standard_name', 'percentile')
 
         # set dimensions
@@ -758,6 +754,7 @@ def toNetCDFPercentile(src_path, dst_path):
         values = src.variables['value'][:]
         percentiles = percentileArrays(values)
         variable[:] = percentiles
+
 
 # WGS
 def wgsToAlbers(arrays):
