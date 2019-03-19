@@ -535,6 +535,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     try:
         test = Dataset(ncfiles[0])
         test.close()
+        print("Using netcdf dates..")
         date_tifs = {}
         for i in range(len(ncfiles)):
             nc = Dataset(ncfiles[i])
@@ -550,8 +551,10 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
         # Now that everything is in the right order, split them back up
         days = np.array(list(date_tifs.keys()))
         arrays = np.array(list(date_tifs.values()))
+        print(str(arrays.shape))
 
     except:
+        print('Using filename dates...')
         datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
         dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
                  d in datestrings]
@@ -563,6 +566,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
             array = data.ReadAsArray()
             arrays.append(array)
         arrays = np.array(arrays)
+        print(str(arrays.shape))
 
     # Filter out dates
     base = dt.datetime(1900, 1, 1)
