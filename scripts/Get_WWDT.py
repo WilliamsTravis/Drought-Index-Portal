@@ -310,7 +310,9 @@ for index in indices:
         pc_path = os.path.join(data_path,
                                'data/droughtindices/netcdfs/percentiles',
                                index_map[index] + '.nc')
-        toNetCDFPercentile(savepath, pc_path)
+        toNetCDF2(tfiles, ncfiles, pc_path, index, epsg=4326, year1=1895,
+                  month1=1, year2=todays_date.year, month2=todays_date.month,
+                  wmode='w', percentiles=True)
 
 print("Update Complete.")
 print("####################################################")
