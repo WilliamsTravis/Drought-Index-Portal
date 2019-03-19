@@ -1066,7 +1066,6 @@ for i in range(1, 3):
         amax = np.nanmax(array)
         amin = np.nanmin(array)
 
-
         # Now, we want to use the same base value range
         if function == 'pmean':
             # Get the data for the other panel for its value range

@@ -295,6 +295,32 @@ def percentileArrays(arrays):
     return pcts
 
 
+def rasterToDataArray(raster_path):
+    '''
+    take a raster and convert it to a data array for use as a source
+    '''
+    data = gdal.Open(raster_path)
+    geom = data.GetGeoTransform()
+    array = data.ReadAsArray()
+    if len(array.shape) == 3:
+        ntime, nlat, nlon = np.shape(array)
+    else:
+        nlat, nlon = np.shape(array)
+    lons = np.arange(nlon) * geom[1] + geom[0]
+    lats = np.arange(nlat) * geom[5] + geom[3]
+    del data
+
+    attributes = OrderedDict({'transform': list(geom),
+                              'res': [geom[1], geom[1]]})
+    data = xr.DataArray(array,
+                        coords=[lats, lons],
+                        dims=['y', 'x'],
+                        attrs=attributes)
+    res = data.res[0]
+    res_str = str(res).replace('.', '').replace('0', '')
+    data.to_netcdf('data/rasters/source_array_' + res_str + '.nc')
+
+
 def readRaster(rasterpath, band, navalue=-9999):
     """
     rasterpath = path to folder containing a series of rasters
@@ -812,11 +838,23 @@ class Cacher:
 
 class Coordinate_Dictionaries:
     '''
-    This translates numpy coordinates to geographic coordinates and back
+    This translates numpy coordinates to geographic coordinates and back.
+    
+    Production notes:
+        - I think this would also be a good place to parameterize all
+            resolution specific elements of the application
+        - These elements include:
+            1) the grid
+            2) the grid gradient
+            3) the counties raster
+            4) the counties data frame
+            5) the states raster
+            6) the states data frame
+            7) the source array
+            8) the source albers nc file
     '''
     def __init__(self, source_path):
         self.source = xr.open_dataarray(source_path)
-        self.grid = grid  #  <------------------------------------------------- best way to make a custom grid from source?
 
         # Geometry
         self.x_length = self.source.shape[2]
@@ -830,6 +868,69 @@ class Coordinate_Dictionaries:
         self.lats = [self.lat_max - self.res*y for y in self.ys]
 
         # Dictionaires with coordinates and array index positions
+        self.grid = grid  #  <------------------------------------------------- best way to make a custom grid from source?
+        self.londict = dict(zip(self.lons, self.xs))
+        self.latdict = dict(zip(self.lats, self.ys))
+        self.londict_rev = {y: x for x, y in self.londict.items()}
+        self.latdict_rev = {y: x for x, y in self.latdict.items()}
+
+        def pointToGrid(self, point):
+            '''
+            Takes in a plotly point dictionary and outputs a grid ID
+            '''
+            lon = point['points'][0]['lon']
+            lat = point['points'][0]['lat']
+            x = self.londict[lon]
+            y = self.latdict[lat]
+            gridid = self.grid[y, x]
+            return gridid
+
+        # Let's say we also a list of gridids
+        def gridToPoint(self, gridid):
+            '''
+            Takes in a grid ID and outputs a plotly point dictionary
+            '''
+            y, x = np.where(self.grid == gridid)
+            lon = self.londict_rev[int(x[0])]
+            lat = self.latdict_rev[int(y[0])]
+            point = {'points': [{'lon': lon, 'lat': lat}]}
+            return point
+
+
+class Coordinate_Dictionaries2:
+    '''
+    This translates numpy coordinates to geographic coordinates and back.
+    
+    Production notes:
+        - I think this would also be a good place to parameterize all
+            resolution specific elements of the application
+        - These elements include:
+            1) the grid
+            2) the grid gradient
+            3) the counties raster
+            4) the counties data frame
+            5) the states raster
+            6) the states data frame
+            7) the source array
+            8) the source albers nc file
+    '''
+    def __init__(self, source_path):
+        with xr.open_dataset(source_path) as data:
+            self.source =  data.variables['value'][0]  # <-------------------------------- what if I could use any existing file here
+
+        # Geometry
+        self.x_length = self.source.shape[2]
+        self.y_length = self.source.shape[1]
+        self.res = self.source.res[0]
+        self.lon_min = self.source.transform[0]
+        self.lat_max = self.source.transform[3] - self.res
+        self.xs = range(self.x_length)
+        self.ys = range(self.y_length)
+        self.lons = [self.lon_min + self.res*x for x in self.xs]
+        self.lats = [self.lat_max - self.res*y for y in self.ys]
+
+        # Dictionaires with coordinates and array index positions
+        self.grid = grid  #  <------------------------------------------------- best way to make a custom grid from source?
         self.londict = dict(zip(self.lons, self.xs))
         self.latdict = dict(zip(self.lats, self.ys))
         self.londict_rev = {y: x for x, y in self.londict.items()}

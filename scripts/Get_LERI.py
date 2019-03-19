@@ -122,7 +122,10 @@ for index in indices:
 
         # ...
 
-        print('Appending not available yet...')
+        print('Appending mode not available yet...')
+
+        pass
+
     ############## If we need to start over ###################################
     else:
         print(original_path + " not detected, building new dataset...\n")
@@ -162,6 +165,8 @@ for index in indices:
                            xRes=0.125, yRes=0.125,
                            outputBounds=[-130, 20, -55, 50])
             del ds
+
+            os.remove(file_path)
 
         # Merge individual tif files into a single netcdf file
         tfiles = glob(os.path.join(temp_folder, '*tif'))
