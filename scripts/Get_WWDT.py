@@ -293,7 +293,9 @@ for index in indices:
 
         # These are lists of all the temporary files
         tfiles = glob(os.path.join(local_path, 'tifs', 'temp_*[0-9]*.tif'))
+        tfiles.sort()
         ncfiles = glob(os.path.join(local_path, 'temp_*[0-9]*.nc'))
+        ncfiles.sort()
 
         # This is the target file - wwdt acronyms differ (and I'm not changing)
         savepath = os.path.join(data_path, 'data/droughtindices/netcdfs/',
