@@ -273,18 +273,17 @@ for index in indices:
         # netcdf file. I should tweak toNetCDF2 to accept either I think.
         # Pardon this expediency
         tfiles = glob(os.path.join(temp_folder, '*tif'))
-        ncdir = os.path.join(data_path, "data/droughtindices/netcdfs/",
+        nc_path = os.path.join(data_path, "data/droughtindices/netcdfs/",
                               index + '.nc')
-        toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,  # these are two years short to test append mode above
-                  year1=1980, month1=1, year2=todays_date.year - 1, month2=12,
+        toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=nc_path, index=index,
+                  year1=1980, month1=1, year2=todays_date.year, month2=12,
                   epsg=4326, percentiles=False, wmode='w')
 
         # Now lets get the percentile values
-        ncdir_perc = os.path.join(data_path, "data/droughtindices/netcdfs/" +
+        pc_path = os.path.join(data_path, "data/droughtindices/netcdfs/" +
                                    "percentiles", index + '.nc')
-        toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir_perc,
-                  index=index, year1=1980, month1=1, year2=todays_date.year - 1,
-                  month2=12, epsg=4326, percentiles=True, wmode='w')
+        toNetCDFPercentile(nc_path, pc_path)
+
 
 # Close connection with FTP server
 ftp.quit()

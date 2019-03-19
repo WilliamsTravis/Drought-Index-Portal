@@ -83,9 +83,9 @@ local_path2 = os.path.join(data_path,
                            'data/droughtindices/netcdfs/percentiles')
 local_path = os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt')
 if not os.path.exists(local_path):
-    os.mkdirs(local_path1)
+    os.makedirs(local_path1)
 if not os.path.exists(local_path2):
-    os.mkdirs(local_path2)
+    os.makedirs(local_path2)
 
 indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3', 'spei6',
            'pdsi', 'scpdsi', 'pzi']
