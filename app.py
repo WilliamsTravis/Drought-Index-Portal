@@ -1267,12 +1267,12 @@ for i in range(1, 3):
             # Save to file for download option
             df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
                         d in dates]
-            columns = OrderedDict({'month': df_dates, choice: list(timeseries), 
-                                    'function': function_names[function],
-                                    'location': location[2]})
+            columns = OrderedDict({'month': df_dates,
+                                   'value': list(timeseries), 
+                                   'function': function_names[function],
+                                   'location': location[2],
+                                   'index': indexnames[choice]})
             df = pd.DataFrame(columns)
-            # df = df.to_csv('data/tables/timeseries/timeseries_' + key + '.csv',
-            #                  encoding='utf-8', index=False)
             df_str = df.to_csv(encoding='utf-8', index=False)
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
             bar_type = 'bar'
@@ -1281,24 +1281,23 @@ for i in range(1, 3):
             timeseries, arrays, label = areaSeries(location, arrays,
                                                    dates, reproject=True)
 
-            # ts_series, dsci = getDroughtArea(arrays, choice)  # <------------ For caching later, when we have more space
+            # ts_series, ts_series_ninc, dsci = getDroughtArea(arrays, choice) # <------------ For caching later, when we have more space
             ts_series, ts_series_ninc, dsci = droughtArea(arrays, choice)
 
             # Save to file for download option
             df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
                         d in dates]
             columns = OrderedDict({'month': df_dates,
-                                   choice + '_d0': list(ts_series_ninc[0]),
-                                   choice + '_d1': list(ts_series_ninc[1]),
-                                   choice + '_d2': list(ts_series_ninc[2]),
-                                   choice + '_d3': list(ts_series_ninc[3]),
-                                   choice + '_d4': list(ts_series_ninc[4]),
-                                   choice + '_dsci': list(dsci),
+                                   'd0': list(ts_series_ninc[0]),
+                                   'd1': list(ts_series_ninc[1]),
+                                   'd2': list(ts_series_ninc[2]),
+                                   'd3': list(ts_series_ninc[3]),
+                                   'd4': list(ts_series_ninc[4]),
+                                   'dsci': list(dsci),
                                    'function': 'Percent Area',
-                                   'location':  location[2]})
+                                   'location':  location[2],
+                                   'index': indexnames[choice]})
             df = pd.DataFrame(columns)
-            # df.to_csv('data/tables/timeseries/timeseries_' + key + '.csv',
-            #           encoding='utf-8', index=False)
             df_str = df.to_csv(encoding='utf-8', index=False)
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
 

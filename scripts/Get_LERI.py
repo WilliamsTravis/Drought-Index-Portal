@@ -6,8 +6,9 @@ This script will download all or update existing LERI files used in the app. It
 uses the same FTP server as EDDI.
 
     Production notes:
-        - LERI does not cover the full grid, and so maybe there would be space
-            to experiment with a different resolution?
+        - LERI does not usually cover the full grid and only dates back to
+            2000, so maybe there would be space to experiment with a
+            different resolution?
         - Also, LERI is not available for the same time periods as EDDI, SPI,
             and SPEI. The monthly values are available for 1, 3, 7 and 12
             month-windows.
@@ -18,6 +19,8 @@ uses the same FTP server as EDDI.
             the 1- and 3-month LERIs then brainstorm how to fit the others in.
         - Also, these are netcdf files, so the process will be a blend of
             Get_EDDI.py and Get_WWDT.py.
+        - I am sharing the temp folder with EDDI, so don't run the two at the
+            same time (Get_LERI and Get_EDDI).
 
 Created on Mon Mar 18 09:47:33 2019
 
@@ -32,6 +35,7 @@ import numpy as np
 import os
 from osgeo import gdal
 import pandas as pd
+import shutil
 import sys
 from tqdm import tqdm
 import xarray as xr
@@ -46,7 +50,8 @@ else:
 
 from functions import toNetCDF2, isInt, toNetCDFPercentile
 
-# gdal.PushErrorHandler('CPLQuietErrorHandler')
+# These make output logs too noisy to see what happened
+gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
 # In[] Data Source and target directories
@@ -54,6 +59,9 @@ ftp_path = 'ftp://ftp.cdc.noaa.gov/Projects/LERI/CONUS_archive/data/'
 temp_folder = os.path.join(data_path, 'data/droughtindices/temps')
 pc_folder = os.path.join(data_path, 'data/droughtindices/netcdfs/percentiles')
 if not os.path.exists(temp_folder):
+    os.makedirs(temp_folder)
+else:
+    shutil.rmtree(temp_folder)
     os.makedirs(temp_folder)
 if not os.path.exists(pc_folder):
     os.makedirs(pc_folder)
@@ -135,7 +143,7 @@ for index in indices:
         # available dates
         date1 = dt.datetime(int(min(ftp_years)), 1, 1)
         date2 = dt.datetime(max_year, max_month, 1)
-        available_dates = pd.date_range(date1, date2, period='M')
+        available_dates = pd.date_range(date1, date2, freq='M')
 
         # Loop through these, download and transform data
         for date in tqdm(available_dates, position=0):
@@ -146,7 +154,7 @@ for index in indices:
             # The are rather large files, this could take a while
             file_name = ('temp_' + str(date.year) +
                          '{:02d}'.format(date.month) + '.tif')
-            tif_path = os.path.join(temp_folder,'a' + file_name)
+            tif_path = os.path.join(temp_folder, file_name)
 
             # Resample each, working from disk
             ds = gdal.Warp(tif_path, file_path,
