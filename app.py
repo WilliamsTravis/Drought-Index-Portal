@@ -231,7 +231,7 @@ source_path = "data/rasters/source_array.nc"
 
 # For translating geographic coordinates to numpy coordinates and back
 cd = Coordinate_Dictionaries(source_path)
-source = cd.source   # <------------------------------------------------------- To allow for different resolutions, this should all be done in a callback
+source = cd.source   # <------------------------------------------------------- To allow for different resolutions, this should all be done in a callback?
 
 # For filtering by state, or defaulting to CONUS
 mask = cd.grid * 0 + 1
@@ -849,16 +849,6 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         # print('locationPicker selection: ' + str(location))
         return location
 
-
-def generate_table(df, max_rows=10):
-    return html.Table(
-        # Header
-        [html.Tr([html.Th(col) for col in df.columns])] +
-
-        # Body
-        [html.Tr([
-            html.Td(df.iloc[i][col]) for col in df.columns
-        ]) for i in range(min(len(df), max_rows))])
 
 # In[] Any callback with multiple instances goes here
 for i in range(1, 3):

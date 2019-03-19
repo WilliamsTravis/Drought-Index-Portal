@@ -170,7 +170,7 @@ for index in indices:
 
             # Now, get the range of dates
             t2 = pd.datetime(final_year, final_month, 15)
-            available_dates = pd.date_range(*(pd.to_datetime([t1, t2]) +  # <-- Why end of month? Could be useful for another data set, I guess, and doesn't really matter yet
+            available_dates = pd.date_range(*(pd.to_datetime([t1, t2]) +  # <-- Why end of month? To be as confused as possible, I think. 
                                               pd.offsets.MonthEnd()), freq='M')
             needed_dates = [a for a in available_dates if
                             a not in existing_dates]
@@ -224,7 +224,7 @@ for index in indices:
 
                     # Convert new date to days
                     date = dt.datetime(d.year, d.month, day=15)
-                    days = date - dt.datetime(1895, 1, 1)
+                    days = date - dt.datetime(1900, 1, 1)
                     days = np.float64(days.days)
 
                     # Convert new data to array
@@ -310,6 +310,7 @@ for index in indices:
         pc_path = os.path.join(data_path,
                                'data/droughtindices/netcdfs/percentiles',
                                index_map[index] + '.nc')
+        print("Calculating Percentiles...")
         toNetCDF2(tfiles, ncfiles, pc_path, index, epsg=4326, year1=1895,
                   month1=1, year2=todays_date.year - 1, month2=todays_date.month,
                   wmode='w', percentiles=True)
