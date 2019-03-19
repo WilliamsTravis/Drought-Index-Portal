@@ -277,7 +277,7 @@ def outLine(color, width):
 
 def percentileArrays(arrays):
     '''
-    a list of 2d numpy arrays or a 3d numpy array
+    arrays = a list of 2d numpy arrays or one 3d numpy array
     '''
     def percentiles(lst):
         '''
@@ -289,9 +289,9 @@ def percentileArrays(arrays):
         pct = rankdata(lst)/len(lst)
         return pct
 
-    # mask = arrays[0] * 0 + 1
+    mask = arrays[0, :, :] * 0 + 1
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
-    # pcts = pcts*mask
+    pcts = pcts*mask
     return pcts
 
 
@@ -533,7 +533,8 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     # Now getting the data, which is not in order because of how wwdt does it
     # We need to associate each day with its array
     try:
-        Dataset(ncfiles[0])
+        test = Dataset(ncfiles[0])
+        test.close()
         date_tifs = {}
         for i in range(len(ncfiles)):
             nc = Dataset(ncfiles[i])
@@ -703,7 +704,6 @@ def toNetCDFPercentile(src_path, dst_path):
 
         # copy attributes
         for name in src.ncattrs():
-            print(name)
             dst.setncattr(name, src.getncattr(name))
 
         # Some attributes need to change
@@ -731,7 +731,6 @@ def toNetCDFPercentile(src_path, dst_path):
         # Set coordinate system attributes
         src_crs = src.variables['crs']
         for name in src_crs.ncattrs():
-            print(name)
             crs.setncattr(name, src_crs.getncattr(name))   
 
         # Variable Attrs

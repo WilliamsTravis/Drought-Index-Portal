@@ -63,6 +63,7 @@ import xarray as xr
 
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
+    sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
     os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
 else:
@@ -298,16 +299,14 @@ for index in indices:
 
         # This function smooshes everything into one netcdf file  # <---------- This is one year short to test the append mode above
         toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1895,
-                  month1=1, year2=todays_date.year - 1, month2=todays_date.month,
+                  month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=False)
 
         # We are also including percentiles, so lets build another dataset
-        savepath_perc = os.path.join(data_path,
-                                     'data/droughtindices/netcdfs/percentiles',
-                                     index_map[index] + '.nc')
-        toNetCDF2(tfiles, ncfiles, savepath_perc, index, epsg=4326, year1=1895,
-                  month1=1, year2=todays_date.year - 1, month2=todays_date.month,
-                  wmode='w', percentiles=True)
+        pc_path = os.path.join(data_path,
+                               'data/droughtindices/netcdfs/percentiles',
+                                index_map[index] + '.nc')
+        toNetCDFPercentile(savepath, pc_path)
 
 print("Update Complete.")
 print("####################################################")
