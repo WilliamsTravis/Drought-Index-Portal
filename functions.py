@@ -532,42 +532,42 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
 
     # Now getting the data, which is not in order because of how wwdt does it
     # We need to associate each day with its array
-    try:
-        test = Dataset(ncfiles[0])
-        test.close()
-        print("Using netcdf dates..")
-        date_tifs = {}
-        for i in range(len(ncfiles)):
-            nc = Dataset(ncfiles[i])
-            days = nc.variables['day'][:]  # This is in days since 1900
-            rasters = gdal.Open(tfiles[i])
-            arrays = rasters.ReadAsArray()
-            for y in range(len(arrays)):
-                date_tifs[days[y]] = arrays[y]
+    # try:
+    test = Dataset(ncfiles[0])
+    test.close()
+    print("Using netcdf dates..")
+    date_tifs = {}
+    for i in range(len(ncfiles)):
+        nc = Dataset(ncfiles[i])
+        days = nc.variables['day'][:]  # This is in days since 1900
+        rasters = gdal.Open(tfiles[i])
+        arrays = rasters.ReadAsArray()
+        for y in range(len(arrays)):
+            date_tifs[days[y]] = arrays[y]
 
-        # okay, that was just in case the dates wanted to bounce around
-        date_tifs = OrderedDict(sorted(date_tifs.items()))
+    # okay, that was just in case the dates wanted to bounce around
+    date_tifs = OrderedDict(sorted(date_tifs.items()))
 
-        # Now that everything is in the right order, split them back up
-        days = np.array(list(date_tifs.keys()))
-        arrays = np.array(list(date_tifs.values()))
-        print(str(arrays.shape))
+    # Now that everything is in the right order, split them back up
+    days = np.array(list(date_tifs.keys()))
+    arrays = np.array(list(date_tifs.values()))
+    print(str(arrays.shape))
 
-    except Exception as e:
-        print(str(e))
-        print('Using filename dates...')
-        datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
-        dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
-                 d in datestrings]
-        deltas = [d - dt.datetime(1900, 1, 1) for d in dates]
-        days = np.array([d.days for d in deltas])
-        arrays = []
-        for t in tfiles:
-            data = gdal.Open(t)
-            array = data.ReadAsArray()
-            arrays.append(array)
-        arrays = np.array(arrays)
-        print(str(arrays.shape))
+    # except Exception as e:
+    #     print(str(e))
+    #     print('Using filename dates...')
+    #     datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
+    #     dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
+    #              d in datestrings]
+    #     deltas = [d - dt.datetime(1900, 1, 1) for d in dates]
+    #     days = np.array([d.days for d in deltas])
+    #     arrays = []
+    #     for t in tfiles:
+    #         data = gdal.Open(t)
+    #         array = data.ReadAsArray()
+    #         arrays.append(array)
+    #     arrays = np.array(arrays)
+    #     print(str(arrays.shape))
 
     # Filter out dates
     base = dt.datetime(1900, 1, 1)
