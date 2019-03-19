@@ -542,8 +542,10 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
         days = nc.variables['day'][:]  # This is in days since 1900
         rasters = gdal.Open(tfiles[i])
         arrays = rasters.ReadAsArray()
+        print('Length Days: ' + str(len(days)))
+        print('Shape Arrays: ' + str(arrays.shape))
         for y in range(len(arrays)):
-            date_tifs[days[y]] = arrays[y]
+            date_tifs[days[y]] = arrays[y]  # <-------------------------------- I believe this is whats breaking the WWDT script, different length arrays.
 
     # okay, that was just in case the dates wanted to bounce around
     date_tifs = OrderedDict(sorted(date_tifs.items()))
