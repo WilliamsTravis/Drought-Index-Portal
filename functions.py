@@ -553,7 +553,8 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
         arrays = np.array(list(date_tifs.values()))
         print(str(arrays.shape))
 
-    except:
+    except Exception as e:
+        print(str(e))
         print('Using filename dates...')
         datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
         dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for

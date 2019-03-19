@@ -250,6 +250,7 @@ for index in indices:
         print(nc_path + " not detected, building new data set...")
 
         # Get the data from wwdt
+        print("Downloading the 12 netcdf files for " + index + "...")
         for i in tqdm(range(1, 13), position=0):
             # These come in monthly files - e.g. all januaries in one file
             file_name = '{}_{}_PRISM.nc'.format(index, i)
@@ -268,6 +269,7 @@ for index in indices:
                 logging.info('Access successful.')
 
         # Get the dates from one of the new data sets
+        print("Transforming downloaded netcdfs into properly shaped tiffs...")
         for i in tqdm(range(1, 13), position=0):
             # DL each monthly file
             source_path = os.path.join(local_path, 'temp_{}.nc'.format(i))
@@ -305,7 +307,7 @@ for index in indices:
         # We are also including percentiles, so lets build another dataset
         pc_path = os.path.join(data_path,
                                'data/droughtindices/netcdfs/percentiles',
-                                index_map[index] + '.nc')
+                               index_map[index] + '.nc')
         toNetCDFPercentile(savepath, pc_path)
 
 print("Update Complete.")
