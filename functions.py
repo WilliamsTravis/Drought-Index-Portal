@@ -353,8 +353,8 @@ class Boundaries:
             print('No counties with ' + str(self.res) +
                   ' resolution available.')
 
-    def getCountiesDF(self):
-        # ...
+    # def getCountiesDF(self):
+    #     # ...
 
     def getGrid(self):
         if self.res == 0.25:
