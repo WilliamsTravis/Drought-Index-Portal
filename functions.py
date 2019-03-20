@@ -323,6 +323,52 @@ def rasterToDataArray(raster_path):
     data.to_netcdf('data/rasters/source_array_' + res_str + '.nc')
 
 
+
+class Boundaries:
+    def __init__(self, resolution):
+        self.res = resolution
+        
+    def getStates(self):
+        if self.res == 0.25:
+            states = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
+            states[states==-9999] = np.nan
+            return states
+        elif self.res == 0.125:
+            states = gdal.Open('data/rasters/us_states_125.tif').ReadAsArray()
+            states[states==-9999] = np.nan
+            return states
+        else:
+            print('No states with ' + str(self.res) + ' resolution available.')
+
+    def getCounties(self):
+        if self.res == 0.25:
+            cnty = gdal.Open('data/rasters/us_counties.tif').ReadAsArray()
+            cnty[cnty==-9999] = np.nan
+            return cnty
+        elif self.res == 0.125:
+            cnty = gdal.Open('data/rasters/us_counties_125.tif').ReadAsArray()
+            cnty[cnty==-9999] = np.nan
+            return cnty
+        else:
+            print('No counties with ' + str(self.res) +
+                  ' resolution available.')
+
+    def getCountiesDF(self):
+        # ...
+
+    def getGrid(self):
+        if self.res == 0.25:
+            grid = gdal.Open('data/rasters/prfgrid.tif').ReadAsArray()
+            grid[grid == -9999] = np.nan
+            return grid
+        elif self.res == 0.125:
+            grid = gdal.Open('data/rasters/grid_125.tif').ReadAsArray()
+            grid[grid == -9999] = np.nan
+            return grid
+        else:
+            print('No counties with ' + str(self.res) +
+                  'resolution available.')
+
 def readRaster(rasterpath, band, navalue=-9999):
     """
     rasterpath = path to folder containing a series of rasters
