@@ -177,6 +177,13 @@ for index in indices:
                   month2=todays_date.month, epsg=4326, percentiles=False,
                   wmode='w')
 
+        # Where there are negative numbers, get rid of them?
+        leri = Dataset(ncdir, 'a')
+        data = leri.variables['value'][:]
+        data[data<0] = np.nan
+        leri.variables['value'] = data
+        leri.close()
+
         # Now lets get the percentile values
         ncdir_perc = os.path.join(data_path, "data/droughtindices/netcdfs/" +
                                    "percentiles", index + '.nc')
