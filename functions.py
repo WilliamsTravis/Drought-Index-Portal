@@ -54,7 +54,9 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'eddi1': 'Evaporative Demand Drought Index - 1 month',
              'eddi2': 'Evaporative Demand Drought Index - 2 month',
              'eddi3': 'Evaporative Demand Drought Index - 3 month',
-             'eddi6': 'Evaporative Demand Drought Index - 6 month'}
+             'eddi6': 'Evaporative Demand Drought Index - 6 month',
+             'leri1': 'Landscape Evaporative Response Index - 1 month',
+             'leri3': 'Landscape Evaporative Response Index - 3 month'}
 
 ######## Functions ############################################################
 def areaSeries(location, arrays, dates, reproject=False):

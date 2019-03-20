@@ -173,15 +173,17 @@ for index in indices:
         ncdir = os.path.join(data_path, "data/droughtindices/netcdfs/",
                               index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,  # these are two years short to test append mode above
-                  year1=1980, month1=1, year2=todays_date.year, month2=12,
-                  epsg=4326, percentiles=False, wmode='w')
+                  year1=1980, month1=1, year2=todays_date.year,
+                  month2=todays_date.month, epsg=4326, percentiles=False,
+                  wmode='w')
 
         # Now lets get the percentile values
         ncdir_perc = os.path.join(data_path, "data/droughtindices/netcdfs/" +
                                    "percentiles", index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir_perc,
                   index=index, year1=1980, month1=1, year2=todays_date.year,
-                  month2=12, epsg=4326, percentiles=True, wmode='w')
+                  month2=todays_date.month, epsg=4326, percentiles=True,
+                  wmode='w')
 
 # Close connection with FTP server
 ftp.quit()
