@@ -119,7 +119,9 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'EDDI-1', 'value': 'eddi1'},
            {'label': 'EDDI-2', 'value': 'eddi2'},
            {'label': 'EDDI-3', 'value': 'eddi3'},
-           {'label': 'EDDI-6', 'value': 'eddi6'}]
+           {'label': 'EDDI-6', 'value': 'eddi6'},
+           {'label': 'LERI-1', 'value': 'leri1'},
+           {'label': 'LERI-3', 'value': 'leri3'}]
 
 # Index dropdown labels
 indexnames = {'pdsi': 'Palmer Drought Severity Index',
@@ -140,7 +142,9 @@ indexnames = {'pdsi': 'Palmer Drought Severity Index',
               'eddi1': 'Evaporative Demand Drought Index - 1 month',
               'eddi2': 'Evaporative Demand Drought Index - 2 month',
               'eddi3': 'Evaporative Demand Drought Index - 3 month',
-              'eddi6': 'Evaporative Demand Drought Index - 6 month'}
+              'eddi6': 'Evaporative Demand Drought Index - 6 month',
+              'leri1': 'Landscape Evaporative Response Index - 1 month',
+              'leri3': 'Landscape Evaporative Response Index - 3 month'}
 
 # Function options (Percentile & Index Values)
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
@@ -162,8 +166,9 @@ function_names = {'pmean': 'Average Percentiles',
                   # 'ocv': 'Coefficient of Variation',
                   'oarea': 'Average Index Values'}
 
-# County Data Frame and options  # <------------------------------------------- Clean this up, automate csv building from source
-counties_df = pd.read_csv('data/tables/counties3.csv')
+##################### Construction Zone #######################################
+# County Data Frame and options  
+counties_df = pd.read_csv('data/tables/counties3.csv')  # <-------------------- Clean this up, automate csv building from source
 c_df = pd.read_csv('data/tables/unique_counties.csv')
 rows = [r for idx, r in c_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
@@ -171,6 +176,7 @@ options_pos = {county_options[i]['label']: i for
                i in range(len(county_options))}
 just_counties = [d['label'] for d in county_options]
 
+###############################################################################
 # State options
 states_df = counties_df[['STATE_NAME',
                          'STUSAB', 'FIPS State']].drop_duplicates().dropna()

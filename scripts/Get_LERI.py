@@ -170,6 +170,7 @@ for index in indices:
 
         # Merge individual tif files into a single netcdf file
         tfiles = glob(os.path.join(temp_folder, '*tif'))
+        tfiles.sort()
         ncdir = os.path.join(data_path, "data/droughtindices/netcdfs/",
                               index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,  # these are two years short to test append mode above
