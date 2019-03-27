@@ -756,9 +756,7 @@ def toRasters(arraylist,path,geometry,srs):
 
 def toNetCDFPercentile(src_path, dst_path):
     '''
-    This is not fully functional, it causes memory problems and I think it may
-    be scrambling the order of the dates somehow. Still, something like this
-    may be useful in the future, so I'm keeping it for later.
+    This causes memory problems in less powerful computers.
     '''
     with Dataset(src_path) as src, Dataset(dst_path, 'w') as dst:
 
