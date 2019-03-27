@@ -275,7 +275,7 @@ for index in indices:
         tfiles = glob(os.path.join(temp_folder, '*tif'))
         tfiles.sort()
         nc_path = os.path.join(data_path, "data/droughtindices/netcdfs/",
-                              index + '.nc')
+                               index + '.nc')
         toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=nc_path, index=index,
                   year1=1980, month1=1, year2=todays_date.year, month2=12,
                   epsg=4326, percentiles=False, wmode='w')

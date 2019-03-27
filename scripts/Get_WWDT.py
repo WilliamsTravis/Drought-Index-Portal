@@ -298,11 +298,11 @@ for index in indices:
         ncfiles.sort()
 
         # This is the target file - wwdt acronyms differ (and I'm not changing)
-        savepath = os.path.join(data_path, 'data/droughtindices/netcdfs/',
-                                index_map[index] + '.nc')
+        nc_path = os.path.join(data_path, 'data/droughtindices/netcdfs/',
+                               index_map[index] + '.nc')
 
         # This function smooshes everything into one netcdf file
-        toNetCDF2(tfiles, ncfiles, savepath, index, epsg=4326, year1=1895,
+        toNetCDF2(tfiles, ncfiles, nc_path, index, epsg=4326, year1=1895,
                   month1=1, year2=todays_date.year, month2=todays_date.month,
                   wmode='w', percentiles=False)
 
@@ -311,9 +311,7 @@ for index in indices:
                                'data/droughtindices/netcdfs/percentiles',
                                index_map[index] + '.nc')
         print("Calculating Percentiles...")
-        toNetCDF2(tfiles, ncfiles, pc_path, index, epsg=4326, year1=1895,
-                  month1=1, year2=todays_date.year, month2=todays_date.month,
-                  wmode='w', percentiles=True)
+        toNetCDFPercentile(nc_path, pc_path)
 
 print("Update Complete.")
 print("####################################################")
