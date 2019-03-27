@@ -302,7 +302,7 @@ def percentileArrays(arrays):
         pct = rankdata(lst)/len(lst)
         return pct
 
-    mask = arrays[0, :, :] * 0 + 1
+    mask = arrays[-10, :, :] * 0 + 1  # Don't use the first or last (if empty)
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
     pcts = pcts*mask
     return pcts
@@ -715,48 +715,15 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
     nco.close()
 
 
-def toRaster(array, path, geometry, srs, navalue=-9999):
-    """
-    path = target path
-    srs = spatial reference system
-    """
-    xpixels = array.shape[1]    
-    ypixels = array.shape[0]
-    path = path.encode('utf-8')
-    image = gdal.GetDriverByName("GTiff").Create(path, xpixels, ypixels,
-                                1, gdal.GDT_Float32)
-    image.SetGeoTransform(geometry)
-    image.SetProjection(srs)
-    image.GetRasterBand(1).WriteArray(array)
-    image.GetRasterBand(1).SetNoDataValue(navalue)
-      
-
-def toRasters(arraylist,path,geometry,srs):
-    """
-    Arraylist format = [[name,array],[name,array],....]
-    path = target path
-    geometry = gdal geometry object
-    srs = spatial reference system object
-    """
-    if path[-2:] == "\\":
-        path = path
-    else:
-        path = path + "\\"
-    sample = arraylist[0][1]
-    ypixels = sample.shape[0]
-    xpixels = sample.shape[1]
-    for ray in  tqdm(arraylist):
-        image = gdal.GetDriverByName("GTiff").Create(os.path.join(path,
-                                                              ray[0] + ".tif"),
-                                    xpixels, ypixels, 1, gdal.GDT_Float32)
-        image.SetGeoTransform(geometry)
-        image.SetProjection(srs)
-        image.GetRasterBand(1).WriteArray(ray[1])
-          
-
 def toNetCDFPercentile(src_path, dst_path):
     '''
     This causes memory problems in less powerful computers.
+    
+    src_path = 'f:/data/droughtindices/netcdfs/spi2.nc'
+    dst_path = 'f:/data/droughtindices/netcdfs/percentiles/spi2.nc'
+    
+    src = Dataset(src_path)
+    dst = Dataset(dst_path, 'w')
     '''
     with Dataset(src_path) as src, Dataset(dst_path, 'w') as dst:
 
@@ -810,6 +777,45 @@ def toNetCDFPercentile(src_path, dst_path):
         percentiles = percentileArrays(values)
         variable[:] = percentiles
 
+
+def toRaster(array, path, geometry, srs, navalue=-9999):
+    """
+    path = target path
+    srs = spatial reference system
+    """
+    xpixels = array.shape[1]    
+    ypixels = array.shape[0]
+    path = path.encode('utf-8')
+    image = gdal.GetDriverByName("GTiff").Create(path, xpixels, ypixels,
+                                1, gdal.GDT_Float32)
+    image.SetGeoTransform(geometry)
+    image.SetProjection(srs)
+    image.GetRasterBand(1).WriteArray(array)
+    image.GetRasterBand(1).SetNoDataValue(navalue)
+      
+
+def toRasters(arraylist,path,geometry,srs):
+    """
+    Arraylist format = [[name,array],[name,array],....]
+    path = target path
+    geometry = gdal geometry object
+    srs = spatial reference system object
+    """
+    if path[-2:] == "\\":
+        path = path
+    else:
+        path = path + "\\"
+    sample = arraylist[0][1]
+    ypixels = sample.shape[0]
+    xpixels = sample.shape[1]
+    for ray in  tqdm(arraylist):
+        image = gdal.GetDriverByName("GTiff").Create(os.path.join(path,
+                                                              ray[0] + ".tif"),
+                                    xpixels, ypixels, 1, gdal.GDT_Float32)
+        image.SetGeoTransform(geometry)
+        image.SetProjection(srs)
+        image.GetRasterBand(1).WriteArray(ray[1])
+          
 
 # WGS
 def wgsToAlbers(arrays, cd, albers_source):
