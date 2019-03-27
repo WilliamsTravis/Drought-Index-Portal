@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-An Application to visualize time series of drought indices (or others soon).
+An Application to visualize time series of drought indices.
 
-Production notes:
-	- There is a nonetype error when deselecting.
+Things to do:
+    1) Dropdown county selections should find averages within the county
+       boundaries in the same way the state dropdowns do.
+    2) Percentiles are not working for the SPI or SPEI, but only for time
+       scales over 1 month. Currently flummoxed.
 
 Created on Fri Jan 4 12:39:23 2019
 
 @author: Travis Williams
-
-Sync Check: 01/20/2019
 """
 
 # Functions and Libraries
@@ -31,7 +32,6 @@ import json
 import numpy as np
 import pandas as pd
 import psutil
-from osgeo import gdal
 import urllib
 import warnings
 import xarray as xr
@@ -41,9 +41,9 @@ frame = getframeinfo(currentframe()).filename
 path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
-# Import functions
-from functions import Index_Maps, makeMap, areaSeries, droughtArea
-from functions import Coordinate_Dictionaries, Location_Builder
+# Import functions and classes
+from functions import makeMap, areaSeries, droughtArea
+from functions import Index_Maps, Admin_Elements, Location_Builder 
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -55,8 +55,11 @@ else:
 warnings.filterwarnings("ignore")
 
 ######################## Default Values #######################################
-default_function = 'oarea'
-default_years = [1985, 2019]
+default_function = 'pmean'
+default_sample = 'pdsi'
+default_1 = 'pdsi'
+default_2 = 'spei6'
+default_years = [2000, 2018]
 
 # Default click before the first click for any map
 default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
@@ -98,8 +101,8 @@ cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
                       'CACHE_THRESHOLD': 2})
 cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
-                        'CACHE_DIR': 'data/cache2',
-                        'CACHE_THRESHOLD': 2})
+                       'CACHE_DIR': 'data/cache2',
+                       'CACHE_THRESHOLD': 2})
 cache.init_app(server)
 cache2.init_app(server)
 
@@ -166,23 +169,20 @@ function_names = {'pmean': 'Average Percentiles',
                   # 'ocv': 'Coefficient of Variation',
                   'oarea': 'Average Index Values'}
 
-##################### Construction Zone #######################################
 # County Data Frame and options  
-counties_df = pd.read_csv('data/tables/counties3.csv')  # <-------------------- Clean this up, automate csv building from source
-c_df = pd.read_csv('data/tables/unique_counties.csv')
-rows = [r for idx, r in c_df.iterrows()]
+counties_df = pd.read_csv('data/tables/unique_counties.csv')
+rows = [r for idx, r in counties_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
-options_pos = {county_options[i]['label']: i for
+options_pos = {county_options[i]['label']: i for  # <-------------------------- Used to update dropdowns
                i in range(len(county_options))}
-just_counties = [d['label'] for d in county_options]
 
-###############################################################################
 # State options
-states_df = counties_df[['STATE_NAME',
-                         'STUSAB', 'FIPS State']].drop_duplicates().dropna()
+states_df = pd.read_table('data/tables/state_fips.txt', sep='|')
 states_df = states_df.sort_values('STUSAB')
+NCONUS = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']  # <----------- I'm reading a book about how we ignore these (D:). In the future we'll have to include them.
+states_df = states_df[~states_df.STUSAB.isin(NCONUS)]
 rows = [r for idx, r in states_df.iterrows()]
-state_options = [{'label': r['STUSAB'], 'value': r['FIPS State']} for
+state_options = [{'label': r['STUSAB'], 'value': r['STATE']} for
                   r in rows]
 
 # Map type options
@@ -208,20 +208,27 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
           [0.70, 'rgb(12,164,235)'], [0.80, 'rgb(0,125,255)'],
           [0.90, 'rgb(10,55,166)'], [1.00, 'rgb(5,16,110)']]
 
-# Date Options
-# Check the latest available date, assuming every data set is synced up
+# Get time dimension from the first data set, assuming everything is uniform
 with xr.open_dataset(
         os.path.join(data_path,
-                     'data/droughtindices/netcdfs/spi1.nc')) as data:
-    sample_nc = data
+             'data/droughtindices/netcdfs/' + default_sample + '.nc')) as data:
+    sample_nc = data.load()
     data.close()
+min_date = sample_nc.time.data[0]
 max_date = sample_nc.time.data[-1]
-del sample_nc
 max_year = pd.Timestamp(max_date).year
+min_year = pd.Timestamp(min_date).year
 max_month = pd.Timestamp(max_date).month
 
+# Get spatial dimensions from the sample data set above
+resolution = sample_nc.crs.GeoTransform[1]
+admin = Admin_Elements(resolution)
+[state_array, county_array, grid, mask,
+ source, albers_source, cd, admin_df] = admin.getElements()
+del sample_nc
+
 # Create the date options
-years = [int(y) for y in range(1895, max_year + 1)]
+years = [int(y) for y in range(min_year, max_year + 1)]
 yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
@@ -232,19 +239,8 @@ for y in yearmarks:
         yearmarks[y] = ""
 
 ################## Map Section ################################################
-# A source data set for geometry and crs information (not fully there yet) 
-source_path = "data/rasters/source_array.nc"
-
-# For translating geographic coordinates to numpy coordinates and back
-cd = Coordinate_Dictionaries(source_path)
-source = cd.source   # <------------------------------------------------------- To allow for different resolutions, this should all be done in a callback?
-
-# For filtering by state, or defaulting to CONUS
-mask = cd.grid * 0 + 1
-state_arrays = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
-
 # NA map for when empty maps are selected
-with np.load("data/npy/NA_overlay.npz") as data:  # <-------------------------- Redo this to look more professional
+with np.load("data/npy/NA_overlay.npz") as data:  # <-------------------------- Redo this to look more professional and match resolutions
     na = data.f.arr_0
     data.close()
 
@@ -279,7 +275,6 @@ layout = dict(
         center=dict(lon=-95.7, lat=37.1),
         zoom=2))
 
-
 ################### Temporary CSS Items #######################################
 # For css later  <------------------------------------------------------------- Move all styling to css
 tab_height = '25px'
@@ -312,7 +307,8 @@ def divMaker(id_num, index='noaa'):
                                          options=indices, value=index)],
                             style={'width': '30%',
                                    'float': 'left'}),
-                    html.Div([
+                    html.Div(
+                        children=[
                             dcc.Tabs(id='location_tab_{}'.format(id_num),
                                      value='county',
                                      style=tab_style,
@@ -353,6 +349,9 @@ def divMaker(id_num, index='noaa'):
                                        'float': 'left'}),
                         html.Button(id='update_graphs_{}'.format(id_num),
                                     children=['Update Graphs'],
+                                    title=('Click to update the map and ' +
+                                           'graphs below with updated ' +
+                                           'location choices'),
                                     style={'width': '20%',
                                            'background-color': '#C7D4EA',
                                            'font-family': 'Times New Roman',
@@ -380,10 +379,12 @@ def divMaker(id_num, index='noaa'):
                           n_clicks=2,
                           children=['Show DSCI: Off'],
                           ),
-                 html.Hr(),
                  html.A('Download Timeseries Data',
                         id='download_link_{}'.format(id_num),
                         download='timeseries_{}.csv'.format(id_num),
+                        title=('This csv includes information for only this ' +
+                               'element and is titled '+
+                               '"timeseries_{}.csv"'.format(id_num)),
                         href="", target='_blank'),
             ], className='six columns')
     return div
@@ -498,7 +499,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                              html.Div([dcc.RangeSlider(
                                                      id='year_slider',
                                                      value=default_years,
-                                                     min=1895,
+                                                     min=min_year,
                                                      max=max_year,
                                                      updatemode='drag',
                                                      marks=yearmarks)],
@@ -540,7 +541,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                         html.Div([
                                  html.H3("Function"),
                                  dcc.Tabs(
-                                    id='function_type', value='perc',
+                                    id='function_type',
+                                    value='perc',
                                     style=tab_style,
                                     children=[
                                         dcc.Tab(label='Percentiles',
@@ -560,7 +562,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                         html.Div([
                                 html.H3('Color Gradient'),
                                 dcc.Tabs(
-                                    id='reverse', value='no',
+                                    id='reverse',
+                                    value='no',
                                     style=tab_style,
                                     children=[
                                         dcc.Tab(value='yes',
@@ -586,6 +589,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
         # Submission Button
         html.Div([
             html.Button(id='submit',
+                        title=('Submit to activate the option settings ' +
+                               'above and update the graphs below.'),
                         children='Submit Options',
                         type='button',
                         style={'background-color': '#C7D4EA',
@@ -598,7 +603,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
 
         # Four by Four Map Layout
         # Row 1
-        html.Div([divMaker(1, 'pdsi'), divMaker(2, 'spei1')],
+        html.Div([divMaker(1, default_1), divMaker(2, default_2)],
                  className='row'),
 
         # Row 2
@@ -766,9 +771,11 @@ def retrieve_data(signal, function, choice):
     delivery = makeMap(data, function)
     return delivery
 
+
 @cache2.memoize()  # <--------------------------------------------------------- Cached for DCSI, done here to add more data when more memory is available
-def getDroughtArea(arrays, choice):
+def retrieve_area_data(arrays, choice):
     return droughtArea(arrays, choice)
+
 
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
@@ -832,8 +839,6 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         if 'update_graph' in context.triggered[0]['prop_id']:
             # When you switch from county to state, there is no initial value -- This is also the initializing condition, by chance 
             if triggered_value is None:
-                print("Triggered selection is update button and value is None \
-                      Defaulting to CONUS")
                 triggered_value = 'all'
                 sel_idx = 0
             else:
@@ -844,15 +849,14 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
                 sel_idx = locations.index(triggered_value)
         else:
             sel_idx = locations.index(triggered_value)
-        
-        selector = Location_Builder(triggered_value, cd)
+        selector = Location_Builder(triggered_value, cd, admin_df)
         location = selector.chooseRecent()
         try:
             location.append(sel_idx)
         except:
             print('empty location')
             raise PreventUpdate
-        # print('locationPicker selection: ' + str(location))
+
         return location
 
 
@@ -886,7 +890,6 @@ for i in range(1, 3):
             try:
                 date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
                 date = dt.datetime.strftime(date, '%b, %Y')
-                # print(str(hover))
                 if click1 % 2 == 0:
                     ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
                           i in range(5)]
@@ -985,7 +988,7 @@ for i in range(1, 3):
         return style, children
 
 
-    @app.callback(Output('county_{}'.format(i), 'options'),  # <--------------- Dropdown label updates, old version
+    @app.callback(Output('county_{}'.format(i), 'options'),
                   [Input('location_store', 'children')],
                   [State('county_{}'.format(i), 'value'),
                    State('key_{}'.format(i), 'children'),
@@ -1033,7 +1036,8 @@ for i in range(1, 3):
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def makeGraph(choice1, choice2, map_type, signal, location, function, key, sync):
+    def makeGraph(choice1, choice2, map_type, signal, location, function, key,
+                  sync):
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
         print("Map Trigger: " + str(trig))
@@ -1044,7 +1048,7 @@ for i in range(1, 3):
         sel_idx = location[-1]
         if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
             idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8, 12] for the full panel
                 raise PreventUpdate
 
         print("Rendering Map #{}".format(int(key)))
@@ -1066,13 +1070,13 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+         dmax, dmin, reverse, res] = retrieve_data(signal, function, choice)
 
         # Individual array min/max
         amax = np.nanmax(array)
         amin = np.nanmin(array)
 
-        # Now, we want to use the same base value range
+        # Now, we want to use the same  value range for colors
         if function == 'pmean':
             # Get the data for the other panel for its value range
             array2 = retrieve_data(signal, function, choice2)[0]
@@ -1080,20 +1084,21 @@ for i in range(1, 3):
             amin2 = np.nanmin(array2)        
             amax = np.nanmax([amax, amax2])        
             amin = np.nanmin([amin, amin2])
-        # if function == 'omean':  # <----------------------------------------- This might require a pre-made chart from probability distributions, much like strike level matching. Other theory behind comparing different index values?
-        #     abmax = ranges['max'][ranges['index'] == choice]
-        #     abmin = ranges['min'][ranges['index'] == choice]
-        #     abmax2 = ranges['max'][ranges['index'] == choice2]
-        #     abmin2 = ranges['min'][ranges['index'] == choice2]
+
+        # Experimenting with leri
+        if 'leri' in choice:
+            array[array < 0] = np.nan
+            amin = 0
+            amax = np.nanmax(array)
 
         #Filter by state
         if location:
             if location[0] == 'state_mask':
                 flag, states, label, idx = location
                 if states != 'all':
-                    states = json.loads(states)
-                    state_mask = state_arrays.copy()
-                    state_mask[~np.isin(state_mask, states)] = np.nan
+                    states_ids = json.loads(states)
+                    state_mask = state_array.copy()
+                    state_mask[~np.isin(state_mask, states_ids)] = np.nan
                     state_mask = state_mask * 0 + 1
                 else:
                     state_mask = mask
@@ -1106,7 +1111,6 @@ for i in range(1, 3):
         # Check on Memory
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                         psutil.virtual_memory().percent))
-
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
@@ -1123,7 +1127,7 @@ for i in range(1, 3):
         del arrays
 
         # Now all this
-        dfs = xr.DataArray(source, name="data")  # <--------------------------- Here, we can change this source for different resolutions.
+        dfs = xr.DataArray(source, name="data")
         pdf = dfs.to_dataframe()
         step = cd.res
         to_bin = lambda x: np.floor(x / step) * step
@@ -1133,10 +1137,10 @@ for i in range(1, 3):
         pdf['gridy'] = pdf['latbin'].map(cd.latdict)
 
         # For hover information
-        grid2 = np.copy(cd.grid)
+        grid2 = np.copy(grid)
         grid2[np.isnan(grid2)] = 0
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
-        pdf = pd.merge(pdf, counties_df, how='inner')
+        pdf = pd.merge(pdf, admin_df, how='inner')
         pdf['data'] = pdf['data'].astype(float)
         pdf['printdata'] = (pdf['place'] + ":<br>    " +
                             pdf['data'].round(3).apply(str))
@@ -1166,20 +1170,23 @@ for i in range(1, 3):
             # The same distance above and below 50
             amin = 50 - delta
             amax = 50 + delta
-
         elif 'min' in function or 'max' in function:
             amin = amin
             amax = amax
-
         elif 'o' in function and 'mean' in function and function != 'oarea':
+            if 'leri' in choice:
+                pass
+            else:
+                alimit = max([abs(amax), abs(amin)])
+                amax = alimit
+                amin = alimit * -1
+        elif function == 'oarea' and 'leri' not in choice:
             alimit = max([abs(amax), abs(amin)])
             amax = alimit
             amin = alimit * -1
-
-        elif function == 'oarea':
-            alimit = max([abs(amax), abs(amin)])
-            amax = alimit
-            amin = alimit * -1
+            colorscale = RdWhBu
+        elif function == 'oarea' and 'leri' in choice:
+            # So Leri's index values already appear to be in percentile space!
             colorscale = RdWhBu
 
         # Create the scattermapbox object
@@ -1199,7 +1206,7 @@ for i in range(1, 3):
                     cmax=amax,
                     cmin=amin,
                     opacity=1.0,
-                    size=5,
+                    size=source.res[0] * 20,
                     colorbar=dict(
                         textposition="auto",
                         orientation="h",
@@ -1242,7 +1249,7 @@ for i in range(1, 3):
 
         # Check which element the selection came from
         sel_idx = location[-1]
-        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update (not syncing)
+        if 'On' not in sync:
             idx = int(key) - 1
             if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
@@ -1256,7 +1263,13 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-         dmax, dmin, reverse] = retrieve_data(signal, function, choice)
+         dmax, dmin, reverse, res] = retrieve_data(signal, function, choice)
+
+        # Experimenting with LERI
+        if 'leri' in choice:
+            arrays[arrays < 0] = np.nan  
+            dmin = 0
+            dmax = 100
 
         # There's a lot of color scale switching in the default settings...
         # ...so sorry any one who's trying to figure this out, I will fix this
@@ -1267,7 +1280,9 @@ for i in range(1, 3):
         if function != 'oarea':
             print("LOCATION: " + str(location))
             timeseries, arrays, label = areaSeries(location, arrays, dates,
-                                                    reproject=False)
+                                                   mask, state_array,
+                                                   albers_source, cd,
+                                                   reproject=False)
 
             # Save to file for download option
             df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
@@ -1283,10 +1298,12 @@ for i in range(1, 3):
             bar_type = 'bar'
         else:
             bar_type = 'overlay'
-            timeseries, arrays, label = areaSeries(location, arrays,
-                                                   dates, reproject=True)
+            timeseries, arrays, label = areaSeries(location, arrays, dates,
+                                                   mask, state_array,
+                                                   albers_source, cd,
+                                                   reproject=True)
 
-            # ts_series, ts_series_ninc, dsci = getDroughtArea(arrays, choice) # <------------ For caching later, when we have more space
+            # ts_series, ts_series_ninc, dsci = retrieve_area_data(arrays, choice) # <------------ For caching later, when we have more space
             ts_series, ts_series_ninc, dsci = droughtArea(arrays, choice)
 
             # Save to file for download option
@@ -1351,7 +1368,10 @@ for i in range(1, 3):
         else:
             colors = ['rgb(255, 255, 0)','rgb(252, 211, 127)',
                       'rgb(255, 170, 0)', 'rgb(230, 0, 0)', 'rgb(115, 0, 0)']
-            line_width = 1 + ((1/(year_range[1] - year_range[0])) * 50)
+            if year_range[0] != year_range[1]:
+                line_width = 1 + ((1/(year_range[1] - year_range[0])) * 50)
+            else:
+                line_width = 12
             data = []
             for i in range(5):
                 trace = dict(type='scatter', fill='tozeroy', mode='none',

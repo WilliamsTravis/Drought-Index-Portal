@@ -14,12 +14,12 @@ from netCDF4 import Dataset
 import numpy as np
 from collections import OrderedDict
 import os
-from osgeo import gdal
-from osgeo import osr
+from osgeo import gdal, ogr, osr  # pcjericks.github.io/py-gdalogr-cookbook/index.html
 import pandas as pd
 from pyproj import Proj
 import salem
 from scipy.stats import rankdata
+from tqdm import tqdm
 import sys
 import xarray as xr
 
@@ -32,9 +32,6 @@ else:
 
 
 ####### Variables #############################################################
-grid = np.load("data/npy/prfgrid.npz")["grid"]
-state_array = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
-mask = state_array * 0 + 1
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'pdsi': 'Palmer Drought Severity Index',
              'scpdsi': 'Self-Calibrated Palmer Drought Severity Index',
@@ -59,7 +56,8 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'leri3': 'Landscape Evaporative Response Index - 3 month'}
 
 ######## Functions ############################################################
-def areaSeries(location, arrays, dates, reproject=False):
+def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
+               reproject=False):
     '''
     location = list output from app.callback function 'locationPicker'
     arrays = a time series of arrays falling into each of 5 drought categories
@@ -81,6 +79,7 @@ def areaSeries(location, arrays, dates, reproject=False):
             else:
                 state_mask = mask
             arrays = arrays * state_mask
+        # elif 'County' in location
         else:
             # Collect array index positions and other information for print
             y, x, label, idx = location
@@ -102,7 +101,7 @@ def areaSeries(location, arrays, dates, reproject=False):
     # If we are sending the output to the drought area function
     if reproject:
         print("Reprojecting to Alber's")
-        arrays = wgsToAlbers(arrays)
+        arrays = wgsToAlbers(arrays, cd, albers_source)
 
     print("Area fitlering complete.")
     return [timeseries, arrays, label]
@@ -180,18 +179,23 @@ def droughtArea(arrays, choice, inclusive=False):
                              2: [-1.3, -1.5],
                              3: [-1.5, -2.0],
                              4: [-2.0, -999]},
-                    'pdsi': {0:[-1.0, -2.0],
+                    'pdsi': {0: [-1.0, -2.0],
                              1: [-2.0, -3.0],
                              2: [-3.0, -4.0],
                              3: [-4.0, -5.0],
-                             4: [-5.0, -999]}}
+                             4: [-5.0, -999]},
+                    'leri': {0: [30, 20],
+                             1: [20, 10],
+                             2: [10, 5],
+                             3: [5, 2],
+                             4: [2, 0]}}
 
     # Choose a set of categories
     cat_key = [key for key in drought_cats.keys() if key in choice][0]
     cats = drought_cats[cat_key]
 
     # Total number of pixels
-    mask = arrays[0] * 0 + 1
+    mask = arrays[0] * 0 + 1  # <------------------------------------- With Leri, NA values change the total area for each time step
     total_area = np.nansum(mask)
 
     def singleFilter(array, d, inclusive=False):
@@ -208,20 +212,22 @@ def droughtArea(arrays, choice, inclusive=False):
         if inclusive:
             mask = array<d[0]
         else:
-            mask = (array<d[0]) & (array>d[1])
+            mask = (array<d[0]) & (array>=d[1])
         return array[mask]
 
     # For each array
-    def filter(arrays, d, total_area, inclusive=False):
+    def filter(arrays, d, inclusive=False):
         values = np.array([singleFilter(a, d, inclusive=inclusive) for
                             a in arrays])
-        ps = np.array([(len(b)/total_area) * 100 for b in values])
+        totals = [len(a[~np.isnan(a)]) for a in arrays]  # <------------------- Because the available area for LERI changes, this adjust the total area for each time step
+        ps = np.array([(len(values[i])/totals[i]) * 100 for
+                       i in range(len(values))])
         return ps
 
     print("starting offending loops...")
-    pnincs = np.array([filter(arrays, cats[i], total_area) for i in range(5)])
+    pnincs = np.array([filter(arrays, cats[i]) for i in range(5)])
     DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-    pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]  # <------------------------ ~60 microseconds with 18 year record (compare to 150 milliseconds to start over :)
+    pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]  # <---------------- ~60 microseconds with 18 year record (compare to 150 milliseconds to start over :)
 
     # Return the list of five layers
     print("drought area calculations complete.")
@@ -232,7 +238,12 @@ def im(array):
     '''
     This just plots an array as an image
     '''
-    plt.imshow(array)
+    # plt.close()
+    # window = plt.get_current_fig_manager()
+    # window.canvas.manager.window.raise_()
+    # plt.close()
+    fig = plt.imshow(array)
+    fig.figure.canvas.raise_()
 
 
 def isInt(string):
@@ -266,7 +277,7 @@ def makeMap(maps, function):
     if function == "ocv":
         data = maps.coefficientVariation()
     if function == "oarea":
-        data = maps.meanOriginal()  # This will require some extra doing...
+        data = maps.meanOriginal()
     return data
 
 
@@ -296,78 +307,6 @@ def percentileArrays(arrays):
     pcts = pcts*mask
     return pcts
 
-
-def rasterToDataArray(raster_path):
-    '''
-    take a raster and convert it to a data array for use as a source
-    '''
-    data = gdal.Open(raster_path)
-    geom = data.GetGeoTransform()
-    array = data.ReadAsArray()
-    if len(array.shape) == 3:
-        ntime, nlat, nlon = np.shape(array)
-    else:
-        nlat, nlon = np.shape(array)
-    lons = np.arange(nlon) * geom[1] + geom[0]
-    lats = np.arange(nlat) * geom[5] + geom[3]
-    del data
-
-    attributes = OrderedDict({'transform': list(geom),
-                              'res': [geom[1], geom[1]]})
-    data = xr.DataArray(array,
-                        coords=[lats, lons],
-                        dims=['y', 'x'],
-                        attrs=attributes)
-    res = data.res[0]
-    res_str = str(res).replace('.', '').replace('0', '')
-    data.to_netcdf('data/rasters/source_array_' + res_str + '.nc')
-
-
-
-class Boundaries:
-    def __init__(self, resolution):
-        self.res = resolution
-        
-    def getStates(self):
-        if self.res == 0.25:
-            states = gdal.Open('data/rasters/us_states.tif').ReadAsArray()
-            states[states==-9999] = np.nan
-            return states
-        elif self.res == 0.125:
-            states = gdal.Open('data/rasters/us_states_125.tif').ReadAsArray()
-            states[states==-9999] = np.nan
-            return states
-        else:
-            print('No states with ' + str(self.res) + ' resolution available.')
-
-    def getCounties(self):
-        if self.res == 0.25:
-            cnty = gdal.Open('data/rasters/us_counties.tif').ReadAsArray()
-            cnty[cnty==-9999] = np.nan
-            return cnty
-        elif self.res == 0.125:
-            cnty = gdal.Open('data/rasters/us_counties_125.tif').ReadAsArray()
-            cnty[cnty==-9999] = np.nan
-            return cnty
-        else:
-            print('No counties with ' + str(self.res) +
-                  ' resolution available.')
-
-    # def getCountiesDF(self):
-    #     # ...
-
-    def getGrid(self):
-        if self.res == 0.25:
-            grid = gdal.Open('data/rasters/prfgrid.tif').ReadAsArray()
-            grid[grid == -9999] = np.nan
-            return grid
-        elif self.res == 0.125:
-            grid = gdal.Open('data/rasters/grid_125.tif').ReadAsArray()
-            grid[grid == -9999] = np.nan
-            return grid
-        else:
-            print('No counties with ' + str(self.res) +
-                  'resolution available.')
 
 def readRaster(rasterpath, band, navalue=-9999):
     """
@@ -776,7 +715,51 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
     nco.close()
 
 
+def toRaster(array, path, geometry, srs, navalue=-9999):
+    """
+    path = target path
+    srs = spatial reference system
+    """
+    xpixels = array.shape[1]    
+    ypixels = array.shape[0]
+    path = path.encode('utf-8')
+    image = gdal.GetDriverByName("GTiff").Create(path, xpixels, ypixels,
+                                1, gdal.GDT_Float32)
+    image.SetGeoTransform(geometry)
+    image.SetProjection(srs)
+    image.GetRasterBand(1).WriteArray(array)
+    image.GetRasterBand(1).SetNoDataValue(navalue)
+      
+
+def toRasters(arraylist,path,geometry,srs):
+    """
+    Arraylist format = [[name,array],[name,array],....]
+    path = target path
+    geometry = gdal geometry object
+    srs = spatial reference system object
+    """
+    if path[-2:] == "\\":
+        path = path
+    else:
+        path = path + "\\"
+    sample = arraylist[0][1]
+    ypixels = sample.shape[0]
+    xpixels = sample.shape[1]
+    for ray in  tqdm(arraylist):
+        image = gdal.GetDriverByName("GTiff").Create(os.path.join(path,
+                                                              ray[0] + ".tif"),
+                                    xpixels, ypixels, 1, gdal.GDT_Float32)
+        image.SetGeoTransform(geometry)
+        image.SetProjection(srs)
+        image.GetRasterBand(1).WriteArray(ray[1])
+          
+
 def toNetCDFPercentile(src_path, dst_path):
+    '''
+    This is not fully functional, it causes memory problems and I think it may
+    be scrambling the order of the dates somehow. Still, something like this
+    may be useful in the future, so I'm keeping it for later.
+    '''
     with Dataset(src_path) as src, Dataset(dst_path, 'w') as dst:
 
         # copy attributes
@@ -831,11 +814,12 @@ def toNetCDFPercentile(src_path, dst_path):
 
 
 # WGS
-def wgsToAlbers(arrays):
+def wgsToAlbers(arrays, cd, albers_source):
     dates = range(len(arrays))
     wgs_proj = Proj(init='epsg:4326')
-    wgrid = salem.Grid(nxny=(300, 120), dxdy=(0.25, -0.25),  # <--------------- customize this for different resolutions.
-                       x0y0=(-130, 50), proj=wgs_proj)
+    geom = cd.source.transform
+    wgrid = salem.Grid(nxny=(cd.x_length, cd.y_length), dxdy=(cd.res, -cd.res),
+                       x0y0=(geom[0], geom[3]), proj=wgs_proj)
     lats = np.unique(wgrid.xy_coordinates[1])
     lats = lats[::-1]
     lons = np.unique(wgrid.xy_coordinates[0])
@@ -844,22 +828,288 @@ def wgsToAlbers(arrays):
                               dims=['time', 'lat', 'lon'])
     wgs_data = xr.Dataset(data_vars={'value': data_array})
 
-    # Albers Equal Area Conic North America
+    # Albers Equal Area Conic North America (epsg not working)
     albers_proj = Proj('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
-                       +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
-                       +datum=NAD83 +units=m +no_defs')
-    with salem.open_xr_dataset(os.path.join(data_path,
-				 'data/droughtindices/netcdfs/albers/albers.nc')) as data:
-        albers = data
-        albers.salem.grid._proj = albers_proj  # Something was off here
-        data.close()
+                        +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
+                        +datum=NAD83 +units=m +no_defs')
 
-    projection = albers.salem.transform(wgs_data, 'linear')
+    # Create an albers grid
+    geom = albers_source.GetGeoTransform()
+    array = albers_source.ReadAsArray()
+    res = geom[1]
+    x_length = albers_source.RasterXSize 
+    y_length = albers_source.RasterYSize 
+    agrid = salem.Grid(nxny=(x_length, y_length), dxdy=(res, -res),
+                       x0y0=(geom[0], geom[3]), proj=albers_proj)
+    lats = np.unique(agrid.xy_coordinates[1])
+    lats = lats[::-1]
+    lons = np.unique(agrid.xy_coordinates[0])
+    data_array = xr.DataArray(data=array,
+                              coords=[lats, lons],
+                              dims=['lat', 'lon'])
+    albers_data = xr.Dataset(data_vars={'value': data_array})
+    albers_data.salem.grid._proj = albers_proj
+    projection = albers_data.salem.transform(wgs_data, 'linear')
     arrays = projection.value.data
     return(arrays)
 
 
 ################################ classes ######################################
+class Admin_Elements:
+    def __init__(self, resolution):
+        self.resolution = resolution
+
+
+    def buildAdmin(self):
+        resolution = self.resolution
+        res_str = str(round(resolution, 3))
+        res_ext = '_' + res_str.replace('.', '_')
+        county_path = 'data/rasters/us_counties' + res_ext + '.tif'
+        state_path = 'data/rasters/us_states' + res_ext + '.tif'
+        
+        # Use the shapefile for just the county, it has state and county fips
+        src_path = 'data/shapefiles/contiguous_counties.shp' 
+    
+        # And rasterize
+        self.rasterize(src_path, county_path, attribute='COUNTYFP',
+                       extent=[-130, 50, -55, 20])
+        self.rasterize(src_path, state_path, attribute='STATEFP',
+                       extent=[-130, 50, -55, 20])
+
+
+    def buildAdminDF(self):
+        resolution = self.resolution
+        res_str = str(round(resolution, 3))
+        res_ext = '_' + res_str.replace('.', '_')
+        grid_path = 'data/rasters/grid' + res_ext + '.tif'
+        gradient_path = 'data/rasters/gradient' + res_ext + '.tif'
+        county_path = 'data/rasters/us_counties' + res_ext + '.tif'
+        state_path = 'data/rasters/us_states' + res_ext + '.tif'
+        admin_path = 'data/tables/admin_df' + res_ext + '.csv'
+    
+        # There are several administrative elements used in the app
+        fips = pd.read_csv('data/tables/US_FIPS_Codes.csv', skiprows=1, index_col=0)
+        res_ext = '_' + str(resolution).replace('.', '_')
+        states = pd.read_table('data/tables/state_fips.txt', sep='|')
+        states = states[['STATE_NAME', 'STUSAB', 'STATE']]
+    
+        # Read, mask and flatten the arrays
+        def flttn(array_path):
+            '''
+            Mask and flatten the grid array
+            '''
+            grid = gdal.Open(array_path).ReadAsArray()
+            grid = grid.astype(np.float64)
+            na = grid[0, 0]
+            grid[grid == na] = np.nan
+            return grid.flatten()
+    
+        grid = flttn(grid_path)
+        gradient = flttn(gradient_path)
+        carray = flttn(county_path)
+        sarray = flttn(state_path)
+    
+        # Associate county and state fips with grid ids
+        cdf = pd.DataFrame(OrderedDict({'grid': grid, 'county_fips': carray,
+                                        'state_fips': sarray,
+                                        'gradient': gradient}))
+        cdf = cdf.dropna()
+        cdf = cdf.astype(int)
+
+        # Create the full county fips (state + county)
+        def frmt(number):
+            return '{:03d}'.format(number)
+        fips['fips'] = (fips['FIPS State'].map(frmt) +
+                        fips['FIPS County'].map(frmt))
+        cdf['fips'] = (cdf['state_fips'].map(frmt) +
+                       cdf['county_fips'].map(frmt))    
+        df = cdf.merge(fips, left_on='fips', right_on='fips', how='inner')
+        df = df.merge(states, left_on='state_fips', right_on='STATE',
+                      how='inner')
+        df['place'] = df['County Name'] + ' County, ' + df['STUSAB']
+        df = df[['County Name', 'STATE_NAME', 'place', 'grid', 'gradient',
+                 'county_fips', 'state_fips', 'fips', 'STUSAB']]
+        df.columns = ['county', 'state', 'place', 'grid', 'gradient',
+                      'county_fips','state_fips', 'fips', 'state_abbr']
+
+        df.to_csv(admin_path, index=False)
+
+
+    def buildGrid(self):
+        '''
+        Use the county raster to build this.
+        '''
+        resolution = self.resolution
+        res_str = str(round(resolution, 3))
+        res_ext = '_' + res_str.replace('.', '_')
+        array_path = 'data/rasters/us_counties' + res_ext + '.tif'
+        if not os.path.exists(array_path):
+            self.buildAdmin()
+        source = gdal.Open(array_path)
+        geom = source.GetGeoTransform()
+        proj = source.GetProjection()
+        array = source.ReadAsArray()
+        array = array.astype(np.float64)
+        na = array[0, 0]
+        mask = array.copy()
+        mask[mask == na] = np.nan
+        mask = mask * 0 + 1
+        gradient = mask.copy()
+        for i in range(gradient.shape[0]):
+            for j in range(gradient.shape[1]):
+                gradient[i, j] = i * j
+        gradient = gradient * mask
+        grid = mask.copy()
+        num = grid.shape[0] * grid.shape[1]
+        for i in range(gradient.shape[0]):
+            for j in range(gradient.shape[1]):
+                num -= 1
+                grid[i, j] = num
+        grid = grid * mask
+        toRaster(grid, 'data/rasters/grid' + res_ext + '.tif', geom, proj,
+                 -9999)
+        toRaster(gradient, 'data/rasters/gradient' + res_ext + '.tif',
+                 geom, proj, -9999)
+        return grid, gradient
+
+    
+    def buildSource(self):
+        '''
+        take a single band raster and convert it to a data array for use as a
+        source. Make one of these for each resolution you might need.
+        '''
+        resolution = self.resolution
+        res_str = str(round(resolution, 3))
+        res_ext = '_' + res_str.replace('.', '_')
+        array_path = 'data/rasters/us_counties' + res_ext + '.tif'
+        if not os.path.exists(array_path):
+            self.buildAdmin(resolution)
+        data = gdal.Open(array_path)
+        geom = data.GetGeoTransform()
+        array = data.ReadAsArray()
+        array = np.array([array])
+        if len(array.shape) == 3:
+            ntime, nlat, nlon = np.shape(array)
+        else:
+            nlat, nlon = np.shape(array)
+        lons = np.arange(nlon) * geom[1] + geom[0]
+        lats = np.arange(nlat) * geom[5] + geom[3]
+        del data
+    
+        attributes = OrderedDict({'transform': geom,
+                                  'res': (geom[1], geom[1])})
+    
+        data = xr.DataArray(data=array,
+                            name=('A ' + str(resolution) + ' resolution grid' +
+                                  ' used as a source array'),
+                            coords=(('band', np.array([1])),
+                                    ('y', lats),
+                                    ('x', lons)),
+                            attrs=attributes)
+        wgs_path = 'data/rasters/source_array' + res_ext + '.nc'
+        data.to_netcdf(wgs_path)
+
+        # We also need a source data set for Alber's projection geometry
+        grid_path = 'data/rasters/grid' + res_ext + '.tif'
+        albers_path = 'data/rasters/source_albers' + res_ext + '.tif'
+        ds = gdal.Warp(albers_path, grid_path, dstSRS='EPSG:102008')
+        ds = None
+
+
+    def getElements(self):
+        '''
+        I want to turn this into a class that handles all resolution dependent
+        objects, but for now I'm just tossing this together for a meeting.
+        '''
+        # Get paths
+        [grid_path, gradient_path, county_path, state_path,
+         source_path, albers_path, admin_path] = self.pathRequest()
+    
+        # Read in objects
+        states = gdal.Open(state_path).ReadAsArray()
+        states[states==-9999] = np.nan
+        cnty = gdal.Open(county_path).ReadAsArray()
+        cnty[cnty==-9999] = np.nan
+        grid = gdal.Open(grid_path).ReadAsArray()
+        grid[grid == -9999] = np.nan
+        mask = grid * 0 + 1
+        cd = Coordinate_Dictionaries(source_path, grid)
+        admin_df = pd.read_csv(admin_path)
+        albers_source = gdal.Open(albers_path)
+        with xr.open_dataarray(source_path) as data:
+            source = data.load()
+            data.close()
+
+        return states, cnty, grid, mask, source, albers_source, cd, admin_df
+
+
+    def pathRequest(self):
+        # Set paths to each element then make sure they exist
+        resolution = self.resolution
+        res_str = str(round(resolution, 3))
+        res_ext = '_' + res_str.replace('.', '_')
+        grid_path = 'data/rasters/grid' + res_ext + '.tif'
+        gradient_path = 'data/rasters/gradient' + res_ext + '.tif'
+        county_path = 'data/rasters/us_counties' + res_ext + '.tif'
+        state_path = 'data/rasters/us_states' + res_ext + '.tif'
+        source_path = 'data/rasters/source_array' + res_ext + '.nc'
+        albers_path = 'data/rasters/source_albers' + res_ext + '.tif'
+        admin_path = 'data/tables/admin_df' + res_ext + '.csv'
+
+        if not os.path.exists(county_path) or not os.path.exists(state_path):
+            self.buildAdmin()
+        if not os.path.exists(grid_path) or not os.path.exists(gradient_path):
+            self.buildGrid()
+        if not os.path.exists(source_path) or not os.path.exists(albers_path):
+            self.buildSource()
+        if not os.path.exists(admin_path):
+            self.buildAdminDF()
+    
+        # Return everything at once
+        path_package = [grid_path, gradient_path, county_path, state_path,
+                        source_path, albers_path, admin_path]
+    
+        return path_package
+
+
+    def rasterize(self, src_path, trgt_path, attribute, extent, epsg=4326,
+                  na=-9999):
+        '''
+        It seems to be unreasonably involved to do this in Python compared to
+        the command line.
+        ''' 
+        resolution = self.resolution
+        # Open shapefile, retrieve the layer
+        src = ogr.Open(src_path)
+        layer = src.GetLayer()
+    
+        # Create the target raster layer
+        xmin, ymax, xmax, ymin = extent
+        cols = int((xmax - xmin)/resolution)
+        rows = int((ymax - ymin)/resolution)
+        trgt = gdal.GetDriverByName('GTiff').Create(trgt_path, cols, rows, 1,
+                                   gdal.GDT_Float32)
+        trgt.SetGeoTransform((xmin, resolution, 0, ymax, 0, -resolution))
+    
+        # Add crs
+        refs = osr.SpatialReference()
+        refs.ImportFromEPSG(epsg)
+        trgt.SetProjection(refs.ExportToWkt())
+    
+        # Set no value
+        band = trgt.GetRasterBand(1)
+        band.SetNoDataValue(na)
+    
+        # Set options
+        ops = ['Attribute=' + attribute]
+    
+        # Finally rasterize
+        gdal.RasterizeLayer(trgt, [1], layer, options=ops)
+    
+        # Close target raster
+        trgt = None
+
+    
 class Cacher:
     '''
     A simple stand in cache for storing objects in memory.
@@ -901,7 +1151,7 @@ class Coordinate_Dictionaries:
             7) the source array
             8) the source albers nc file
     '''
-    def __init__(self, source_path):
+    def __init__(self, source_path, grid):
         self.source = xr.open_dataarray(source_path)
 
         # Geometry
@@ -909,76 +1159,14 @@ class Coordinate_Dictionaries:
         self.y_length = self.source.shape[1]
         self.res = self.source.res[0]
         self.lon_min = self.source.transform[0]
-        self.lat_max = self.source.transform[3] - self.res
+        self.lat_max = self.source.transform[3]
         self.xs = range(self.x_length)
         self.ys = range(self.y_length)
         self.lons = [self.lon_min + self.res*x for x in self.xs]
         self.lats = [self.lat_max - self.res*y for y in self.ys]
 
         # Dictionaires with coordinates and array index positions
-        self.grid = grid  #  <------------------------------------------------- best way to make a custom grid from source?
-        self.londict = dict(zip(self.lons, self.xs))
-        self.latdict = dict(zip(self.lats, self.ys))
-        self.londict_rev = {y: x for x, y in self.londict.items()}
-        self.latdict_rev = {y: x for x, y in self.latdict.items()}
-
-        def pointToGrid(self, point):
-            '''
-            Takes in a plotly point dictionary and outputs a grid ID
-            '''
-            lon = point['points'][0]['lon']
-            lat = point['points'][0]['lat']
-            x = self.londict[lon]
-            y = self.latdict[lat]
-            gridid = self.grid[y, x]
-            return gridid
-
-        # Let's say we also a list of gridids
-        def gridToPoint(self, gridid):
-            '''
-            Takes in a grid ID and outputs a plotly point dictionary
-            '''
-            y, x = np.where(self.grid == gridid)
-            lon = self.londict_rev[int(x[0])]
-            lat = self.latdict_rev[int(y[0])]
-            point = {'points': [{'lon': lon, 'lat': lat}]}
-            return point
-
-
-class Coordinate_Dictionaries2:
-    '''
-    This translates numpy coordinates to geographic coordinates and back.
-    
-    Production notes:
-        - I think this would also be a good place to parameterize all
-            resolution specific elements of the application
-        - These elements include:
-            1) the grid
-            2) the grid gradient
-            3) the counties raster
-            4) the counties data frame
-            5) the states raster
-            6) the states data frame
-            7) the source array
-            8) the source albers nc file
-    '''
-    def __init__(self, source_path):
-        with xr.open_dataset(source_path) as data:
-            self.source =  data.variables['value'][0]  # <-------------------------------- what if I could use any existing file here
-
-        # Geometry
-        self.x_length = self.source.shape[2]
-        self.y_length = self.source.shape[1]
-        self.res = self.source.res[0]
-        self.lon_min = self.source.transform[0]
-        self.lat_max = self.source.transform[3] - self.res
-        self.xs = range(self.x_length)
-        self.ys = range(self.y_length)
-        self.lons = [self.lon_min + self.res*x for x in self.xs]
-        self.lats = [self.lat_max - self.res*y for y in self.ys]
-
-        # Dictionaires with coordinates and array index positions
-        self.grid = grid  #  <------------------------------------------------- best way to make a custom grid from source?
+        self.grid = grid
         self.londict = dict(zip(self.lons, self.xs))
         self.latdict = dict(zip(self.lats, self.ys))
         self.londict_rev = {y: x for x, y in self.londict.items()}
@@ -1038,7 +1226,7 @@ class Index_Maps():
 
     # Reduce memory by preallocating attribute slots
     __slots__ = ('year1', 'year2', 'month1', 'month2', 'function',
-                 'colorscale', 'reverse', 'choice', 'grid', 'mask')
+                 'colorscale', 'reverse', 'choice')
 
     # Create Initial Values
     def __init__(self, time_range=[[2000, 2017], [1, 12]],
@@ -1054,8 +1242,6 @@ class Index_Maps():
         self.colorscale = colorscale
         self.reverse = reverse
         self.choice = choice
-        self.grid = np.load("data/npy/prfgrid.npz")["grid"]
-        self.mask = self.grid * 0 + 1
 
 
     def setColor(self, default='percentile'):
@@ -1142,10 +1328,15 @@ class Index_Maps():
         with xr.open_dataset(array_path) as data:
             data = data.sel(time=slice(d1, d2))
             indexlist = data
-            # indexlist.value.data = indexlist.value.data.astype(np.float16)
+            res = indexlist.crs.GeoTransform[1]
             del data
+        
+        if 'leri' in self.choice:
+            arrays = indexlist.value.data
+            arrays[arrays < 0] = np.nan
+            indexlist.value.data = arrays
 
-        return indexlist
+        return indexlist, res
 
 
     def getOriginal(self):
@@ -1155,13 +1346,13 @@ class Index_Maps():
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/",
                                   self.choice + '.nc')
-        indexlist = self.getData(array_path)
+        indexlist, res = self.getData(array_path)
         limits = [abs(np.nanmin(indexlist.value.data)),
                   abs(np.nanmax(indexlist.value.data))]
         dmax = max(limits)  # Makes an even graph
         dmin = dmax*-1
         gc.collect()
-        return [indexlist, dmin, dmax]
+        return [indexlist, dmin, dmax, res]
 
 
     def getPercentile(self):
@@ -1171,7 +1362,7 @@ class Index_Maps():
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/percentiles",
                                   self.choice + '.nc')
-        indexlist = self.getData(array_path)
+        indexlist, res = self.getData(array_path)
         indexlist.value.data = indexlist.value.data * 100
 
         # We want the color scale to be centered on 50, first get max/min
@@ -1187,7 +1378,7 @@ class Index_Maps():
 
         gc.collect()
 
-        return [indexlist, dmin, dmax]
+        return [indexlist, dmin, dmax, res]
 
 
     def getAlbers(self):
@@ -1198,13 +1389,13 @@ class Index_Maps():
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/albers",
                                   self.choice + '.nc')
-        indexlist = self.getData(array_path)
+        indexlist, res = self.getData(array_path)
         limits = [abs(np.nanmin(indexlist.value.data)),
                   abs(np.nanmax(indexlist.value.data))]
         dmax = max(limits)  # Makes an even graph
         dmin = dmax*-1
         gc.collect()
-        return [indexlist, dmin, dmax]
+        return [indexlist, dmin, dmax, res]
 
 
     def calculateCV(indexlist):
@@ -1242,10 +1433,10 @@ class Index_Maps():
         Calculate mean of original index values
         '''
         # Get time series of values
-        [indexlist, dmin, dmax] = self.getOriginal()
+        [indexlist, dmin, dmax, res] = self.getOriginal()
 
         # Get data
-        array = indexlist.mean('time').value.data
+        array = indexlist.mean('time').value.data  # <------------------------- This seems to be miscalculating 
         arrays = indexlist.value.data
         dates = indexlist.time.data
         del indexlist
@@ -1259,7 +1450,7 @@ class Index_Maps():
         else:
             reverse = False
 
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
     def maxOriginal(self):
@@ -1267,7 +1458,7 @@ class Index_Maps():
         Calculate max of original index values
         '''
         # Get time series of values
-        [indexlist, dmin, dmax] = self.getOriginal()
+        [indexlist, dmin, dmax, res] = self.getOriginal()
 
         # Get data
         array = indexlist.max('time').value.data
@@ -1284,7 +1475,7 @@ class Index_Maps():
         else:
             reverse = False
 
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
     def minOriginal(self):
@@ -1292,7 +1483,7 @@ class Index_Maps():
         Calculate max of original index values
         '''
         # Get time series of values
-        [indexlist, dmin, dmax] = self.getOriginal()
+        [indexlist, dmin, dmax, res] = self.getOriginal()
 
         # Get data
         array = indexlist.min('time').value.data
@@ -1308,7 +1499,7 @@ class Index_Maps():
             reverse = True
         else:
             reverse = False
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
     def meanPercentile(self):
@@ -1316,7 +1507,7 @@ class Index_Maps():
         Calculate mean of percentiles of original index values
         '''
         # Get time series of values
-        [indexlist, dmin, dmax] = self.getPercentile()
+        [indexlist, dmin, dmax, res] = self.getPercentile()
 
         # Get data
         array = indexlist.mean('time').value.data
@@ -1332,7 +1523,7 @@ class Index_Maps():
             reverse = True
         else:
             reverse = False
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
     def maxPercentile(self):
@@ -1340,7 +1531,7 @@ class Index_Maps():
         Calculate mean of percentiles of original index values
         '''
          # Get time series of values
-        [indexlist, dmin, dmax] = self.getPercentile()
+        [indexlist, dmin, dmax, res] = self.getPercentile()
 
         # Get data
         array = indexlist.max('time').value.data
@@ -1357,7 +1548,7 @@ class Index_Maps():
         else:
             reverse = False
 
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
     def minPercentile(self):
@@ -1365,7 +1556,7 @@ class Index_Maps():
         Calculate mean of percentiles of original index values
         '''
          # Get time series of values
-        [indexlist, dmin, dmax] = self.getPercentile()
+        [indexlist, dmin, dmax, res] = self.getPercentile()
 
         # Get data
         array = indexlist.min('time').value.data
@@ -1382,7 +1573,7 @@ class Index_Maps():
         else:
             reverse = False
 
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
     def coefficientVariation(self):
@@ -1390,7 +1581,7 @@ class Index_Maps():
         Calculate mean of percentiles of original index values
         '''
         # Get time series of values
-        [indexlist, dmin, dmax] = self.getOriginal()
+        [indexlist, dmin, dmax, res] = self.getOriginal()
 
         # Get data
         arrays = indexlist.value.data
@@ -1404,7 +1595,7 @@ class Index_Maps():
         # The colorscale will always mean the same thing
         reverse = False
 
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
 class Location_Builder:
@@ -1414,11 +1605,11 @@ class Location_Builder:
     list object needed further down the line. To do so, it holds county, 
     state, grid, and other administrative information.
     '''
-    def __init__(self, location, coordinate_dictionary):
+    def __init__(self, location, coordinate_dictionary, admin_df):
         self.location = location
-        self.counties_df = pd.read_csv('data/tables/counties3.csv')
-        self.states_df = self.counties_df[['STATE_NAME', 'STUSAB',
-                                    'FIPS State']].drop_duplicates().dropna()
+        self.admin_df = admin_df
+        self.states_df = admin_df[['state', 'state_abbr',
+                                   'state_fips']].drop_duplicates().dropna()
         self.cd = coordinate_dictionary
 
     def chooseRecent(self):
@@ -1427,7 +1618,7 @@ class Location_Builder:
         selection it came from. Return a list with some useful elements.
         '''
         location= self.location
-        counties_df = self.counties_df
+        counties_df = self.admin_df
         states_df = self.states_df
         cd = self.cd
 
@@ -1449,11 +1640,11 @@ class Location_Builder:
             # Single or multiple, not all or empty, state or list of states
             elif len(location) >= 1:
                 # Return the mask, a flag, and the state names
-                state = list(states_df['STUSAB'][
-                             states_df['FIPS State'].isin(location)])
+                state = list(states_df['state_abbr'][
+                             states_df['state_fips'].isin(location)])
                 if len(state) < 4:
-                    state = [states_df['STATE_NAME'][
-                             states_df['STUSAB'] == s].item() for s in state]
+                    state = [states_df['state'][
+                             states_df['state_abbr']==s].item() for s in state]
                 states = ", ".join(state)
                 location = ['state_mask', str(location), states]
     

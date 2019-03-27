@@ -26,7 +26,6 @@ Created on Mon Mar 18 09:47:33 2019
 
 @author: User
 """
-import calendar
 import datetime as dt
 import ftplib
 from glob import glob
@@ -41,6 +40,7 @@ from tqdm import tqdm
 import xarray as xr
 
 if sys.platform == 'win32':
+    sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
     os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
 else:
@@ -48,7 +48,7 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions import toNetCDF2, isInt, toNetCDFPercentile
+from functions import toNetCDF2, isInt
 
 # These make output logs too noisy to see what happened
 gdal.PushErrorHandler('CPLQuietErrorHandler')
@@ -173,7 +173,7 @@ for index in indices:
         tfiles.sort()
         ncdir = os.path.join(data_path, "data/droughtindices/netcdfs/",
                               index + '.nc')
-        toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,  # these are two years short to test append mode above
+        toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,
                   year1=1980, month1=1, year2=todays_date.year,
                   month2=todays_date.month, epsg=4326, percentiles=False,
                   wmode='w')
