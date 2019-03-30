@@ -6,6 +6,7 @@ Created on Tue Jan 22 18:02:17 2019
 @author: User
 """
 import datetime as dt
+from dash.exceptions import PreventUpdate
 from dateutil.relativedelta import relativedelta
 import gc
 import json
@@ -63,11 +64,9 @@ def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
     arrays = a time series of arrays falling into each of 5 drought categories
     inclusive = whether or to categorize drought by including all categories
     '''
-    if type(location[0]) is int:
-        print("Location is singular")
-        y, x, label, idx = location
+    if location[0] == 'grid_id':
+        flag, y, x, label, idx = location
         timeseries = np.array([round(a[y, x], 4) for a in arrays])
-
     else:
         if location[0] == 'state_mask':
             flag, states, label, idx = location
@@ -82,7 +81,7 @@ def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
         # elif 'County' in location
         else:
             # Collect array index positions and other information for print
-            y, x, label, idx = location
+            flag, y, x, label, idx = location
             x = json.loads(x)
             y = json.loads(y)
 
@@ -100,10 +99,10 @@ def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
 
     # If we are sending the output to the drought area function
     if reproject:
-        print("Reprojecting to Alber's")
+        # print("Reprojecting to Alber's")
         arrays = wgsToAlbers(arrays, cd, albers_source)
 
-    print("Area fitlering complete.")
+    # print("Area fitlering complete.")
     return [timeseries, arrays, label]
 
 
@@ -195,7 +194,7 @@ def droughtArea(arrays, choice, inclusive=False):
     cats = drought_cats[cat_key]
 
     # Total number of pixels
-    mask = arrays[0] * 0 + 1  # <------------------------------------- With Leri, NA values change the total area for each time step
+    mask = arrays[0] * 0 + 1  # <---------------------------------------------- With Leri, NA values change the total area for each time step
     total_area = np.nansum(mask)
 
     def singleFilter(array, d, inclusive=False):
@@ -302,9 +301,9 @@ def percentileArrays(arrays):
         pct = rankdata(lst)/len(lst)
         return pct
 
-    mask = arrays[-10, :, :] * 0 + 1  # Don't use the first or last (if empty)
+    # mask = arrays[-10, :, :] * 0 + 1  # Don't use the first or last (if empty)
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
-    pcts = pcts*mask
+    # pcts = pcts*mask
     return pcts
 
 
@@ -1044,6 +1043,24 @@ class Admin_Elements:
             source = data.load()
             data.close()
 
+        # We actually want full state-county fips for counties
+        # Stack both into one
+        state_counties = np.stack([states, cnty])
+
+        # Our function will take as the input a list [state fips, county fips]
+        # for each index position on the map
+        def formatFIPS(lst):
+            try:
+                fips1 = '{:03d}'.format(int(lst[0]))
+                fips2 = '{:03d}'.format(int(lst[1]))
+                fips = float(fips1 + fips2)
+            except:
+                fips = np.nan
+            return fips
+
+        # Get a field of full fips to use as location ids
+        cnty = np.apply_along_axis(formatFIPS, 0, state_counties)
+
         return states, cnty, grid, mask, source, albers_source, cd, admin_df
 
 
@@ -1176,27 +1193,27 @@ class Coordinate_Dictionaries:
         self.londict_rev = {y: x for x, y in self.londict.items()}
         self.latdict_rev = {y: x for x, y in self.latdict.items()}
 
-        def pointToGrid(self, point):
-            '''
-            Takes in a plotly point dictionary and outputs a grid ID
-            '''
-            lon = point['points'][0]['lon']
-            lat = point['points'][0]['lat']
-            x = self.londict[lon]
-            y = self.latdict[lat]
-            gridid = self.grid[y, x]
-            return gridid
+    def pointToGrid(self, point):
+        '''
+        Takes in a plotly point dictionary and outputs a grid ID
+        '''
+        lon = point['points'][0]['lon']
+        lat = point['points'][0]['lat']
+        x = self.londict[lon]
+        y = self.latdict[lat]
+        gridid = self.grid[y, x]
+        return gridid
 
-        # Let's say we also a list of gridids
-        def gridToPoint(self, gridid):
-            '''
-            Takes in a grid ID and outputs a plotly point dictionary
-            '''
-            y, x = np.where(self.grid == gridid)
-            lon = self.londict_rev[int(x[0])]
-            lat = self.latdict_rev[int(y[0])]
-            point = {'points': [{'lon': lon, 'lat': lat}]}
-            return point
+    # Let's say we also a list of gridids
+    def gridToPoint(self, gridid):
+        '''
+        Takes in a grid ID and outputs a plotly point dictionary
+        '''
+        y, x = np.where(self.grid == gridid)
+        lon = self.londict_rev[int(x[0])]
+        lat = self.latdict_rev[int(y[0])]
+        point = {'points': [{'lon': lon, 'lat': lat}]}
+        return point
 
 
 class Index_Maps():
@@ -1609,87 +1626,116 @@ class Location_Builder:
     list object needed further down the line. To do so, it holds county, 
     state, grid, and other administrative information.
     '''
-    def __init__(self, location, coordinate_dictionary, admin_df):
-        self.location = location
-        self.admin_df = admin_df
+
+    def __init__(self, trig_id, trig_val, coordinate_dictionary, admin_df,
+                 state_array, county_array):
+        self.trig_id = trig_id
+        self.trig_val = trig_val
+        self.cd = coordinate_dictionary
+        self.admin_df = admin_df  # <------------------------------------------ Here down can be read in with a resolution value
         self.states_df = admin_df[['state', 'state_abbr',
                                    'state_fips']].drop_duplicates().dropna()
-        self.cd = coordinate_dictionary
+        self.state_array = state_array  
+        self.county_array = county_array
 
     def chooseRecent(self):
         '''
         Check the location for various features to determine what type of
         selection it came from. Return a list with some useful elements.
+
+        Possible triggering elements:
+
+            'map_1.clickData',
+            'map_2.clickData',
+            'map_1.selectedData',
+            'map_2.selectedData',
+            'county_1.value',
+            'county_2.value',
+            'state_1.value',
+            'state_2.value'
+
         '''
-        location= self.location
-        counties_df = self.admin_df
+        trig_id = self.trig_id
+        trig_val = self.trig_val
+        admin_df = self.admin_df
         states_df = self.states_df
         cd = self.cd
+        county_array = self.county_array
 
-        # 1: Selection is a grid ID
-        if type(location) is int and len(str(location)) >= 3:
-            county = counties_df['place'][counties_df.grid == location].item()
-            y, x = np.where(cd.grid == location)
-            location = [int(y), int(x), county]
+        print("Location Picker Trigger: " + str(trig_id))
+        print("Location Picker Value: " + str(trig_val))
+
+        # 1: Selection is a county selection
+        if 'county' in trig_id:
+            county = admin_df['place'][admin_df.fips == trig_val].unique()[0]
+            y, x = np.where(county_array == trig_val)
+            location = ['county_id', str(list(y)), str(list(x)), county]
+
+        # 2: Selection is a single grid IDs
+        elif 'clickData' in trig_id:
+            lon = trig_val['points'][0]['lon']
+            lat = trig_val['points'][0]['lat']
+            x = cd.londict[lon]
+            y = cd.latdict[lat]
+            gridid = cd.grid[y, x]
+            counties = admin_df['place'][admin_df.grid == gridid]
+            county = counties.unique()
+            label = county[0] + ' (Grid ' + str(int(gridid)) + ')'
+            location = ['grid_id', y, x, label]        
+
+        # 3: Selection is a set of grid IDs
+        elif 'selectedData' in trig_id:
+            if trig_val is not None:
+                selections = trig_val['points']
     
+                y = list([cd.latdict[d['lat']] for d in selections])
+                x = list([cd.londict[d['lon']] for d in selections])
+                try:
+                    counties = np.array([d['text'][:d['text'].index('<')] for
+                                     d in selections])
+                except:
+                    counties = np.array([d['text'][:d['text'].index(':')] for
+                                     d in selections])
+                local_df = admin_df[admin_df['place'].isin(
+                                    list(np.unique(counties)))]
+    
+                # Use gradient to print NW and SE most counties as a range
+                NW = local_df['place'][
+                    local_df['gradient'] == min(local_df['gradient'])].item()
+                SE = local_df['place'][
+                    local_df['gradient'] == max(local_df['gradient'])].item()
+                # if NW != SE:
+                label = NW + " to " + SE
+                # else:
+                    # label = NW
+                location = ['grid_ids', str(y), str(x), label]        
+            else:
+                raise PreventUpdate
+
         # 2: location is a list of states
-        elif type(location) is list:
-            # Empty, default to CONUS
-            if len(location) == 0:
+        elif 'update' in trig_id:
+            # Selection is the default 'all'
+            if type(trig_val) is str:
                 location = ['state_mask', 'all', 'Contiguous United States']
-    
-            elif len(location) == 1 and location[0] == 'all':
+        
+            # Empty list, default to CONUS
+            elif len(trig_val) == 0:
                 location = ['state_mask', 'all', 'Contiguous United States']
-    
-            # Single or multiple, not all or empty, state or list of states
-            elif len(location) >= 1:
+
+            # A selection of 'all' within a list
+            elif len(trig_val) == 1 and trig_val[0] == 'all':
+                location = ['state_mask', 'all', 'Contiguous United States']
+
+            # Single or multiple, not 'all' or empty, state or list of states
+            elif len(trig_val) >= 1:
                 # Return the mask, a flag, and the state names
                 state = list(states_df['state_abbr'][
-                             states_df['state_fips'].isin(location)])
-                if len(state) < 4:
+                             states_df['state_fips'].isin(trig_val)])
+                if len(state) < 4:  # Spell out full state name in title
                     state = [states_df['state'][
                              states_df['state_abbr']==s].item() for s in state]
                 states = ", ".join(state)
-                location = ['state_mask', str(location), states]
-    
-        # Selection is the default 'all' states
-        elif type(location) is str:
-            location = ['state_mask', 'all', 'Contiguous United States']
-    
-        # 4: Location is a point object
-        elif type(location) is dict:
-            if len(location['points']) == 1:
-                lon = location['points'][0]['lon']
-                lat = location['points'][0]['lat']
-                x = cd.londict[lon]
-                y = cd.latdict[lat]
-                gridid = cd.grid[y, x]
-                counties = counties_df['place'][counties_df.grid == gridid]
-                county = counties.unique()
-                if len(county) == 0:
-                    label = ""
-                else:
-                    label = county[0]
-                location = [y, x, label]
-    
-            elif len(location['points']) > 1:
-                selections = location['points']
-                y = list([cd.latdict[d['lat']] for d in selections])
-                x = list([cd.londict[d['lon']] for d in selections])
-                counties = np.array([d['text'][:d['text'].index(':')] for
-                                     d in selections])
-                county_df = counties_df[counties_df['place'].isin(
-                                        list(np.unique(counties)))]
-    
-                # Use gradient to print NW and SE most counties as a range
-                NW = county_df['place'][
-                    county_df['gradient'] == min(county_df['gradient'])].item()
-                SE = county_df['place'][
-                    county_df['gradient'] == max(county_df['gradient'])].item()
-                if NW != SE:
-                    label = NW + " to " + SE
-                else:
-                    label = NW
-                location = [str(y), str(x), label]
-    
+                location = ['state_mask', str(trig_val), states]
+
+
         return location

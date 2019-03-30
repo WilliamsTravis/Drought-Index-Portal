@@ -5,8 +5,6 @@ An Application to visualize time series of drought indices.
 Things to do:
     1) Dropdown county selections should find averages within the county
        boundaries in the same way the state dropdowns do.
-    2) Percentiles are not working for the SPI or SPEI, but only for time
-       scales over 1 month. Currently flummoxed.
 
 Created on Fri Jan 4 12:39:23 2019
 
@@ -59,7 +57,7 @@ default_function = 'pmean'
 default_sample = 'pdsi'
 default_1 = 'pdsi'
 default_2 = 'spei6'
-default_years = [2000, 2018]
+default_years = [2000, 2019]
 
 # Default click before the first click for any map
 default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
@@ -170,11 +168,11 @@ function_names = {'pmean': 'Average Percentiles',
                   'oarea': 'Average Index Values'}
 
 # County Data Frame and options  
-counties_df = pd.read_csv('data/tables/unique_counties.csv')
+counties_df = pd.read_csv('data/tables/unique_counties.csv')  # <-------------- Rebuild this to have a FIPS code as its value, same method as states
 rows = [r for idx, r in counties_df.iterrows()]
-county_options = [{'label': r['place'], 'value': r['grid']} for r in rows]
-options_pos = {county_options[i]['label']: i for  # <-------------------------- Used to update dropdowns
-               i in range(len(county_options))}
+county_options = [{'label': r['place'], 'value': r['fips']} for r in rows]
+fips_pos = {county_options[i]['value']: i for i in range(len(county_options))}
+label_pos = {county_options[i]['label']: i for i in range(len(county_options))}
 
 # State options
 states_df = pd.read_table('data/tables/state_fips.txt', sep='|')
@@ -351,7 +349,7 @@ def divMaker(id_num, index='noaa'):
                                     children=['Update Graphs'],
                                     title=('Click to update the map and ' +
                                            'graphs below with updated ' +
-                                           'location choices'),
+                                           'location choices.'),
                                     style={'width': '20%',
                                            'background-color': '#C7D4EA',
                                            'font-family': 'Times New Roman',
@@ -359,8 +357,8 @@ def divMaker(id_num, index='noaa'):
                                            'margin-top': '26'
                                            })],
                         className='row'),
-                 dcc.Graph(id='map_{}'.format(id_num),
-                           config={'showSendToCloud': True}),
+                 html.Div([dcc.Graph(id='map_{}'.format(id_num),
+                           config={'showSendToCloud': True})]),
                  html.Div([dcc.Graph(id='series_{}'.format(id_num),
                                      config={'showSendToCloud': True})]),
                  html.Div(id='coverage_div_{}'.format(id_num),
@@ -464,7 +462,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                 html.Button(id='toggle_options',
                             children='Toggle Options: Off',
                             type='button',
-                            title='Click to collapse the options above',
+                            title='Click to collapse the options above.',
                             style={'display': 'none'}),
                 html.Button(id="desc_button",
                             children="Project Description: Off",
@@ -475,7 +473,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                 html.Button(id="click_sync",
                             children="Location Syncing: On",
                             title=("Toggle on and off to sync the location " +
-                                   "of the time series between each map"),
+                                   "of the time series between each map."),
                             style={'display': 'none'})],
                 style={'margin-bottom': '30',
                        'text-align': 'center'}),
@@ -615,6 +613,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
         html.Div(id='key_1', children='1', style={'display': 'none'}),
         html.Div(id='key_2', children='2', style={'display': 'none'}),
         html.Div(id='location_store', style={'display': 'none'}),
+        html.Div(id='label_store_1', style={'display': 'none'}),
+        html.Div(id='label_store_2', style={'display': 'none'}),
         html.Div(id='choice_store', style={'display': 'none'}),
 
         ],
@@ -824,20 +824,18 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         lines of logic to determine which was most recently updated.
         '''
         # package the selections for indexing
+        # print(str(click1))
         locations = [click1, click2, select1, select2, county1, county2,
                      state1, state2]
         updates = [update1, update2]
         context = dash.callback_context
         triggered_value = context.triggered[0]['value']
-        triggered_id = context.triggered[0]['prop_id']
-        print('Triggered Prop ID ' + str(triggered_id))
-        if 'selectedData' in triggered_id:
-            print('Selected Data Point Length: ' +
-                  str(len(triggered_value['points'])))
+        trigger = context.triggered[0]['prop_id']
+        # print("Initial Trigger: " + trigger)
 
         # The update graph button activates state selections
-        if 'update_graph' in context.triggered[0]['prop_id']:
-            # When you switch from county to state, there is no initial value -- This is also the initializing condition, by chance 
+        if 'update_graph' in trigger:
+            # When you switch from county to state, there is no initial value  <-- This is also the initializing condition, by chance 
             if triggered_value is None:
                 triggered_value = 'all'
                 sel_idx = 0
@@ -849,7 +847,8 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
                 sel_idx = locations.index(triggered_value)
         else:
             sel_idx = locations.index(triggered_value)
-        selector = Location_Builder(triggered_value, cd, admin_df)
+        selector = Location_Builder(trigger, triggered_value, cd, admin_df,
+                                    state_array, county_array)
         location = selector.chooseRecent()
         try:
             location.append(sel_idx)
@@ -988,17 +987,30 @@ for i in range(1, 3):
         return style, children
 
 
-    @app.callback(Output('county_{}'.format(i), 'options'),
-                  [Input('location_store', 'children')],
+    @app.callback([Output('county_{}'.format(i), 'options'),
+                   Output('county_{}'.format(i), 'placeholder'),
+                   Output('label_store_{}'.format(i), 'children')],# <--------------- What if I cleared the value and replaced it with the approriate place holder?
+                  [Input('location_store', 'children')],                     #  Can't change the value, must be some sort of infinite loop protection
                   [State('county_{}'.format(i), 'value'),
+                   State('county_{}'.format(i), 'label'),
+                   State('label_store_{}'.format(i), 'children'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def dropOne(location, previous_grid, key, sync):
+    def dropOne(location,
+                current_fips,
+                current_label, 
+                previous_fips,
+                key, sync):
         '''
         As a work around to updating synced dropdown labels and because we
         can't change the dropdown value with out creating an infinite loop, we
         are temporarily changing the options so that the value stays the same,
         but the one label to that value is the synced county name.
+
+        So, this has obvious issues. In the case one clicks on the altered
+        county selector, another one entirely will show.
+
+        I wonder how long it will take for someone to find this out :).
 
         Check that we are working with the right selection, and do this first
         to prevent update if not syncing
@@ -1010,21 +1022,67 @@ for i in range(1, 3):
             idx = int(key) - 1
             if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
-        try:
-            if type(location[0]) is int:
-                current_county = location[2]
+        # try:
+            # Singular grid
+        print('\nELMENT #{}'.format(int(key)))
+        print('dropOne LOCATION: ' + str(location))
+        print('dropOne PREVIOUS FIPS: ' + str(previous_fips))
+
+        try: 
+            # Only update if it is a singular point
+            location[0].index('id')
+
+            # Recreate the county options
+            current_options = copy.deepcopy(county_options)
+
+            # Grid id is labeled differently
+            if location[0] == 'grid_id':
+                current_label = location[3]
+                current_county = current_label[:current_label.index(" (")]
+            elif location[0] == 'county_id':
+                current_county = location[3]
             else:
-                current_county = "Multiple Counties"
-
-            current_options = county_options.copy()
-            previous_county = counties_df['place'][
-                                  counties_df['grid'] == previous_grid].item()
-            old_idx = options_pos[previous_county]
+                current_county = 'Multiple Counties'
+            try:
+                old_idx = fips_pos[current_fips]
+            except:
+                print("ELEMENT  #{}".format(int(key)) + ": Can't find previous county")
+                old_idx = label_pos[current_county]
+    
             current_options[old_idx]['label'] = current_county
+            # fips = county_options[old_idx]['value']
+            
+            # if current_fips != previous_fips:
+            #     print("Fips don't match")
+            # else:
+            #     print("Fips match")
+            # if current_county != current_label:
+            #     print("Labels don't match" )
+            # else:
+            #     print('Labels match')
+                # raise PreventUpdate
 
-            return current_options
+            print("ELEMENT #{} fips: {}".format(int(key), current_fips))
+            
+            return current_options, current_county, current_fips
+
         except:
+            print('ELEMENT #{} excepted.'.format(int(key)) + '\n')
             raise PreventUpdate
+                  
+            # current_county = "Multiple Counties"
+            # current_options = county_options
+
+
+        # except:
+        #     print('dropOne excepted')
+        #     raise PreventUpdate
+
+        # current_value = admin_df['fips'][
+        #                  admin_df['place'] == current_county].unique()[0]
+        # old_copy = copy.deepcopy(current_options[old_idx])
+        # current_options[old_idx]['value'] = current_value
+        # current_options.insert(old_idx + 1, old_copy)
 
 
     @app.callback(Output("map_{}".format(i), 'figure'),
@@ -1038,10 +1096,14 @@ for i in range(1, 3):
                    State('click_sync', 'children')])
     def makeGraph(choice1, choice2, map_type, signal, location, function, key,
                   sync):
+
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
-        print("Map Trigger: " + str(trig))
-        if trig == 'location_store.children' and location[0] != 'state_mask':
+
+        # print("Graph location: " + str(location))
+
+        # print("Map Trigger: " + str(trig))
+        if trig == 'location_store.children' and location[0] != 'state_mask':  # <----- 'mask' not in location[0] to include county areas
             raise PreventUpdate
 
         # Check which element the selection came from
@@ -1051,7 +1113,7 @@ for i in range(1, 3):
             if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8, 12] for the full panel
                 raise PreventUpdate
 
-        print("Rendering Map #{}".format(int(key)))
+        # print("Rendering Map #{}".format(int(key)))
 
         # Clear memory space
         gc.collect()
@@ -1091,7 +1153,7 @@ for i in range(1, 3):
             amin = 0
             amax = np.nanmax(array)
 
-        #Filter by state
+        #Filter by state  or county
         if location:
             if location[0] == 'state_mask':
                 flag, states, label, idx = location
@@ -1099,14 +1161,29 @@ for i in range(1, 3):
                     states_ids = json.loads(states)
                     state_mask = state_array.copy()
                     state_mask[~np.isin(state_mask, states_ids)] = np.nan
-                    state_mask = state_mask * 0 + 1
+                    area_mask = state_mask * 0 + 1
                 else:
-                    state_mask = mask
+                    area_mask = mask
+            elif location[0] == 'county_id':
+                flag, y, x, label, idx = location
+                y = np.array(json.loads(y))
+                x = np.array(json.loads(x))
+                fipses = np.unique(county_array[y, x])
+                county_mask = county_array.copy()
+                county_mask[~np.isin(county_mask, fipses)] = np.nan
+                area_mask = county_mask * 0 + 1
+                # if counties != 'all':
+                #     counties_ids = json.loads(counties)
+                #     county_mask = county_array.copy()
+                #     county_mask[~np.isin(county_mask, counties_ids)] = np.nan
+                #     area_mask = county_mask * 0 + 1
+                # else:
+                #     area_mask = mask
             else:
-                state_mask = mask
+                area_mask = mask
         else:
-            state_mask = mask
-        array = array * state_mask
+            area_mask = mask
+        array = array * area_mask
 
         # Check on Memory
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
@@ -1142,7 +1219,8 @@ for i in range(1, 3):
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, admin_df, how='inner')
         pdf['data'] = pdf['data'].astype(float)
-        pdf['printdata'] = (pdf['place'] + ":<br>    " +
+        pdf['printdata'] = (pdf['place'] + "<br>Grid ID: " + 
+                            pdf['grid'].apply(int).apply(str) + "<br>      " + 
                             pdf['data'].round(3).apply(str))
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
@@ -1243,11 +1321,11 @@ for i in range(1, 3):
                    State('function_choice', 'value')])
     def makeSeries(submit, signal, choice, choice_store, sync, location,
                    show_dsci, key, function):
-        # Troubleshooting limited selection problem
-        trig = dash.callback_context.triggered[0]['prop_id']
-        print("Series Trigger: " + str(trig))
-
         # Check which element the selection came from
+        # if location:
+        #     sel_idx = location[-1]
+        # else:
+        #     location = ['state_mask', 'all', 'Contiguous United States', 0]
         sel_idx = location[-1]
         if 'On' not in sync:
             idx = int(key) - 1
@@ -1278,7 +1356,7 @@ for i in range(1, 3):
 
         # If the function is oarea, we plot five overlapping timeseries
         if function != 'oarea':
-            print("LOCATION: " + str(location))
+            # print("LOCATION: " + str(location))
             timeseries, arrays, label = areaSeries(location, arrays, dates,
                                                    mask, state_array,
                                                    albers_source, cd,
