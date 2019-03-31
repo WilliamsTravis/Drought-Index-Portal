@@ -481,8 +481,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
     # Description
         html.Div([
             html.Div([dcc.Markdown(id='description')],
-                     style={'text-align':'center',
-                            'width':'70%',
+                     style={'text-align':'left',
+                            'width':'100%',
                             'margin':'0px auto'})],
             style={'text-align':'center',
                    'margin': '0 auto',
@@ -735,8 +735,8 @@ def toggleDescription(click):
     if click % 2 == 0:
         desc_children = ""
         style = {'background-color': '#a8b3c4',
-                  'border-radius': '4px',
-                  'font-family': 'Times New Roman'}
+                 'border-radius': '4px',
+                 'font-family': 'Times New Roman'}
         button_children = "Description: Off"
 
     else:
