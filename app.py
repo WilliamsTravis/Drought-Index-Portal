@@ -481,8 +481,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
     # Description
         html.Div([
             html.Div([dcc.Markdown(id='description')],
-                     style={'text-align':'left',
-                            'width':'100%',
+                     style={'text-align':'center',
+                            'width':'70%',
                             'margin':'0px auto'})],
             style={'text-align':'center',
                    'margin': '0 auto',
@@ -987,20 +987,53 @@ for i in range(1, 3):
         return style, children
 
 
+    @app.callback(Output('state_{}'.format(i), 'placeholder'),
+                  [Input('update_graphs_1', 'n_clicks'),
+                   Input('update_graphs_2', 'n_clicks'), 
+                   Input('location_store', 'children')],
+                  [State('key_{}'.format(i), 'children'),
+                   State('click_sync', 'children')])
+    def dropState(update1, update2, location, key, sync):
+        # Check which element the selection came from
+        sel_idx = location[-1]
+        print(str(location))
+        if 'On' not in sync:
+            idx = int(key) - 1
+            if sel_idx not in idx + np.array([0, 2, 4, 6]):
+                raise PreventUpdate
+        try:
+            if 'state' in location[0]:
+                fips = json.loads(location[1])
+                states = [states_df['STUSAB'][states_df['STATE'] == s].item() +
+                          ', ' for s in fips]
+                states[-1] = states[-1][:states[-1].index(',')]
+            return states
+        except:
+            raise PreventUpdate
+
+    # @app.callback(Output('state_{}'.format(i), 'style'),
+    #               [Input('state_{}'.format(i), 'value')])
+    # def stateSize(states):
+    #     length = len(states)
+    #     # print('stateSize: ' + str(length))
+    #     if length <= 5:
+    #         font_size = 12
+    #     else:
+    #         font_size = 12 - (length / 48)*10
+    #     style = {'font-size': font_size}
+    #     return style
+
     @app.callback([Output('county_{}'.format(i), 'options'),
                    Output('county_{}'.format(i), 'placeholder'),
-                   Output('label_store_{}'.format(i), 'children')],# <--------------- What if I cleared the value and replaced it with the approriate place holder?
-                  [Input('location_store', 'children')],                     #  Can't change the value, must be some sort of infinite loop protection
+                   Output('label_store_{}'.format(i), 'children')],  # <--------------- What if I cleared the value and replaced it with the approriate place holder?
+                  [Input('location_store', 'children')],                       #  Can't change the value, must be some sort of infinite loop protection
                   [State('county_{}'.format(i), 'value'),
                    State('county_{}'.format(i), 'label'),
                    State('label_store_{}'.format(i), 'children'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def dropOne(location,
-                current_fips,
-                current_label, 
-                previous_fips,
-                key, sync):
+    def dropCounty(location, current_fips, current_label, previous_fips, key,
+                   sync):
         '''
         As a work around to updating synced dropdown labels and because we
         can't change the dropdown value with out creating an infinite loop, we
@@ -1023,10 +1056,10 @@ for i in range(1, 3):
             if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
         # try:
-            # Singular grid
-        print('\nELMENT #{}'.format(int(key)))
-        print('dropOne LOCATION: ' + str(location))
-        print('dropOne PREVIOUS FIPS: ' + str(previous_fips))
+        #     # Singular grid
+        # print('\nELMENT #{}'.format(int(key)))
+        # print('dropOne LOCATION: ' + str(location))
+        # print('dropOne PREVIOUS FIPS: ' + str(previous_fips))
 
         try: 
             # Only update if it is a singular point
@@ -1046,43 +1079,19 @@ for i in range(1, 3):
             try:
                 old_idx = fips_pos[current_fips]
             except:
-                print("ELEMENT  #{}".format(int(key)) + ": Can't find previous county")
+                # print("ELEMENT  #{}".format(int(key)) + ": Can't find previous county")
                 old_idx = label_pos[current_county]
     
             current_options[old_idx]['label'] = current_county
-            # fips = county_options[old_idx]['value']
-            
-            # if current_fips != previous_fips:
-            #     print("Fips don't match")
-            # else:
-            #     print("Fips match")
-            # if current_county != current_label:
-            #     print("Labels don't match" )
-            # else:
-            #     print('Labels match')
-                # raise PreventUpdate
 
-            print("ELEMENT #{} fips: {}".format(int(key), current_fips))
+            # print("ELEMENT #{} fips: {}".format(int(key), current_fips))
             
             return current_options, current_county, current_fips
 
         except:
-            print('ELEMENT #{} excepted.'.format(int(key)) + '\n')
+            # print('ELEMENT #{} excepted.'.format(int(key)) + '\n')
             raise PreventUpdate
-                  
-            # current_county = "Multiple Counties"
-            # current_options = county_options
 
-
-        # except:
-        #     print('dropOne excepted')
-        #     raise PreventUpdate
-
-        # current_value = admin_df['fips'][
-        #                  admin_df['place'] == current_county].unique()[0]
-        # old_copy = copy.deepcopy(current_options[old_idx])
-        # current_options[old_idx]['value'] = current_value
-        # current_options.insert(old_idx + 1, old_copy)
 
 
     @app.callback(Output("map_{}".format(i), 'figure'),
@@ -1096,7 +1105,6 @@ for i in range(1, 3):
                    State('click_sync', 'children')])
     def makeGraph(choice1, choice2, map_type, signal, location, function, key,
                   sync):
-
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
@@ -1219,8 +1227,8 @@ for i in range(1, 3):
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, admin_df, how='inner')
         pdf['data'] = pdf['data'].astype(float)
-        pdf['printdata'] = (pdf['place'] + "<br>Grid ID: " + 
-                            pdf['grid'].apply(int).apply(str) + "<br>      " + 
+        pdf['printdata'] = (pdf['place'] + " (grid: " + 
+                            pdf['grid'].apply(int).apply(str) + ")<br>      " + 
                             pdf['data'].round(3).apply(str))
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
