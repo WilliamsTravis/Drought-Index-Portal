@@ -1691,7 +1691,7 @@ class Location_Builder:
                 y = list([cd.latdict[d['lat']] for d in selections])
                 x = list([cd.londict[d['lon']] for d in selections])
                 try:
-                    counties = np.array([d['text'][:d['text'].index('<')] for
+                    counties = np.array([d['text'][:d['text'].index(' (')] for
                                      d in selections])
                 except:
                     counties = np.array([d['text'][:d['text'].index(':')] for
