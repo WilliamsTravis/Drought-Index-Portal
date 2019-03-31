@@ -377,6 +377,7 @@ def divMaker(id_num, index='noaa'):
                           n_clicks=2,
                           children=['Show DSCI: Off'],
                           ),
+                 html.Hr(),
                  html.A('Download Timeseries Data',
                         id='download_link_{}'.format(id_num),
                         download='timeseries_{}.csv'.format(id_num),
