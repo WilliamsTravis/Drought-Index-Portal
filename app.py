@@ -900,7 +900,8 @@ def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
         location = selector.chooseRecent()
         if 'shape' in location [0] and location[3] is None:
             print(str(location[3]))
-            location = default_location
+            default_loc = copy.deepcopy(default_location)
+            location = default_loc
         try:
             location.append(sel_idx)
         except:
@@ -938,46 +939,51 @@ for i in range(1, 3):
                   [State('shape_{}'.format(i), 'filename'),
                    State('shape_{}'.format(i), 'last_modified')])
     def parseShape(contents, filenames, last_modified):
-        # if len(filenames) == 1:
-        #     from zipfile import ZipFile
-        #     from tempfile import SpooledTemporaryFile
-        #     if '.zip' in filenames[0] or '.7z' in filenames[0]:
-        #         print('Zipped File detected')
-        #         content_type, shp_element = contents[0].split(',')
-        #         decoded = base64.b64decode(shp_element)
-        #         print("Content Decoded")
-                # with SpooledTemporaryFile() as tmp:
-                #     print("Writing Decoded Zip File to temp file")
-                #     tmp.write(decoded)
-                #     archive = ZipFile(tmp, 'r')
-                #     print(str(type(archive)))
-                #     for file in archive.filelist:
-                #         fname = file.filename
-                #         print(fname)
-                #         content = archive.read(fname)
-                #         # content = base64.decodebytes(content)
-                #         print('\n')
-                #         # print(content)
-                #         with open('data/shapefiles/temp/' + fname, 'w') as f:
-                #             f.write(content.decode())
-            # else:  # This means it is either an unzipped folder or not enough
-                # ...
-
+        print("parseShape triggered")
         if filenames:
             basename = os.path.splitext(filenames[0])[0]
-            content_elements = [c.split(',') for c in contents]
-            # types = [e[0] for e in content_elements] 
-            elements = [e[1] for e in content_elements]
-            for i in range(len(elements)):
-                decoded = base64.b64decode(elements[i])
-                fname = filenames[i]
-                name, ext = os.path.splitext(fname)
-                fname = 'temp' + ext
-                fname = os.path.join('data', 'shapefiles', 'temp',
-                                     fname)
-                with open(fname, 'wb') as f:
-                    f.write(decoded)
+            if len(filenames) == 1:
+                from zipfile import ZipFile
+                from tempfile import SpooledTemporaryFile
+                if '.zip' in filenames[0] or '.7z' in filenames[0]:
+                    print('Zipped File detected')
+                    content_type, shp_element = contents[0].split(',')
+                    print('Content_Type' + content_type)
+                    decoded = base64.b64decode(shp_element)
+                    print("Content Decoded")
+                    with SpooledTemporaryFile() as tmp:
+                        print("Writing Decoded Zip File to temp file")
+                        tmp.write(decoded)
+                        archive = ZipFile(tmp, 'r')
+                        print(str(type(archive)))
+                        for file in archive.filelist:
+                            fname = file.filename
+                            print(fname)
+                            content = archive.read(fname)
+                            print(str(type(content)))
+                            # print(content)
+                            # decoded = base64.decodebytes(content)
+                            print('\n')
+                            # print(decoded)
+                            with open('data/shapefiles/temp/' + fname, 'wb') as f:
+                                f.write(content)
+                # else:  # This means it is either an unzipped folder or not enough
+                    # ...
 
+            elif len(filenames) > 1:
+                content_elements = [c.split(',') for c in contents]
+                # types = [e[0] for e in content_elements] 
+                elements = [e[1] for e in content_elements]
+                for i in range(len(elements)):
+                    decoded = base64.b64decode(elements[i])
+                    fname = filenames[i]
+                    name, ext = os.path.splitext(fname)
+                    fname = 'temp' + ext
+                    fname = os.path.join('data', 'shapefiles', 'temp',
+                                         fname)
+                    with open(fname, 'wb') as f:
+                        f.write(decoded)
+    
             # Now let's just rasterize it for a mask  # <---------------------- It may be more precise to calculate points within the shapefile, this is a simpler standin
             shp = gpd.read_file('data/shapefiles/temp/temp.shp')
 
