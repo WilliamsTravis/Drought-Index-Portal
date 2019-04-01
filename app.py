@@ -188,6 +188,7 @@ states_df = states_df[~states_df.STUSAB.isin(NCONUS)]
 rows = [r for idx, r in states_df.iterrows()]
 state_options = [{'label': r['STUSAB'], 'value': r['STATE']} for
                   r in rows]
+state_options.insert(0, {'label': 'ALL', 'value': 'all'})
 
 # Map type options
 maptypes = [{'label': 'Light', 'value': 'light'},
@@ -946,33 +947,19 @@ for i in range(1, 3):
                 from zipfile import ZipFile
                 from tempfile import SpooledTemporaryFile
                 if '.zip' in filenames[0] or '.7z' in filenames[0]:
-                    print('Zipped File detected')
                     content_type, shp_element = contents[0].split(',')
-                    print('Content_Type' + content_type)
                     decoded = base64.b64decode(shp_element)
-                    print("Content Decoded")
                     with SpooledTemporaryFile() as tmp:
-                        print("Writing Decoded Zip File to temp file")
                         tmp.write(decoded)
                         archive = ZipFile(tmp, 'r')
-                        print(str(type(archive)))
                         for file in archive.filelist:
                             fname = file.filename
-                            print(fname)
                             content = archive.read(fname)
-                            print(str(type(content)))
-                            # print(content)
-                            # decoded = base64.decodebytes(content)
-                            print('\n')
-                            # print(decoded)
                             with open('data/shapefiles/temp/' + fname, 'wb') as f:
                                 f.write(content)
-                # else:  # This means it is either an unzipped folder or not enough
-                    # ...
 
             elif len(filenames) > 1:
                 content_elements = [c.split(',') for c in contents]
-                # types = [e[0] for e in content_elements] 
                 elements = [e[1] for e in content_elements]
                 for i in range(len(elements)):
                     decoded = base64.b64decode(elements[i])
@@ -1509,7 +1496,7 @@ for i in range(1, 3):
             columns = OrderedDict({'month': df_dates,
                                    'value': list(timeseries), 
                                    'function': function_names[function],
-                                   'location': location[2],
+                                   'location': location[-2],
                                    'index': indexnames[choice]})
             df = pd.DataFrame(columns)
             df_str = df.to_csv(encoding='utf-8', index=False)
@@ -1536,7 +1523,7 @@ for i in range(1, 3):
                                    'd4': list(ts_series_ninc[4]),
                                    'dsci': list(dsci),
                                    'function': 'Percent Area',
-                                   'location':  location[2],
+                                   'location':  location[-2],
                                    'index': indexnames[choice]})
             df = pd.DataFrame(columns)
             df_str = df.to_csv(encoding='utf-8', index=False)
