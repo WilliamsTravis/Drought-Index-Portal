@@ -1222,7 +1222,7 @@ for i in range(1, 3):
                    State('click_sync', 'children')])
     def makeGraph(choice1, choice2, map_type, signal, location, function, key,
                   sync):
-        # Prevent update from location unless it is a state filter
+        # Prevent update from location unless it is a state or shape filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
         # print("Graph location: " + str(location))
@@ -1232,12 +1232,13 @@ for i in range(1, 3):
             if 'grid' in location[0] or 'county' in location[0]:  # <---------- 'mask' not in location[0] to include county areas
                 raise PreventUpdate
 
-        # Check which element the selection came from
-        sel_idx = location[-1]
-        if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
-            idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8, 12] for the full panel
-                raise PreventUpdate
+            # Check which element the selection came from
+            sel_idx = location[-1]
+            if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
+                idx = int(key) - 1
+                if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8, 12] for the full panel
+                    print("Preventing Update")
+                    raise PreventUpdate
 
         print("Rendering Map #{}".format(int(key)))
 
@@ -1450,19 +1451,25 @@ for i in range(1, 3):
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children'),
-                   Input('click_sync', 'children'),
                    Input('location_store', 'children'),
                    Input('dsci_button_{}'.format(i), 'n_clicks')],
                   [State('key_{}'.format(i), 'children'),
+                   State('click_sync', 'children'),
                    State('function_choice', 'value')])
-    def makeSeries(submit, signal, choice, choice_store, sync, location,
-                   show_dsci, key, function):
+    def makeSeries(submit, signal, choice, choice_store,  location,
+                   show_dsci, key, sync, function):
+        # Prevent update from location unless it is a state filter
+        trig = dash.callback_context.triggered[0]['prop_id']
+
         # Check which element the selection came from
-        sel_idx = location[-1]
-        if 'On' not in sync:
-            idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8] for the full panel
-                raise PreventUpdate
+        if trig == 'location_store.children':
+            sel_idx = location[-1]
+            if 'On' not in sync:
+                idx = int(key) - 1
+                if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <------------ [0, 4, 8] for the full panel
+                    print(str(sel_idx))
+                    print("Preventing Update")
+                    raise PreventUpdate
 
         # Create signal for the global_store
         choice_store = json.loads(choice_store)
