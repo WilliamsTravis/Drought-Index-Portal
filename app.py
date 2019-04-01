@@ -1116,7 +1116,7 @@ for i in range(1, 3):
         sel_idx = location[-1]
         if 'On' not in sync:
             idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):
+            if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
                 raise PreventUpdate
         try:
             if 'state' in location[0]:
@@ -1170,7 +1170,7 @@ for i in range(1, 3):
         sel_idx = location[-1]
         if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
             idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
         # try:
         #     # Singular grid
@@ -1229,7 +1229,7 @@ for i in range(1, 3):
 
         # print("Map Trigger: " + str(trig))
         if trig == 'location_store.children':
-            if location[0] != 'state_mask' and location[0] != 'shape_mask':  # <----- 'mask' not in location[0] to include county areas
+            if 'grid' in location[0] or 'county' in location[0]:  # <---------- 'mask' not in location[0] to include county areas
                 raise PreventUpdate
 
         # Check which element the selection came from
@@ -1281,7 +1281,8 @@ for i in range(1, 3):
 
 
         # Filter by x, y positions in location
-        if location[1] != 'all':
+        flag = location[0]
+        if 'id' not in flag and flag != 'county_mask' and location[1] != 'all':
             flag, y, x, label, idx = location
             y = np.array(json.loads(y))
             x = np.array(json.loads(x))        
@@ -1460,7 +1461,7 @@ for i in range(1, 3):
         sel_idx = location[-1]
         if 'On' not in sync:
             idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
 
         # Create signal for the global_store
