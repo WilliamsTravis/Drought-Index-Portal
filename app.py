@@ -12,6 +12,7 @@ Created on Fri Jan 4 12:39:23 2019
 """
 
 # Functions and Libraries
+import netCDF4
 import base64
 import copy
 import dash
@@ -50,7 +51,7 @@ from functions import Index_Maps, Admin_Elements, Location_Builder
 if sys.platform == 'win32':
     data_path = 'f:/'
 else:
-    data_path = '/root/Sync'
+    data_path = '/root/Sync/'
 
 # What to do with the mean of empty slice warning?
 warnings.filterwarnings("ignore")
@@ -127,6 +128,7 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'EDDI-6', 'value': 'eddi6'},
            {'label': 'LERI-1', 'value': 'leri1'},
            {'label': 'LERI-3', 'value': 'leri3'}]
+
 
 # Index dropdown labels
 indexnames = {'pdsi': 'Palmer Drought Severity Index',
@@ -213,9 +215,9 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
 # Get time dimension from the first data set, assuming everything is uniform
 with xr.open_dataset(
         os.path.join(data_path,
-             'data/droughtindices/netcdfs/' + default_sample + '.nc')) as data:
+             'data/droughtindices/netcdfs/spi1.nc')) as data:
     sample_nc = data.load()
-    data.close()
+
 min_date = sample_nc.time.data[0]
 max_date = sample_nc.time.data[-1]
 max_year = pd.Timestamp(max_date).year
