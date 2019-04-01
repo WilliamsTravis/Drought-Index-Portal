@@ -1736,9 +1736,11 @@ class Location_Builder:
         # 3: location is the basename of a shapefile saved as temp.shp
         elif 'shape' in trig_id:
             # We don't have the x,y values just yet
-            shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
-            shp[shp==-9999] = np.nan
-            y, x = np.where(~np.isnan(shp))
-            location = ['shape_mask', str(list(y)), str(list(x)), trig_val]
-
+            try:
+                shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
+                shp[shp==-9999] = np.nan
+                y, x = np.where(~np.isnan(shp))
+                location = ['shape_mask', str(list(y)), str(list(x)), trig_val]
+            except:
+                location = ['state_mask', 'all', 'Contiguous United States']
         return location

@@ -955,6 +955,8 @@ for i in range(1, 3):
                         for file in archive.filelist:
                             fname = file.filename
                             content = archive.read(fname)
+                            name, ext = os.path.splitext(fname)
+                            fname = 'temp' + ext
                             with open('data/shapefiles/temp/' + fname, 'wb') as f:
                                 f.write(content)
 
