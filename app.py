@@ -12,8 +12,7 @@ Created on Fri Jan 4 12:39:23 2019
 """
 
 # Functions and Libraries
-import os
-import sys
+import base64
 import copy
 import dash
 from dash.dependencies import Input, Output, State
@@ -25,11 +24,15 @@ import datetime as dt
 from collections import OrderedDict
 from flask_caching import Cache
 import gc
+import geopandas as gpd
 from inspect import currentframe, getframeinfo
 import json
 import numpy as np
+import os
+from osgeo import gdal
 import pandas as pd
 import psutil
+import sys
 import urllib
 import warnings
 import xarray as xr
@@ -58,6 +61,7 @@ default_sample = 'pdsi'
 default_1 = 'pdsi'
 default_2 = 'spei6'
 default_years = [2000, 2019]
+default_location = ['state_mask', 'all', 'Contiguous United States']
 
 # Default click before the first click for any map
 default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
@@ -286,6 +290,11 @@ unselected_style = {'border-top-left-radius': '3px',
                     'background-color': '#f9f9f9',
                     'padding': '0px 24px',
                     'border-bottom': '1px solid #d6d6d6'}
+on_button_style = {'width': '20%', 'background-color': '#C7D4EA',
+                   'font-family': 'Times New Roman', 'padding': '0px'}
+off_button_style =  {'background-color': '#a8b3c4',
+                     'border-radius': '4px',
+                     'font-family': 'Times New Roman'}
 
 ################### Application Layout ########################################
 # Create a Div maker
@@ -303,7 +312,7 @@ def divMaker(id_num, index='noaa'):
                                                                 tablet_style)),
                             dcc.Dropdown(id='choice_{}'.format(id_num),
                                          options=indices, value=index)],
-                            style={'width': '30%',
+                            style={'width': '25%',
                                    'float': 'left'}),
                     html.Div(
                         children=[
@@ -319,32 +328,65 @@ def divMaker(id_num, index='noaa'):
                                                  label='State/States',
                                                  style=tablet_style,
                                                  selected_style=tablet_style
+                                                 ),
+                                         dcc.Tab(value='shape',
+                                                 label='Shapefile',
+                                                 style=tablet_style,
+                                                 selected_style=tablet_style
                                                  )]),
-                                html.Div(id='location_div_{}'.format(id_num),
-                                         children=[
-                                            html.Div(
-                                             id='county_div_{}'.format(id_num),
-                                             children=
-                                               [dcc.Dropdown(
-                                                 id='county_{}'.format(id_num),
-                                                 options=county_options,
-                                                 clearable=False,
-                                                 multi=False,
-                                                 value=24098)]),
-                                            html.Div(
-                                             id='state_div_{}'.format(id_num),
-                                             children=
-                                               [dcc.Dropdown(
-                                                 id='state_{}'.format(id_num),
-                                                 options=state_options,
-                                                 clearable=False,
-                                                 multi=True,
-                                                 placeholder=('Contiguous ' +
-                                                              'United States'),
-                                                 value=None)],
-                                               style={'display': 'none'})])],
-                                style={'width': '50%',
+                                html.Div(
+                                    id='location_div_{}'.format(id_num),
+                                    children=[
+                                        html.Div(
+                                          id='county_div_{}'.format(id_num),
+                                          children=
+                                             [dcc.Dropdown(
+                                               id='county_{}'.format(id_num),
+                                               options=county_options,
+                                               clearable=False,
+                                               multi=False,
+                                               value=24098)]),
+
+                                        html.Div(
+                                          id='state_div_{}'.format(id_num),
+                                          children=
+                                             [dcc.Dropdown(
+                                               id='state_{}'.format(id_num),
+                                               options=state_options,
+                                               clearable=False,
+                                               multi=True,
+                                               placeholder=('Contiguous ' +
+                                                            'United States'),
+                                               value=None)],
+                                           style={'display': 'none'}),
+
+                                        html.Div(
+                                          id='shape_div_{}'.format(id_num),
+                                          title=('To use a shapefile as an ' +
+                                            'area filter, upload one as ' +
+                                            'either a zipfile or list ' +
+                                            'that includes the .shp, .shx, ' +
+                                            '.sbn and .sbx files.'),
+                                          children=[
+                                             dcc.Upload(
+                                               id='shape_{}'.format(id_num),
+                                               children=[
+                                                       'Drag and drop or ',
+                                                       html.A('select files')],
+                                               multiple=True,
+                                               style={'borderWidth': '2px',
+                                                      'borderStyle': 'dashed',
+                                                      'borderRadius': '3px',
+                                                      'borderColor': '#CCCCCC',
+                                                      'textAlign': 'center',
+                                                      'margin': '2px',
+                                                      'padding': '2px'}
+                                               )]
+                                            )])
+                                ],
+                                style={'width': '55%',
                                        'float': 'left'}),
+
                         html.Button(id='update_graphs_{}'.format(id_num),
                                     children=['Update Graphs'],
                                     title=('Click to update the map and ' +
@@ -354,15 +396,19 @@ def divMaker(id_num, index='noaa'):
                                            'background-color': '#C7D4EA',
                                            'font-family': 'Times New Roman',
                                            'padding': '0px',
-                                           'margin-top': '26'
-                                           })],
+                                           'margin-top': '26'})],
                         className='row'),
-                 html.Div([dcc.Graph(id='map_{}'.format(id_num),
-                           config={'showSendToCloud': True})]),
-                 html.Div([dcc.Graph(id='series_{}'.format(id_num),
-                                     config={'showSendToCloud': True})]),
-                 html.Div(id='coverage_div_{}'.format(id_num),
-                          style={'margin-bottom': '25'}),
+
+                 html.Div([
+                         dcc.Graph(id='map_{}'.format(id_num),
+                                   config={'showSendToCloud': True})]),
+                 html.Div([
+                         dcc.Graph(
+                                 id='series_{}'.format(id_num),
+                                 config={'showSendToCloud': True})]),
+                 html.Div(
+                         id='coverage_div_{}'.format(id_num),
+                         style={'margin-bottom': '25'}),
                  html.Button(
                          id='dsci_button_{}'.format(id_num),
                          title=('The Drought Severity ' +
@@ -385,6 +431,13 @@ def divMaker(id_num, index='noaa'):
                                'element and is titled '+
                                '"timeseries_{}.csv"'.format(id_num)),
                         href="", target='_blank'),
+                html.Div(id='key_{}'.format(id_num),
+                         children='{}'.format(id_num),
+                         style={'display': 'none'}),
+                html.Div(id='label_store_{}'.format(id_num),
+                         style={'display': 'none'}),
+                html.Div(id='shape_store_{}'.format(id_num),
+                         style={'display': 'none'}),
             ], className='six columns')
     return div
 
@@ -611,11 +664,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
 
         # Signals
         html.Div(id='signal', style={'display': 'none'}),
-        html.Div(id='key_1', children='1', style={'display': 'none'}),
-        html.Div(id='key_2', children='2', style={'display': 'none'}),
         html.Div(id='location_store', style={'display': 'none'}),
-        html.Div(id='label_store_1', style={'display': 'none'}),
-        html.Div(id='label_store_2', style={'display': 'none'}),
         html.Div(id='choice_store', style={'display': 'none'}),
 
         ],
@@ -711,17 +760,11 @@ def toggleSyncButton(click):
         click = 0
     if click % 2 == 0:
         children = "Location Syncing: On"
-        style = {'background-color': '#c7d4ea',
-                 'border-radius': '4px',
-                 'font-family': 'Times New Roman',  # Specified in css?
-                 }
+        style = on_button_style
     else:
         children = "Location Syncing: Off"
-        style = {'background-color': '#a8b3c4',
-                 'border-radius': '4px',
-                 'font-family': 'Times New Roman',}
+        style = off_button_style
     return style, children
-
 
 @app.callback([Output('description', 'children'),
                Output('desc_button', 'style'),
@@ -810,12 +853,14 @@ def submitSignal(click, colorscale, reverse, year_range, month_range):
                Input('map_2', 'selectedData'),
                Input('county_1', 'value'),
                Input('county_2', 'value'),
+               Input('shape_store_1', 'children'),
+               Input('shape_store_2', 'children'),
                Input('update_graphs_1', 'n_clicks'),
                Input('update_graphs_2', 'n_clicks')],
               [State('state_1', 'value'),
                State('state_2', 'value')])
-def locationPicker(click1, click2, select1, select2, county1, county2, update1, 
-                   update2, state1, state2):
+def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
+                   shape2, update1, update2, state1, state2):
         '''
         With the context strategy it is still useful to have an independent
         selection filter callback. Because there are many types of buttons and
@@ -827,12 +872,12 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         # package the selections for indexing
         # print(str(click1))
         locations = [click1, click2, select1, select2, county1, county2,
-                     state1, state2]
+                     shape1, shape2, state1, state2]
         updates = [update1, update2]
         context = dash.callback_context
         triggered_value = context.triggered[0]['value']
         trigger = context.triggered[0]['prop_id']
-        # print("Initial Trigger: " + trigger)
+        print("Initial Trigger: " + trigger)
 
         # The update graph button activates state selections
         if 'update_graph' in trigger:
@@ -851,6 +896,9 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
         selector = Location_Builder(trigger, triggered_value, cd, admin_df,
                                     state_array, county_array)
         location = selector.chooseRecent()
+        if 'shape' in location [0] and location[3] is None:
+            print(str(location[3]))
+            location = default_location
         try:
             location.append(sel_idx)
         except:
@@ -863,7 +911,8 @@ def locationPicker(click1, click2, select1, select2, county1, county2, update1,
 # In[] Any callback with multiple instances goes here
 for i in range(1, 3):
     @app.callback([Output('county_div_{}'.format(i), 'style'),
-                   Output('state_div_{}'.format(i), 'style')],
+                   Output('state_div_{}'.format(i), 'style'),
+                   Output('shape_div_{}'.format(i), 'style')],
                   [Input('location_tab_{}'.format(i), 'value')],
                   [State('key_{}'.format(i), 'children')])
     def displayLocOptions(tab_choice, key):
@@ -871,10 +920,81 @@ for i in range(1, 3):
         if tab_choice == 'county':
             county_style = {}
             state_style = {'display': 'none'}
-        else:
+            shape_style = {'display': 'none'}
+        elif tab_choice == 'state':
             county_style = {'display': 'none'}
             state_style = {}
-        return county_style, state_style
+            shape_style = {'display': 'none'}
+        else:
+            county_style = {'display': 'none'}
+            state_style = {'display': 'none'}
+            shape_style = {}   
+        return county_style, state_style, shape_style
+
+    @app.callback(Output('shape_store_{}'.format(i), 'children'),
+                  [Input('shape_{}'.format(i), 'contents')],
+                  [State('shape_{}'.format(i), 'filename'),
+                   State('shape_{}'.format(i), 'last_modified')])
+    def parseShape(contents, filenames, last_modified):
+        # if len(filenames) == 1:
+        #     from zipfile import ZipFile
+        #     from tempfile import SpooledTemporaryFile
+        #     if '.zip' in filenames[0] or '.7z' in filenames[0]:
+        #         print('Zipped File detected')
+        #         content_type, shp_element = contents[0].split(',')
+        #         decoded = base64.b64decode(shp_element)
+        #         print("Content Decoded")
+                # with SpooledTemporaryFile() as tmp:
+                #     print("Writing Decoded Zip File to temp file")
+                #     tmp.write(decoded)
+                #     archive = ZipFile(tmp, 'r')
+                #     print(str(type(archive)))
+                #     for file in archive.filelist:
+                #         fname = file.filename
+                #         print(fname)
+                #         content = archive.read(fname)
+                #         # content = base64.decodebytes(content)
+                #         print('\n')
+                #         # print(content)
+                #         with open('data/shapefiles/temp/' + fname, 'w') as f:
+                #             f.write(content.decode())
+            # else:  # This means it is either an unzipped folder or not enough
+                # ...
+
+        if filenames:
+            basename = os.path.splitext(filenames[0])[0]
+            content_elements = [c.split(',') for c in contents]
+            # types = [e[0] for e in content_elements] 
+            elements = [e[1] for e in content_elements]
+            for i in range(len(elements)):
+                decoded = base64.b64decode(elements[i])
+                fname = filenames[i]
+                name, ext = os.path.splitext(fname)
+                fname = 'temp' + ext
+                fname = os.path.join('data', 'shapefiles', 'temp',
+                                     fname)
+                with open(fname, 'wb') as f:
+                    f.write(decoded)
+
+            # Now let's just rasterize it for a mask  # <---------------------- It may be more precise to calculate points within the shapefile, this is a simpler standin
+            shp = gpd.read_file('data/shapefiles/temp/temp.shp')
+
+            # Check CRS, reproject if needed
+            # ...
+
+            # Cut to extent and save back to file here
+            # ...
+
+            # Any attribute will do
+            attr = shp.columns[0]
+
+            # The admin class already has the resolution built in  
+            admin.rasterize('data/shapefiles/temp/temp.shp',
+                            'data/shapefiles/temp/temp.tif',
+                            attribute=attr,
+                            extent=[-130, 50, -55, 20])
+            return basename
+
 
     @app.callback(Output('coverage_div_{}'.format(i), 'children'),
                   [Input('series_{}'.format(i), 'hoverData'),
@@ -997,7 +1117,6 @@ for i in range(1, 3):
     def dropState(update1, update2, location, key, sync):
         # Check which element the selection came from
         sel_idx = location[-1]
-        print(str(location))
         if 'On' not in sync:
             idx = int(key) - 1
             if sel_idx not in idx + np.array([0, 2, 4, 6]):
@@ -1112,17 +1231,18 @@ for i in range(1, 3):
         # print("Graph location: " + str(location))
 
         # print("Map Trigger: " + str(trig))
-        if trig == 'location_store.children' and location[0] != 'state_mask':  # <----- 'mask' not in location[0] to include county areas
-            raise PreventUpdate
+        if trig == 'location_store.children':
+            if location[0] != 'state_mask' and location[0] != 'shape_mask':  # <----- 'mask' not in location[0] to include county areas
+                raise PreventUpdate
 
         # Check which element the selection came from
         sel_idx = location[-1]
         if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
             idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6]):  # <--------------- [0, 4, 8, 12] for the full panel
+            if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8, 12] for the full panel
                 raise PreventUpdate
 
-        # print("Rendering Map #{}".format(int(key)))
+        print("Rendering Map #{}".format(int(key)))
 
         # Clear memory space
         gc.collect()
@@ -1162,37 +1282,46 @@ for i in range(1, 3):
             amin = 0
             amax = np.nanmax(array)
 
-        #Filter by state  or county
-        if location:
-            if location[0] == 'state_mask':
-                flag, states, label, idx = location
-                if states != 'all':
-                    states_ids = json.loads(states)
-                    state_mask = state_array.copy()
-                    state_mask[~np.isin(state_mask, states_ids)] = np.nan
-                    area_mask = state_mask * 0 + 1
-                else:
-                    area_mask = mask
-            elif location[0] == 'county_id':
-                flag, y, x, label, idx = location
-                y = np.array(json.loads(y))
-                x = np.array(json.loads(x))
-                fipses = np.unique(county_array[y, x])
-                county_mask = county_array.copy()
-                county_mask[~np.isin(county_mask, fipses)] = np.nan
-                area_mask = county_mask * 0 + 1
-                # if counties != 'all':
-                #     counties_ids = json.loads(counties)
-                #     county_mask = county_array.copy()
-                #     county_mask[~np.isin(county_mask, counties_ids)] = np.nan
-                #     area_mask = county_mask * 0 + 1
-                # else:
-                #     area_mask = mask
-            else:
-                area_mask = mask
-        else:
-            area_mask = mask
-        array = array * area_mask
+
+        # Filter by x, y positions in location
+        if location[1] != 'all':
+            flag, y, x, label, idx = location
+            y = np.array(json.loads(y))
+            x = np.array(json.loads(x))        
+            gridids = grid[y, x]
+            array[~np.isin(grid, gridids)] = np.nan
+
+        # if location:
+        #     if location[0] == 'state_mask':
+        #         flag, states, label, idx = location
+        #         if states != 'all':
+        #             states_ids = json.loads(states)
+        #             state_mask = state_array.copy()
+        #             state_mask[~np.isin(state_mask, states_ids)] = np.nan
+        #             area_mask = state_mask * 0 + 1
+        #         else:
+        #             area_mask = mask
+        #     elif location[0] == 'county_id':
+        #         flag, y, x, label, idx = location
+        #         y = np.array(json.loads(y))
+        #         x = np.array(json.loads(x))
+        #         fipses = np.unique(county_array[y, x])
+        #         county_mask = county_array.copy()
+        #         county_mask[~np.isin(county_mask, fipses)] = np.nan
+        #         area_mask = county_mask * 0 + 1
+        #     elif location[0] == 'shape_mask':
+        #         # There are several ways to do this, perhaps simplest:
+        #         # 1) Rasterize shapefile
+        #         # 2) Read in Shapefile as array
+        #         # 3) Create mask out of it, done.
+        #         shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
+        #         shp[shp==-9999] = np.nan
+        #         area_mask = shp * 0 + 1
+        #     else:
+        #         area_mask = mask
+        # else:
+        #     area_mask = mask
+        # array = array * area_mask
 
         # Check on Memory
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
@@ -1212,7 +1341,7 @@ for i in range(1, 3):
         del array
         del arrays
 
-        # Now all this
+        # Create a data frame of coordinates, index values, labels, etc
         dfs = xr.DataArray(source, name="data")
         pdf = dfs.to_dataframe()
         step = cd.res
@@ -1331,10 +1460,6 @@ for i in range(1, 3):
     def makeSeries(submit, signal, choice, choice_store, sync, location,
                    show_dsci, key, function):
         # Check which element the selection came from
-        # if location:
-        #     sel_idx = location[-1]
-        # else:
-        #     location = ['state_mask', 'all', 'Contiguous United States', 0]
         sel_idx = location[-1]
         if 'On' not in sync:
             idx = int(key) - 1
@@ -1365,7 +1490,6 @@ for i in range(1, 3):
 
         # If the function is oarea, we plot five overlapping timeseries
         if function != 'oarea':
-            # print("LOCATION: " + str(location))
             timeseries, arrays, label = areaSeries(location, arrays, dates,
                                                    mask, state_array,
                                                    albers_source, cd,
@@ -1472,6 +1596,8 @@ for i in range(1, 3):
                                               width=line_width)))
 
         # Copy and customize Layout
+        if label is None:
+            label = 'Existing Shapefile'
         layout_copy = copy.deepcopy(layout)
         layout_copy['title'] = (indexnames[choice] +
                                 "<Br>" + label)

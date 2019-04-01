@@ -64,42 +64,26 @@ def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
     arrays = a time series of arrays falling into each of 5 drought categories
     inclusive = whether or to categorize drought by including all categories
     '''
-    if location[0] == 'grid_id':
+    if len(location) == 5:
         flag, y, x, label, idx = location
-        timeseries = np.array([round(a[y, x], 4) for a in arrays])
-    else:
-        if location[0] == 'state_mask':
-            flag, states, label, idx = location
-            if states != 'all':
-                states = json.loads(states)
-                state_mask = state_array.copy()
-                state_mask[~np.isin(state_mask, states)] = np.nan
-                state_mask = state_mask * 0 + 1
-            else:
-                state_mask = mask
-            arrays = arrays * state_mask
-        # elif 'County' in location
+        y = json.loads(y)
+        x = json.loads(x)
+        if type(y) is not list:
+            timeseries = np.array([round(a[y, x], 4) for a in arrays])
         else:
-            # Collect array index positions and other information for print
-            flag, y, x, label, idx = location
-            x = json.loads(x)
-            y = json.loads(y)
-
-            # Create a location mask and filter the arrays
-            ys = np.array(y)
-            xs = np.array(x)
-            loc_mask = arrays[0].copy()
-            loc_mask[ys, xs] = 9999
-            loc_mask[loc_mask<9999] = np.nan
-            loc_mask = loc_mask * 0 + 1
-            arrays = arrays * loc_mask
-
-        # Timeseries of mean values
+            gridids = cd.grid[y, x]
+            area_mask = cd.grid.copy()
+            area_mask[~np.isin(cd.grid, gridids)] = np.nan
+            area_mask = area_mask * 0 + 1
+            arrays = arrays  * area_mask
+            timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
+    else:
+        arrays = arrays * mask
+        flag, states, label, idx = location
         timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
 
-    # If we are sending the output to the drought area function
+    # If we are sending the output to the drought area function  # < ---------- Why not just put that in the drought area function? Because this could be useful here later.
     if reproject:
-        # print("Reprojecting to Alber's")
         arrays = wgsToAlbers(arrays, cd, albers_source)
 
     # print("Area fitlering complete.")
@@ -1661,9 +1645,10 @@ class Location_Builder:
         states_df = self.states_df
         cd = self.cd
         county_array = self.county_array
+        state_array = self.state_array
 
-        print("Location Picker Trigger: " + str(trig_id))
-        print("Location Picker Value: " + str(trig_val))
+        # print("Location Picker Trigger: " + str(trig_id))
+        # print("Location Picker Value: " + str(trig_val))
 
         # 1: Selection is a county selection
         if 'county' in trig_id:
@@ -1681,7 +1666,7 @@ class Location_Builder:
             counties = admin_df['place'][admin_df.grid == gridid]
             county = counties.unique()
             label = county[0] + ' (Grid ' + str(int(gridid)) + ')'
-            location = ['grid_id', y, x, label]        
+            location = ['grid_id',str(y), str(x), label]        
 
         # 3: Selection is a set of grid IDs
         elif 'selectedData' in trig_id:
@@ -1731,11 +1716,29 @@ class Location_Builder:
                 # Return the mask, a flag, and the state names
                 state = list(states_df['state_abbr'][
                              states_df['state_fips'].isin(trig_val)])
+
                 if len(state) < 4:  # Spell out full state name in title
                     state = [states_df['state'][
                              states_df['state_abbr']==s].item() for s in state]
+                
                 states = ", ".join(state)
-                location = ['state_mask', str(trig_val), states]
 
+                # Now get the right x, y positions
+                # state_mask = state_array.copy()
+                
+                y, x = np.where(np.isin(state_array, trig_val))
+                # state_mask[~np.isin(state_mask, trig_val)] = np.nan
+                # area_mask = state_mask * 0 + 1
+
+                # And return the location information
+                location = ['state_mask', str(list(y)), str(list(x)), states]
+
+        # 3: location is the basename of a shapefile saved as temp.shp
+        elif 'shape' in trig_id:
+            # We don't have the x,y values just yet
+            shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
+            shp[shp==-9999] = np.nan
+            y, x = np.where(~np.isnan(shp))
+            location = ['shape_mask', str(list(y)), str(list(x)), trig_val]
 
         return location

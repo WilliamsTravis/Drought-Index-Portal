@@ -7,7 +7,7 @@ Click [here](https://github.com/WilliamsTravis/Ubuntu-Practice-Machine/raw/maste
 
 &nbsp;
 
-**Index Acronymns**:
+**Index Acronymns**
 
 **PDSI**: &emsp;  The Palmer Drought Severity Index
 
@@ -31,7 +31,3 @@ Click [here](https://github.com/WilliamsTravis/Ubuntu-Practice-Machine/raw/maste
 
 **Date**: 01-22-2019
 
-
-&nbsp;
-&ensp; 
-&emsp;
