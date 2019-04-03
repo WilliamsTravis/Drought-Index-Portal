@@ -12,7 +12,7 @@ Created on Fri Jan 4 12:39:23 2019
 """
 
 # Functions and Libraries
-import netCDF4
+import netCDF4  # Leave this, without it there are problems in Linux
 import base64
 import copy
 import dash
@@ -44,7 +44,7 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions and classes
-from functions import makeMap, areaSeries, droughtArea
+from functions import makeMap, areaSeries, droughtArea, shapeReproject
 from functions import Index_Maps, Admin_Elements, Location_Builder 
 
 # Check if we are working in Windows or Linux to find the data
@@ -293,8 +293,11 @@ unselected_style = {'border-top-left-radius': '3px',
                     'background-color': '#f9f9f9',
                     'padding': '0px 24px',
                     'border-bottom': '1px solid #d6d6d6'}
-on_button_style = {'width': '20%', 'background-color': '#C7D4EA',
-                   'font-family': 'Times New Roman', 'padding': '0px'}
+on_button_style = {
+                   # 'width': '20%',
+                   'background-color': '#C7D4EA',
+                   'border-radius': '4px',
+                   'font-family': 'Times New Roman'}
 off_button_style =  {'background-color': '#a8b3c4',
                      'border-radius': '4px',
                      'font-family': 'Times New Roman'}
@@ -367,9 +370,10 @@ def divMaker(id_num, index='noaa'):
                                           id='shape_div_{}'.format(id_num),
                                           title=('To use a shapefile as an ' +
                                             'area filter, upload one as ' +
-                                            'either a zipfile or list ' +
-                                            'that includes the .shp, .shx, ' +
-                                            '.sbn and .sbx files.'),
+                                            'either a zipfile or a grouped ' +
+                                            'selection that includes the ' +
+                                            '.shp, .shx, .sbn, .proj, and ' +
+                                            '.sbx files.'),
                                           children=[
                                              dcc.Upload(
                                                id='shape_{}'.format(id_num),
@@ -390,16 +394,35 @@ def divMaker(id_num, index='noaa'):
                                 style={'width': '55%',
                                        'float': 'left'}),
 
-                        html.Button(id='update_graphs_{}'.format(id_num),
-                                    children=['Update Graphs'],
+                        html.Div([
+                                html.Button(
+                                    id='reset_map_{}'.format(id_num),
+                                    children='Reset',
+                                    title=('Click to remove area filters.'),
+                                    style={'width': '20%',
+                                           'font-size': '10',
+                                           'height': '26px',
+                                           'line-height': '4px',
+                                           'background-color': '#ffff',
+                                           'font-family': 'Times New Roman',
+                                           }),
+                                html.Button(
+                                    id='update_graphs_{}'.format(id_num),
+                                    children='Update',
                                     title=('Click to update the map and ' +
                                            'graphs below with updated ' +
-                                           'location choices.'),
+                                           'location choices (state ' +
+                                           'selections do not update ' +
+                                           'automatically).'),
                                     style={'width': '20%',
-                                           'background-color': '#C7D4EA',
+                                           'height': '34px',
+                                           'font-size': '10',
+                                           'line-height': '5px',
+                                           'background-color': '#F9F9F9',
                                            'font-family': 'Times New Roman',
-                                           'padding': '0px',
-                                           'margin-top': '26'})],
+                                           }),
+                                    ])
+                                ],
                         className='row'),
 
                  html.Div([
@@ -974,22 +997,40 @@ for i in range(1, 3):
                         f.write(decoded)
     
             # Now let's just rasterize it for a mask  # <---------------------- It may be more precise to calculate points within the shapefile, this is a simpler standin
+            # shp = gpd.read_file('data/shapefiles/temp/albers_cut.shp')
             shp = gpd.read_file('data/shapefiles/temp/temp.shp')
 
             # Check CRS, reproject if needed
-            # ...
+            crs = shp.crs
+            epsg = crs['init']
+            epsg = int(epsg[epsg.index(':') + 1:])
+            if crs['init'] != 'epsg:4326':
+                print("Reprojecting Shapefile...")
+                crs = shp.crs
+                epsg = crs['init']
+                epsg = int(epsg[epsg.index(':') + 1:])
+                shapeReproject(src='data/shapefiles/temp/temp.shp',
+                               dst='data/shapefiles/temp/temp.shp',
+                               src_epsg=epsg, dst_epsg=4326)
 
-            # Cut to extent and save back to file here
-            # ...
+            # Find a column that is numeric
+            numeric = shp._get_numeric_data()
+            attr = numeric.columns[0]
 
-            # Any attribute will do
-            attr = shp.columns[0]
+            # The admin class already has the resolution built in
+            src = 'data/shapefiles/temp/temp.shp'
+            dst = 'data/shapefiles/temp/temp1.tif'
+            print("Rasterizing Shapefile...")
+            admin.rasterize(src, dst, attribute=attr)
+    
 
-            # The admin class already has the resolution built in  
-            admin.rasterize('data/shapefiles/temp/temp.shp',
-                            'data/shapefiles/temp/temp.tif',
-                            attribute=attr,
-                            extent=[-130, 50, -55, 20])
+            # Cut to extent
+            print("Cutting shapefile to extent...")
+            tif = gdal.Translate('data/shapefiles/temp/temp.tif',
+                                 'data/shapefiles/temp/temp1.tif',
+                                 projWin=[-130, 50, -55, 20])
+            tif = None
+
             return basename
 
 
@@ -1172,12 +1213,6 @@ for i in range(1, 3):
             idx = int(key) - 1
             if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8] for the full panel
                 raise PreventUpdate
-        # try:
-        #     # Singular grid
-        # print('\nELMENT #{}'.format(int(key)))
-        # print('dropOne LOCATION: ' + str(location))
-        # print('dropOne PREVIOUS FIPS: ' + str(previous_fips))
-
         try: 
             # Only update if it is a singular point
             location[0].index('id')
@@ -1196,12 +1231,9 @@ for i in range(1, 3):
             try:
                 old_idx = fips_pos[current_fips]
             except:
-                # print("ELEMENT  #{}".format(int(key)) + ": Can't find previous county")
                 old_idx = label_pos[current_county]
     
             current_options[old_idx]['label'] = current_county
-
-            # print("ELEMENT #{} fips: {}".format(int(key), current_fips))
             
             return current_options, current_county, current_fips
 
@@ -1216,18 +1248,17 @@ for i in range(1, 3):
                    Input('choice_2', 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
-                   Input('location_store', 'children')],
+                   Input('location_store', 'children'),
+                   Input('reset_map_1', 'n_clicks'),
+                   Input('reset_map_2', 'n_clicks')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
-    def makeGraph(choice1, choice2, map_type, signal, location, function, key,
-                  sync):
+    def makeGraph(choice1, choice2, map_type, signal, location, reset1, reset2,
+                  function, key, sync):
         # Prevent update from location unless it is a state or shape filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
-        # print("Graph location: " + str(location))
-
-        # print("Map Trigger: " + str(trig))
         if trig == 'location_store.children':
             if 'grid' in location[0] or 'county' in location[0]:  # <---------- 'mask' not in location[0] to include county areas
                 raise PreventUpdate
@@ -1237,6 +1268,14 @@ for i in range(1, 3):
             if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
                 idx = int(key) - 1
                 if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8, 12] for the full panel
+                    print("Preventing Update")
+                    raise PreventUpdate
+        if 'reset_map' in trig:
+            sel_idx = location[-1]
+            location = ['state_mask', 'all', 'Everything', sel_idx]
+            if 'On' not in sync:
+                idx = int(key) - 1
+                if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
                     print("Preventing Update")
                     raise PreventUpdate
 
@@ -1289,38 +1328,6 @@ for i in range(1, 3):
             x = np.array(json.loads(x))        
             gridids = grid[y, x]
             array[~np.isin(grid, gridids)] = np.nan
-
-        # if location:
-        #     if location[0] == 'state_mask':
-        #         flag, states, label, idx = location
-        #         if states != 'all':
-        #             states_ids = json.loads(states)
-        #             state_mask = state_array.copy()
-        #             state_mask[~np.isin(state_mask, states_ids)] = np.nan
-        #             area_mask = state_mask * 0 + 1
-        #         else:
-        #             area_mask = mask
-        #     elif location[0] == 'county_id':
-        #         flag, y, x, label, idx = location
-        #         y = np.array(json.loads(y))
-        #         x = np.array(json.loads(x))
-        #         fipses = np.unique(county_array[y, x])
-        #         county_mask = county_array.copy()
-        #         county_mask[~np.isin(county_mask, fipses)] = np.nan
-        #         area_mask = county_mask * 0 + 1
-        #     elif location[0] == 'shape_mask':
-        #         # There are several ways to do this, perhaps simplest:
-        #         # 1) Rasterize shapefile
-        #         # 2) Read in Shapefile as array
-        #         # 3) Create mask out of it, done.
-        #         shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
-        #         shp[shp==-9999] = np.nan
-        #         area_mask = shp * 0 + 1
-        #     else:
-        #         area_mask = mask
-        # else:
-        #     area_mask = mask
-        # array = array * area_mask
 
         # Check on Memory
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
@@ -1514,6 +1521,10 @@ for i in range(1, 3):
             bar_type = 'bar'
         else:
             bar_type = 'overlay'
+            if location[0] == 'grid_id':
+                location = ['state_mask', 'all',
+                    'Contiguous United States (point estimates not available)',
+                    0]
             timeseries, arrays, label = areaSeries(location, arrays, dates,
                                                    mask, state_array,
                                                    albers_source, cd,

@@ -9,13 +9,14 @@ import datetime as dt
 from dash.exceptions import PreventUpdate
 from dateutil.relativedelta import relativedelta
 import gc
+from glob import glob
 import json
-import matplotlib.pyplot as plt
-from netCDF4 import Dataset
-import numpy as np
 from collections import OrderedDict
 import os
 from osgeo import gdal, ogr, osr  # pcjericks.github.io/py-gdalogr-cookbook/index.html
+import matplotlib.pyplot as plt
+from netCDF4 import Dataset
+import numpy as np
 import pandas as pd
 from pyproj import Proj
 import salem
@@ -56,6 +57,7 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'leri1': 'Landscape Evaporative Response Index - 1 month',
              'leri3': 'Landscape Evaporative Response Index - 3 month'}
 
+
 ######## Functions ############################################################
 def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
                reproject=False):
@@ -64,7 +66,7 @@ def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
     arrays = a time series of arrays falling into each of 5 drought categories
     inclusive = whether or to categorize drought by including all categories
     '''
-    if len(location) == 5:
+    if len(location) > 4:
         flag, y, x, label, idx = location
         y = json.loads(y)
         x = json.loads(x)
@@ -77,6 +79,7 @@ def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
             area_mask = area_mask * 0 + 1
             arrays = arrays  * area_mask
             timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
+
     else:
         arrays = arrays * mask
         flag, states, label, idx = location
@@ -314,6 +317,96 @@ def readRaster(rasterpath, band, navalue=-9999):
     array[array==navalue] = np.nan
     return(array, geometry, arrayref)
 
+
+############ Construction Zone ###############################################
+def shapeReproject(src, dst, src_epsg, dst_epsg):
+    '''
+    There doesn't appear to be an ogr2ogr analog in Python's OGR module.
+    This simply reprojects a shapefile from the file.
+    
+    src = source file path
+    dst = destination file path
+    src_epsg = the epsg coordinate reference code for the source file
+    dst_epsg = the epsg coordinate reference code for the destination file
+    
+    src = 'data/shapefiles/temp/temp.shp'
+    dst = 'data/shapefiles/temp/temp.shp'
+    src_epsg = 102008
+    dst_epsg = 4326
+
+    '''
+    # Get the shapefile driver
+    driver = ogr.GetDriverByName('ESRI Shapefile')
+
+    # If dst and src match, overwrite is true, set a temporary dst name
+    if dst == src:
+        overwrite = True
+        base, filename = os.path.split(dst)
+        name, ext = os.path.splitext(filename)
+        dst = os.path.join(base, name + '2' + ext)
+    else:
+        overwrite = False
+
+    # Establish Coordinate Reference Systems
+    src_crs = osr.SpatialReference()
+    dst_crs = osr.SpatialReference()
+    src_crs.ImportFromEPSG(src_epsg)
+    dst_crs.ImportFromEPSG(dst_epsg)
+
+    # Create the tranformation method
+    transformation = osr.CoordinateTransformation(src_crs, dst_crs)
+
+    # Get/Generate layers
+    src_dataset = driver.Open(src)
+    src_layer = src_dataset.GetLayer()
+    if os.path.exists(dst):
+        driver.DeleteDataSource(dst)
+    dst_dataset = driver.CreateDataSource(dst)
+    dst_file_name = os.path.basename(dst)
+    dst_layer_name = os.path.splitext(dst_file_name)[0]
+    dst_layer = dst_dataset.CreateLayer(dst_layer_name,
+                                        geom_type=ogr.wkbMultiPolygon)
+
+    # add Fields
+    src_layer_defn = src_layer.GetLayerDefn()
+    for i in range(0, src_layer_defn.GetFieldCount()):
+        field_defn = src_layer_defn.GetFieldDefn(i)
+        dst_layer.CreateField(field_defn)
+
+    # Get Destination Layer Feature Definition
+    dst_layer_defn = dst_layer.GetLayerDefn()
+
+    # Project Features
+    src_feature = src_layer.GetNextFeature()
+    while src_feature:
+        geom = src_feature.GetGeometryRef()
+        geom.Transform(transformation)
+        dst_feature = ogr.Feature(dst_layer_defn)
+        dst_feature.SetGeometry(geom)
+        for i in range(0, dst_layer_defn.GetFieldCount()):
+            dst_feature.SetField(dst_layer_defn.GetFieldDefn(i).GetNameRef(),
+                                 src_feature.GetField(i))
+        dst_layer.CreateFeature(dst_feature)
+        dst_feature = None
+        src_feature = src_layer.GetNextFeature()
+
+    # Set coordinate extents?
+    dst_layer.GetExtent()
+    
+    # Save and close
+    src_dataset = None
+    dst_dataset = None
+
+    # Overwrite if needed
+    if overwrite is True:
+        src_files = glob('data/shapefiles/temp/temp.*')
+        dst_files = glob('data/shapefiles/temp/temp2.*')
+        for sf in src_files:
+            os.remove(sf)
+        for df in dst_files:
+            os.rename(df, df.replace('2', ''))
+
+############ Construction Zone ###############################################
 
 def standardize(indexlist):
     '''
@@ -1077,22 +1170,23 @@ class Admin_Elements:
         return path_package
 
 
-    def rasterize(self, src_path, trgt_path, attribute, extent, epsg=4326,
-                  na=-9999):
+    def rasterize(self, src, dst, attribute, epsg=4326, na=-9999):
         '''
         It seems to be unreasonably involved to do this in Python compared to
         the command line.
         ''' 
         resolution = self.resolution
+
         # Open shapefile, retrieve the layer
-        src = ogr.Open(src_path)
-        layer = src.GetLayer()
-    
+        src_data = ogr.Open(src)
+        layer = src_data.GetLayer()
+        extent = layer.GetExtent()  # This is wrong
+
         # Create the target raster layer
-        xmin, ymax, xmax, ymin = extent
+        xmin, xmax, ymin, ymax = extent
         cols = int((xmax - xmin)/resolution)
         rows = int((ymax - ymin)/resolution)
-        trgt = gdal.GetDriverByName('GTiff').Create(trgt_path, cols, rows, 1,
+        trgt = gdal.GetDriverByName('GTiff').Create(dst, cols, rows, 1,
                                    gdal.GDT_Float32)
         trgt.SetGeoTransform((xmin, resolution, 0, ymax, 0, -resolution))
     
@@ -1113,7 +1207,7 @@ class Admin_Elements:
     
         # Close target raster
         trgt = None
-
+        src_data = None
     
 class Cacher:
     '''
