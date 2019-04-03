@@ -374,7 +374,8 @@ def divMaker(id_num, index='noaa'):
                                             'either a zipfile or a grouped ' +
                                             'selection that includes the ' +
                                             '.shp, .shx, .sbn, .proj, and ' +
-                                            '.sbx files.'),
+                                            '.sbx files. Make sure the ' +
+                                            ' is unprojected for now.'),
                                           children=[
                                              dcc.Upload(
                                                id='shape_{}'.format(id_num),
@@ -411,7 +412,7 @@ def divMaker(id_num, index='noaa'):
                                     id='update_graphs_{}'.format(id_num),
                                     children='Update',
                                     title=('Click to update the map and ' +
-                                           'graphs below with updated ' +
+                                           'graphs below with ' +
                                            'location choices (state ' +
                                            'selections do not update ' +
                                            'automatically).'),
@@ -1009,14 +1010,10 @@ for i in range(1, 3):
                 print("Geopandas Could Not Find CRS")
                 fshp = fiona.open('data/shapefiles/temp/temp.shp')
                 crs_wkt = fshp.crs_wkt
-                print(crs_wkt)
                 crs_ref = osr.SpatialReference()
-                print("Imported Spatial Reference")
                 crs_ref.ImportFromWkt(crs_wkt)
-                print("Retrieving EPSG")
                 crs_ref.AutoIdentifyEPSG()
                 epsg = crs_ref.GetAttrValue('AUTHORITY', 1)
-                print(epsg)
                 epsg = int(epsg)
                 fshp.close()
 
@@ -1034,8 +1031,7 @@ for i in range(1, 3):
             src = 'data/shapefiles/temp/temp.shp'
             dst = 'data/shapefiles/temp/temp1.tif'
             print("Rasterizing Shapefile...")
-            admin.rasterize(src, dst, attribute=attr)
-    
+            admin.rasterize(src, dst, attribute=attr)  # <--------------------- Disk space errors on Ubunutu machine
 
             # Cut to extent
             print("Cutting shapefile to extent...")
