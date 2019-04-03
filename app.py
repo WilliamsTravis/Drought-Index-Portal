@@ -23,6 +23,7 @@ import dash_html_components as html
 import dash_table
 import datetime as dt
 from collections import OrderedDict
+import fiona
 from flask_caching import Cache
 import gc
 import geopandas as gpd
@@ -30,7 +31,7 @@ from inspect import currentframe, getframeinfo
 import json
 import numpy as np
 import os
-from osgeo import gdal
+from osgeo import gdal, osr
 import pandas as pd
 import psutil
 import sys
@@ -997,18 +998,22 @@ for i in range(1, 3):
                         f.write(decoded)
     
             # Now let's just rasterize it for a mask  # <---------------------- It may be more precise to calculate points within the shapefile, this is a simpler standin
-            # shp = gpd.read_file('data/shapefiles/temp/albers_cut.shp')
             shp = gpd.read_file('data/shapefiles/temp/temp.shp')
 
-            # Check CRS, reproject if needed
+            # Check CRS, reproject if needed  # <------------------------------ This step works well locally, 
             crs = shp.crs
-            epsg = crs['init']
-            epsg = int(epsg[epsg.index(':') + 1:])
-            if crs['init'] != 'epsg:4326':
-                print("Reprojecting Shapefile...")
-                crs = shp.crs
+            try:
                 epsg = crs['init']
                 epsg = int(epsg[epsg.index(':') + 1:])
+            except:
+                fshp = fiona.open('data/shapefiles/temp/temp.shp')
+                crs = fshp.crs_wkt
+                crs_ref = osr.SpatialReference()
+                crs_ref.ImportFromWkt(crs)
+                epsg = int(crs_ref.GetAttrValue('AUTHORITY', 1))
+                fshp.close()
+            if epsg != 4326:
+                print("Reprojecting Shapefile...")
                 shapeReproject(src='data/shapefiles/temp/temp.shp',
                                dst='data/shapefiles/temp/temp.shp',
                                src_epsg=epsg, dst_epsg=4326)
