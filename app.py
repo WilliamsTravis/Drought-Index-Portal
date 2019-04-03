@@ -59,7 +59,7 @@ warnings.filterwarnings("ignore")
 
 ######################## Default Values #######################################
 default_function = 'pmean'
-default_sample = 'pdsi'
+default_sample = 'spi1'
 default_1 = 'pdsi'
 default_2 = 'spei6'
 default_years = [2000, 2019]
@@ -174,7 +174,7 @@ function_names = {'pmean': 'Average Percentiles',
                   # 'ocv': 'Coefficient of Variation',
                   'oarea': 'Average Index Values'}
 
-# County Data Frame and options  
+# County Data Frame and options
 counties_df = pd.read_csv('data/tables/unique_counties.csv')  # <-------------- Rebuild this to have a FIPS code as its value, same method as states
 rows = [r for idx, r in counties_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['fips']} for r in rows]
@@ -375,7 +375,7 @@ def divMaker(id_num, index='noaa'):
                                             'selection that includes the ' +
                                             '.shp, .shx, .sbn, .proj, and ' +
                                             '.sbx files. Make sure the ' +
-                                            ' is unprojected for now.'),
+                                            'file is unprojected for now.'),
                                           children=[
                                              dcc.Upload(
                                                id='shape_{}'.format(id_num),
