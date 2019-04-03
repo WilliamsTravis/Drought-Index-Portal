@@ -2,6 +2,8 @@
 
 /data/cache2
 
+/data/shapefiles/temp
+
 /env
 
 *.log

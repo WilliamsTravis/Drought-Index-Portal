@@ -996,22 +996,30 @@ for i in range(1, 3):
                                          fname)
                     with open(fname, 'wb') as f:
                         f.write(decoded)
-    
+
             # Now let's just rasterize it for a mask  # <---------------------- It may be more precise to calculate points within the shapefile, this is a simpler standin
             shp = gpd.read_file('data/shapefiles/temp/temp.shp')
 
-            # Check CRS, reproject if needed  # <------------------------------ This step works well locally, 
+            # Check CRS, reproject if needed  # <------------------------------ This step works well locally,
             crs = shp.crs
             try:
                 epsg = crs['init']
                 epsg = int(epsg[epsg.index(':') + 1:])
             except:
+                print("Geopandas Could Not Find CRS")
                 fshp = fiona.open('data/shapefiles/temp/temp.shp')
-                crs = fshp.crs_wkt
+                crs_wkt = fshp.crs_wkt
+                print(crs_wkt)
                 crs_ref = osr.SpatialReference()
-                crs_ref.ImportFromWkt(crs)
-                epsg = int(crs_ref.GetAttrValue('AUTHORITY', 1))
+                print("Imported Spatial Reference")
+                crs_ref.ImportFromWkt(crs_wkt)
+                print("Retrieving EPSG")
+                crs_ref.AutoIdentifyEPSG()
+                epsg = crs_ref.GetAttrValue('AUTHORITY', 1)
+                print(epsg)
+                epsg = int(epsg)
                 fshp.close()
+
             if epsg != 4326:
                 print("Reprojecting Shapefile...")
                 shapeReproject(src='data/shapefiles/temp/temp.shp',
