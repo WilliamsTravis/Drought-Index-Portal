@@ -86,8 +86,14 @@ ranges = pd.read_csv('data/tables/index_ranges.csv')
 app = dash.Dash(__name__)
 
 # Go to stylesheet, styled after a DASH example (how to serve locally?)
+# app.css.append_css({'external_url':
+#                     'https://codepen.io/williamstravis/pen/maxwvK.css'})
+# app.scripts.config.serve_locally = True
+
+
+# My CSS is starting to fail to load. Is it my code, css, or something else?
 app.css.append_css({'external_url':
-                    'https://codepen.io/williamstravis/pen/maxwvK.css'})
+                    'https://codepen.io/chriddyp/pen/bWLwgP.css'})
 app.scripts.config.serve_locally = True
 
 # For the Loading screen
