@@ -85,16 +85,16 @@ ranges = pd.read_csv('data/tables/index_ranges.csv')
 ############### The DASH application and server ###############################
 app = dash.Dash(__name__)
 
-# Go to stylesheet, styled after a DASH example (how to serve locally?)
-# app.css.append_css({'external_url':
-#                     'https://codepen.io/williamstravis/pen/maxwvK.css'})
+# Go to stylesheet, styled after a DASH example (how to serve locally?)  # <--- Check out criddyp's response about a third of the way down here <https://community.plot.ly/t/serve-locally-option-with-additional-scripts-and-style-sheets/6974/6>
+app.css.append_css({'external_url':
+                    'https://codepen.io/williamstravis/pen/maxwvK.css'})
 # app.scripts.config.serve_locally = True
 
 
 # My CSS is starting to fail to load. Is it my code, css, or something else?
-app.css.append_css({'external_url':
-                    'https://codepen.io/chriddyp/pen/bWLwgP.css'})
-app.scripts.config.serve_locally = True
+# app.css.append_css({'external_url':
+#                     'https://codepen.io/chriddyp/pen/bWLwgP.css'})
+# app.scripts.config.serve_locally = True
 
 # For the Loading screen
 app.css.append_css({"external_url":
