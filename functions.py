@@ -1170,7 +1170,8 @@ class Admin_Elements:
         return path_package
 
 
-    def rasterize(self, src, dst, attribute, epsg=4326, na=-9999):
+    def rasterize(self, src, dst, attribute, all_touch=False,
+                  epsg=4326, na=-9999):
         '''
         It seems to be unreasonably involved to do this in Python compared to
         the command line.
@@ -1200,11 +1201,14 @@ class Admin_Elements:
         band.SetNoDataValue(na)
     
         # Set options
-        ops = ['Attribute=' + attribute]
-    
+        if all_touch is True:
+            ops = ['-at', '-a ' + attribute]
+        else:
+            ops = ['ATTRIBUTE=' + attribute]
+
         # Finally rasterize
         gdal.RasterizeLayer(trgt, [1], layer, options=ops)
-    
+
         # Close target raster
         trgt = None
         src_data = None

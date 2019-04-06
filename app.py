@@ -110,6 +110,8 @@ app.config['suppress_callback_exceptions'] = True
 cache = Cache(config={'CACHE_TYPE': 'filesystem',
                       'CACHE_DIR': 'data/cache',
                       'CACHE_THRESHOLD': 2})
+
+# Create a separate cache to hold drought area data for toggling DSCI on/off
 cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
                        'CACHE_DIR': 'data/cache2',
                        'CACHE_THRESHOLD': 2})
@@ -135,7 +137,6 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'EDDI-6', 'value': 'eddi6'},
            {'label': 'LERI-1', 'value': 'leri1'},
            {'label': 'LERI-3', 'value': 'leri3'}]
-
 
 # Index dropdown labels
 indexnames = {'pdsi': 'Palmer Drought Severity Index',
@@ -164,7 +165,6 @@ indexnames = {'pdsi': 'Palmer Drought Severity Index',
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
                          {'label': 'Maximum', 'value': 'pmax'},
                          {'label': 'Minimum', 'value': 'pmin'}]
-
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
                          {'label': 'Minimum', 'value': 'omin'},
@@ -181,7 +181,7 @@ function_names = {'pmean': 'Average Percentiles',
                   'oarea': 'Average Index Values'}
 
 # County Data Frame and options
-counties_df = pd.read_csv('data/tables/unique_counties.csv')  # <-------------- Rebuild this to have a FIPS code as its value, same method as states
+counties_df = pd.read_csv('data/tables/unique_counties.csv')
 rows = [r for idx, r in counties_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['fips']} for r in rows]
 fips_pos = {county_options[i]['value']: i for i in range(len(county_options))}
@@ -190,12 +190,12 @@ label_pos = {county_options[i]['label']: i for i in range(len(county_options))}
 # State options
 states_df = pd.read_table('data/tables/state_fips.txt', sep='|')
 states_df = states_df.sort_values('STUSAB')
-NCONUS = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']  # <----------- I'm reading a book about how we ignore these (D:). In the future we'll have to include them.
+NCONUS = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']  # <----------- I'm reading a book about how we ignore most of these (D:). In the future we'll have to include them.
 states_df = states_df[~states_df.STUSAB.isin(NCONUS)]
 rows = [r for idx, r in states_df.iterrows()]
 state_options = [{'label': r['STUSAB'], 'value': r['STATE']} for
                   r in rows]
-state_options.insert(0, {'label': 'ALL', 'value': 'all'})
+state_options.insert(0, {'label': 'ALL STATES IN CONUS', 'value': 'all'})
 
 # Map type options
 maptypes = [{'label': 'Light', 'value': 'light'},
@@ -265,7 +265,7 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
 
 # Mapbox initial layout
-# (Check this out! https://paulcbauer.shinyapps.io/plotlylayout/)
+# Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
 layout = dict(
     autosize=True,
     height=500,
@@ -300,9 +300,7 @@ unselected_style = {'border-top-left-radius': '3px',
                     'background-color': '#f9f9f9',
                     'padding': '0px 24px',
                     'border-bottom': '1px solid #d6d6d6'}
-on_button_style = {
-                   # 'width': '20%',
-                   'background-color': '#C7D4EA',
+on_button_style = {'background-color': '#C7D4EA',
                    'border-radius': '4px',
                    'font-family': 'Times New Roman'}
 off_button_style =  {'background-color': '#a8b3c4',
@@ -406,7 +404,7 @@ def divMaker(id_num, index='noaa'):
                                 html.Button(
                                     id='reset_map_{}'.format(id_num),
                                     children='Reset',
-                                    title=('Click to remove area filters.'),
+                                    title=('Remove area filters.'),
                                     style={'width': '20%',
                                            'font-size': '10',
                                            'height': '26px',
@@ -417,7 +415,7 @@ def divMaker(id_num, index='noaa'):
                                 html.Button(
                                     id='update_graphs_{}'.format(id_num),
                                     children='Update',
-                                    title=('Click to update the map and ' +
+                                    title=('Update the map and ' +
                                            'graphs below with ' +
                                            'location choices (state ' +
                                            'selections do not update ' +
@@ -445,7 +443,8 @@ def divMaker(id_num, index='noaa'):
                          style={'margin-bottom': '25'}),
                  html.Button(
                          id='dsci_button_{}'.format(id_num),
-                         title=('The Drought Severity ' +
+                         title=
+                         ('The Drought Severity ' +
                           'Coverage Index (DSCI) is a way to aggregate the ' +
                           'five drought severity classifications into a '+
                           'single number. It is calculated by taking the ' +
@@ -475,93 +474,89 @@ def divMaker(id_num, index='noaa'):
             ], className='six columns')
     return div
 
-app.layout = html.Div([  # <--------------------------------------------------- Line all brackets and parens up
+app.layout = html.Div([  # <--------------------------------------------------- Line all brackets and parens up.
                html.Div([
 
                 # Sponsers
-                html.A(html.Img(
-                    src = ("https://github.com/WilliamsTravis/" +
-                            "Pasture-Rangeland-Forage/blob/master/" +
-                            "data/earthlab.png?raw=true"),
+                html.A(
+                  html.Img(
+                    src=("https://github.com/WilliamsTravis/" +
+                         "Pasture-Rangeland-Forage/blob/master/" +
+                         "data/earthlab.png?raw=true"),
                     className='one columns',
-                    style={
-                        'height': '40',
-                        'width': '100',
-                        'float': 'right',
-                        'position': 'static'
-                           }),
-                        href="https://www.colorado.edu/earthlab/",
-                        target="_blank"),
-                html.A(html.Img(
-                    src = ('https://github.com/WilliamsTravis/Pasture-' +
-                           'Rangeland-Forage/blob/master/data/' +
-                           'wwa_logo2015.png?raw=true'),
+                    style={'height': '40',
+                           'width': '100',
+                           'float': 'right',
+                           'position': 'static'}),
+                    href="https://www.colorado.edu/earthlab/",
+                    target="_blank"),
+                html.A(
+                  html.Img(
+                    src=('https://github.com/WilliamsTravis/Pasture-' +
+                         'Rangeland-Forage/blob/master/data/' +
+                         'wwa_logo2015.png?raw=true'),
                     className='one columns',
-                    style={
-                        'height': '50',
-                        'width': '150',
-                        'float': 'right',
-                        'position': 'static',
-                        }),
-                        href = "http://wwa.colorado.edu/",
-                        target = "_blank"),
-                 html.A(html.Img(
-                    src =( "https://github.com/WilliamsTravis/Pasture-" +
+                    style={'height': '50',
+                           'width': '150',
+                           'float': 'right',
+                           'position': 'static'}),
+                    href = "http://wwa.colorado.edu/",
+                    target = "_blank"),
+                 html.A(
+                   html.Img(
+                    src=( "https://github.com/WilliamsTravis/Pasture-" +
                           "Rangeland-Forage/blob/master/data/" +
                           "nidis.png?raw=true"),
                     className='one columns',
-                    style={
-                        'height': '50',
-                        'width': '200',
-                        'float': 'right',
-                        'position': 'relative',
-                        }),
-                        href = "https://www.drought.gov/drought/",
-                        target = "_blank"),
-                 html.A(html.Img(
+                    style={'height': '50',
+                           'width': '200',
+                           'float': 'right',
+                           'position': 'relative'}),
+                    href = "https://www.drought.gov/drought/",
+                    target = "_blank"),
+                 html.A(
+                   html.Img(
                     src = ("https://github.com/WilliamsTravis/Pasture-" +
                            "Rangeland-Forage/blob/master/data/" +
                            "cires.png?raw=true"),
                     className='one columns',
-                    style={
-                        'height': '50',
-                        'width': '100',
-                        'float': 'right',
-                        'position': 'relative',
-                        'margin-right': '20',
-                        }),
-                        href = "https://cires.colorado.edu/",
-                        target = "_blank"
-                        )],
+                    style={'height': '50',
+                           'width': '100',
+                           'float': 'right',
+                           'position': 'relative',
+                           'margin-right': '20'}),
+                    href = "https://cires.colorado.edu/",
+                    target = "_blank")],
                 className = 'row'),
 
         # Title
-        html.Div([html.H1('Drought Index Comparison Portal'),
-                  html.Hr()],
-                 className='twelve columns',
-                 style={'font-weight': 'bolder',
-                        'text-align': 'center',
-                        'font-size': '50px',
-                        'font-family': 'Times New Roman',
-                        'margin-top': '25'}),
+        html.Div([
+            html.H1('Drought Index Comparison Portal'),
+            html.Hr()],
+            className='twelve columns',
+            style={'font-weight': 'bolder',
+                   'text-align': 'center',
+                   'font-size': '50px',
+                   'font-family': 'Times New Roman',
+                   'margin-top': '25'}),
 
         # Toggle Options
         html.Div([
                 html.Button(id='toggle_options',
                             children='Toggle Options: Off',
                             type='button',
-                            title='Click to collapse the options above.',
+                            title=('Display/hide options that ' +
+                                   'apply to each map below.'),
                             style={'display': 'none'}),
                 html.Button(id="desc_button",
-                            children="Project Description: Off",
-                            title=("Toggle this on and off to show a " +
-                                   "description of the project with " +
-                                   "some instructions."),
+                            children='Project Description: Off',
+                            title=('Display/hide a description of ' +
+                                   'the application with instructions.'),
                             style={'display': 'none'}),
                 html.Button(id="click_sync",
-                            children="Location Syncing: On",
-                            title=("Toggle on and off to sync the location " +
-                                   "of the time series between each map."),
+                            children='Location Syncing: On',
+                            title=('Sync/unsync the location ' +
+                                   'of the time series between each map.'),
                             style={'display': 'none'})],
                 style={'margin-bottom': '30',
                        'text-align': 'center'}),
@@ -571,7 +566,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
             html.Div([dcc.Markdown(id='description')],
                      style={'text-align':'center',
                             'width':'70%',
-                            'margin':'0px auto'})],
+                            'margin':'0px auto'}),
+            html.Hr()],
             style={'text-align':'center',
                    'margin': '0 auto',
                    'width': '100%'}),
@@ -675,7 +671,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
         # Submission Button
         html.Div([
             html.Button(id='submit',
-                        title=('Submit to activate the option settings ' +
+                        title=('Submit the option settings ' +
                                'above and update the graphs below.'),
                         children='Submit Options',
                         type='button',
@@ -1037,8 +1033,7 @@ for i in range(1, 3):
             src = 'data/shapefiles/temp/temp.shp'
             dst = 'data/shapefiles/temp/temp1.tif'
             print("Rasterizing Shapefile...")
-            admin.rasterize(src, dst, attribute=attr)  # <--------------------- Disk space errors on Ubunutu machine
-
+            admin.rasterize(src, dst, attribute=attr, all_touch=False)  # <---- Disk space errors on Ubunutu machine, all touch not working.
             # Cut to extent
             print("Cutting shapefile to extent...")
             tif = gdal.Translate('data/shapefiles/temp/temp.tif',
