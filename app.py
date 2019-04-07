@@ -1380,14 +1380,14 @@ for i in range(1, 3):
             if type(gridid) is np.ndarray:
                 gridid = [np.nanmin(gridid), np.nanmax(gridid)]
                 title = (indexnames[choice] + '<br>' +
-                         function_names[function] + 'with Grids ' +
+                         function_names[function] + 'With Grids ' +
                          str(int(gridid[0]))  + ' to ' + str(int(gridid[1])) +
                          '  ('  + date_print + ')')
                 title_size = 15
             else:
                 title = (indexnames[choice] + '<br>' +
-                         function_names[function] + 'with Grid ' +
-                         str(int(gridid))  + '  ('  + date_print+ '  )')
+                         function_names[function] + 'With Grid ' +
+                         str(int(gridid))  + '  ('  + date_print+ ')')
             timeseries, arrays2, label = areaSeries(location, arrays, dates,
                                                    mask, state_array,
                                                    albers_source, cd,
