@@ -16,11 +16,13 @@ import os
 from osgeo import gdal, ogr, osr  # pcjericks.github.io/py-gdalogr-cookbook/index.html
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
+from numba import jit
 import numpy as np
 import pandas as pd
 from pyproj import Proj
 import salem
 from scipy.stats import rankdata
+import time
 from tqdm import tqdm
 import sys
 import xarray as xr
@@ -139,6 +141,24 @@ def coordinateDictionaries(source):
         latdict = dict(zip(lats, ys))
 
         return londict, latdict, res
+
+
+@jit(nopython=True)
+def correlationField(ts, arrays):
+    '''
+    Create a 2d array of pearson correlation coefficient between the time
+    series at the location of the grid id and every other grid in a 3d array
+    '''
+    # Apply that to each cell
+    one_field = np.zeros((arrays.shape[1], arrays.shape[2]))
+    for i in range(arrays.shape[1]):
+        for j in range(arrays.shape[2]):
+            lst = arrays[:, i, j]
+            cor = np.corrcoef(ts, lst)[0,1]
+            one_field[i, j] = cor
+
+    return one_field
+
 
 def droughtArea(arrays, choice, inclusive=False):
     '''
@@ -264,6 +284,10 @@ def makeMap(maps, function):
         data = maps.coefficientVariation()
     if function == "oarea":
         data = maps.meanOriginal()
+    if function == "ocorr":
+        data = maps.meanOriginal()
+    if function == "pcorr":
+        data = maps.meanPercentile()
     return data
 
 

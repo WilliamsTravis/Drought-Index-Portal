@@ -46,7 +46,8 @@ os.chdir(path)
 
 # Import functions and classes
 from functions import makeMap, areaSeries, droughtArea, shapeReproject
-from functions import Index_Maps, Admin_Elements, Location_Builder 
+from functions import Index_Maps, Admin_Elements, Location_Builder
+from functions import correlationField
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -164,21 +165,25 @@ indexnames = {'pdsi': 'Palmer Drought Severity Index',
 # Function options (Percentile & Index Values)
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
                          {'label': 'Maximum', 'value': 'pmax'},
-                         {'label': 'Minimum', 'value': 'pmin'}]
+                         {'label': 'Minimum', 'value': 'pmin'},
+                         {'label': 'Correlation', 'value': 'pcorr'}]
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
                          {'label': 'Minimum', 'value': 'omin'},
                     # {'label': 'Coefficient of Variation', 'value': 'ocv'},
-                         {'label': 'Drought Severity Area', 'value':'oarea'}]
+                         {'label': 'Drought Severity Area', 'value':'oarea'},
+                         {'label': 'Correlation', 'value': 'ocorr'}]
 
 function_names = {'pmean': 'Average Percentiles',
-                  'pmax': 'Maxmium Percentile',
-                  'pmin': 'Minimum Percentile',
+                  'pmax': 'Maxmium Percentiles',
+                  'pmin': 'Minimum Percentiles',
                   'omean': 'Average Index Values',
-                  'omax': 'Maximum Index Value',
-                  'omin': 'Minimum Index Value',
+                  'omax': 'Maximum Index Values',
+                  'omin': 'Minimum Index Values',
                   # 'ocv': 'Coefficient of Variation',
-                  'oarea': 'Average Index Values'}
+                  'oarea': 'Average Index Values',
+                  'pcorr': "Pearson's Correlation ",
+                  'ocorr': "Pearson's Correlation "}
 
 # County Data Frame and options
 counties_df = pd.read_csv('data/tables/unique_counties.csv')
@@ -840,10 +845,17 @@ def functionOptions(function_type):
 # Function callbacks
 @cache.memoize() # To be replaced with something more efficient
 def retrieve_data(signal, function, choice):
+    # Retrieve signal elements
     [time_range, colorscale, reverse_override] = signal
+
+    # Retrieve data package
     data = Index_Maps(time_range, colorscale, reverse_override, choice)
-    delivery = makeMap(data, function)
-    return delivery
+
+    # Choose which function with which to transform data
+    [array, arrays, dates, colorscale,
+         dmax, dmin, reverse, res] = makeMap(data, function)
+
+    return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
 @cache2.memoize()  # <--------------------------------------------------------- Cached for DCSI, done here to add more data when more memory is available
@@ -1270,8 +1282,9 @@ for i in range(1, 3):
         trig = dash.callback_context.triggered[0]['prop_id']
 
         if trig == 'location_store.children':
-            if 'grid' in location[0] or 'county' in location[0]:  # <---------- 'mask' not in location[0] to include county areas
-                raise PreventUpdate
+            if 'corr' not in function:
+                if 'grid' in location[0] or 'county' in location[0]:  # <---------- 'mask' not in location[0] to include county areas
+                    raise PreventUpdate
 
             # Check which element the selection came from
             sel_idx = location[-1]
@@ -1280,6 +1293,7 @@ for i in range(1, 3):
                 if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8, 12] for the full panel
                     print("Preventing Update")
                     raise PreventUpdate
+
         if 'reset_map' in trig:
             sel_idx = location[-1]
             location = ['state_mask', 'all', 'Everything', sel_idx]
@@ -1299,6 +1313,10 @@ for i in range(1, 3):
 
         # Collect and adjust signal
         [[year_range, month_range], colorscale, reverse_override] = signal
+
+        # Stand in for correlation default coloring
+        if 'corr' in function:
+            cs = colorscale
 
         # Figure which choice is this panel's and which the other
         key = int(key) - 1
@@ -1329,15 +1347,59 @@ for i in range(1, 3):
             amin = 0
             amax = np.nanmax(array)
 
+        # There are several possible date ranges to display
+        y1 = year_range[0]
+        y2 = year_range[1]
+        m1 = month_range[0]
+        m2 = month_range[1]
+
+        if y1 != y2:
+            date_print = '{} - {}'.format(y1, y2)
+        elif y1 == y2 and m1 != m2:
+            date_print = "{} - {}, {}".format(monthmarks[m1],
+                                              monthmarks[m2], y1)
+        else:
+            date_print = "{}, {}".format(monthmarks[m1], y1)
 
         # Filter by x, y positions in location
         flag = location[0]
-        if 'id' not in flag and flag != 'county_mask' and location[1] != 'all':
+        if 'id' not in flag and flag != 'county_mask' and location[1] != 'all' and 'corr' not in function:
             flag, y, x, label, idx = location
             y = np.array(json.loads(y))
             x = np.array(json.loads(x))        
             gridids = grid[y, x]
             array[~np.isin(grid, gridids)] = np.nan
+
+        if 'corr' in function and location[1] != 'all':
+            print(str(location))
+            flag, y, x, label, idx = location
+            y = np.array(json.loads(y))
+            x = np.array(json.loads(x))        
+            gridid = grid[y, x]
+            print(str(gridid))
+            if type(gridid) is np.ndarray:
+                gridid = [np.nanmin(gridid), np.nanmax(gridid)]
+                title = (indexnames[choice] + '<br>' +
+                         function_names[function] + 'with Grids ' +
+                         str(int(gridid[0]))  + ' to ' + str(int(gridid[1])) +
+                         '  ('  + date_print + ')')
+                title_size = 15
+            else:
+                title = (indexnames[choice] + '<br>' +
+                         function_names[function] + 'with Grid ' +
+                         str(int(gridid))  + ': '  + date_print)
+            timeseries, arrays2, label = areaSeries(location, arrays, dates,
+                                                   mask, state_array,
+                                                   albers_source, cd,
+                                                   reproject=False)
+            
+            array = correlationField(timeseries, arrays)
+            title_size = 20
+
+        else:
+            title = (indexnames[choice] + '<br>' +
+                     function_names[function] + ': ' + date_print)
+            title_size = 20
 
         # Check on Memory
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
@@ -1380,19 +1442,6 @@ for i in range(1, 3):
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
 
-        # There are several possible date ranges to display
-        y1 = year_range[0]
-        y2 = year_range[1]
-        m1 = month_range[0]
-        m2 = month_range[1]
-
-        if y1 != y2:
-            date_print = '{} - {}'.format(y1, y2)
-        elif y1 == y2 and m1 != m2:
-            date_print = "{} - {}, {}".format(monthmarks[m1],
-                                              monthmarks[m2], y1)
-        else:
-            date_print = "{}, {}".format(monthmarks[m1], y1)
 
         # The y-axis depends on the chosen function
         if 'p' in function and 'mean' in function:
@@ -1420,6 +1469,11 @@ for i in range(1, 3):
         elif function == 'oarea' and 'leri' in choice:
             # So Leri's index values already appear to be in percentile space!
             colorscale = RdWhBu
+        elif 'corr' in function:
+            amax = 1
+            amin = 0
+            if cs == 'Default':
+                colorscale = 'Viridis'
 
         # Create the scattermapbox object
         data = [
@@ -1454,10 +1508,10 @@ for i in range(1, 3):
             style=map_type,
             center=dict(lon=-95.7, lat=37.1),
             zoom=2)
-        layout_copy['title'] = (indexnames[choice] + '<br>' +
-                                function_names[function] + ': ' +
-                                date_print)
-
+        layout_copy['titlefont']=dict(color='#CCCCCC', size=title_size,
+                                      family='Time New Roman',
+                                      fontweight='bold')
+        layout_copy['title'] = title
         figure = dict(data=data, layout=layout_copy)
         return figure
 
@@ -1494,6 +1548,11 @@ for i in range(1, 3):
 
         # Collect signals
         [[year_range, month_range], colorscale, reverse_override] = signal
+
+        # Stand in for correlation default coloring
+        print(function)
+        if 'corr' in function:
+            cs = colorscale
 
         # Get/cache data
         [array, arrays, dates, colorscale,
@@ -1583,6 +1642,12 @@ for i in range(1, 3):
             yaxis = dict(title='Percent Area (%)',
                           range=[0, 100],
                           hovermode='y')
+
+        if 'corr' in function:
+            print(cs)
+            if cs == 'Default':
+                colorscale = 'Viridis'
+                reverse=True
 
         # Trying to free up space for more workers
         del array
