@@ -1387,7 +1387,7 @@ for i in range(1, 3):
             else:
                 title = (indexnames[choice] + '<br>' +
                          function_names[function] + 'with Grid ' +
-                         str(int(gridid))  + ': '  + date_print)
+                         str(int(gridid))  + '  ('  + date_print+ '  )')
             timeseries, arrays2, label = areaSeries(location, arrays, dates,
                                                    mask, state_array,
                                                    albers_source, cd,
