@@ -13,7 +13,8 @@ from glob import glob
 import json
 from collections import OrderedDict
 import os
-from osgeo import gdal, ogr, osr  # pcjericks.github.io/py-gdalogr-cookbook/index.html
+from osgeo import gdal, ogr, osr
+from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 from numba import jit
@@ -289,6 +290,47 @@ def makeMap(maps, function):
     if function == "pcorr":
         data = maps.meanPercentile()
     return data
+
+
+def movie(array, titles=None, axis=0):
+    '''
+    if the time axis is not 0, specify which it is.
+    '''
+    if titles is None:
+        titles = ["" for t in range(len(array))]
+    if type(titles) is str:
+        titles = [titles + ': ' + str(t) for t in range(len(array))]
+
+    fig, ax = plt.subplots()
+
+    ax.set_ylim((array.shape[1], 0))
+    ax.set_xlim((0, array.shape[2]))
+
+    im = ax.imshow(array[0, :, :], cmap='viridis_r')
+
+    def init():
+        if axis == 0:
+            im.set_data(array[0, :, :])
+        elif axis == 1:
+            im.set_data(array[:, 0, :])
+        else:
+            im.set_data(array[:, :, 0])
+        return im,
+
+    def animate(i):
+        if axis == 0:
+            data_slice = array[i, :, :]
+        elif axis == 1:
+            data_slice = array[:, i, :]
+        else:
+            data_slice = array[:, :, i]
+        im.set_data(data_slice)
+        ax.set_title(titles[i])
+        return im,
+
+    anim = FuncAnimation(fig, animate, init_func=init, blit=False, repeat=True)
+
+    return anim
 
 
 # For making outlines...move to css, maybe
