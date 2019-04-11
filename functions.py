@@ -175,7 +175,7 @@ def droughtArea(arrays, choice, inclusive=False):
         arrays = arrays*-1
 
     # Drought Categories
-    print("calculating drought area...")
+    # print("calculating drought area...")
     drought_cats = {'sp': {0: [-0.5, -0.8],
                            1: [-0.8, -1.3],
                            2: [-1.3, -1.5],
@@ -231,13 +231,13 @@ def droughtArea(arrays, choice, inclusive=False):
                        i in range(len(values))])
         return ps
 
-    print("starting offending loops...")
+    # print("starting offending loops...")
     pnincs = np.array([filter(arrays, cats[i]) for i in range(5)])
     DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
     pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]  # <---------------- ~60 microseconds with 18 year record (compare to 150 milliseconds to start over :)
 
     # Return the list of five layers
-    print("drought area calculations complete.")
+    # print("drought area calculations complete.")
     return pincs, pnincs, DSCI
 
 
@@ -690,7 +690,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     try:
         test = Dataset(ncfiles[0])
         test.close()
-        print("Combining data using netcdf dates..")
+        # print("Combining data using netcdf dates..")
         date_tifs = {}
         for i in range(len(ncfiles)):
             nc = Dataset(ncfiles[i])
@@ -709,7 +709,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
 
     except Exception as e:
         print(str(e))
-        print('Combininb data using filename dates...')
+        # print('Combining data using filename dates...')
         datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
         dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
                   d in datestrings]
@@ -838,7 +838,7 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
 
     # Make sure there are the same number of time steps
     if ntime != len(nc.variables['time']):
-        print("Time lengths don't match.")
+        # print("Time lengths don't match.")
         sys.exit(1)
 
     days = nc.variables['time'][:]  # This is in days since 1900

@@ -912,14 +912,12 @@ def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
         lines of logic to determine which was most recently updated.
         '''
         # package the selections for indexing
-        # print(str(click1))
         locations = [click1, click2, select1, select2, county1, county2,
                      shape1, shape2, state1, state2]
         updates = [update1, update2]
         context = dash.callback_context
         triggered_value = context.triggered[0]['value']
         trigger = context.triggered[0]['prop_id']
-        print("Initial Trigger: " + trigger)
 
         # The update graph button activates state selections
         if 'update_graph' in trigger:
@@ -939,13 +937,13 @@ def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
                                     state_array, county_array)
         location = selector.chooseRecent()
         if 'shape' in location [0] and location[3] is None:
-            print(str(location[3]))
+            # print(str(location[3]))
             default_loc = copy.deepcopy(default_location)
             location = default_loc
         try:
             location.append(sel_idx)
         except:
-            print('empty location')
+            # print('empty location')
             raise PreventUpdate
 
         return location
@@ -979,7 +977,6 @@ for i in range(1, 3):
                   [State('shape_{}'.format(i), 'filename'),
                    State('shape_{}'.format(i), 'last_modified')])
     def parseShape(contents, filenames, last_modified):
-        print("parseShape triggered")
         if filenames:
             basename = os.path.splitext(filenames[0])[0]
             if len(filenames) == 1:
@@ -1021,7 +1018,7 @@ for i in range(1, 3):
                 epsg = crs['init']
                 epsg = int(epsg[epsg.index(':') + 1:])
             except:
-                print("Geopandas Could Not Find CRS")
+                # print("Geopandas Could Not Find CRS")
                 fshp = fiona.open('data/shapefiles/temp/temp.shp')
                 crs_wkt = fshp.crs_wkt
                 crs_ref = osr.SpatialReference()
@@ -1032,7 +1029,7 @@ for i in range(1, 3):
                 fshp.close()
 
             if epsg != 4326:
-                print("Reprojecting Shapefile...")
+                # print("Reprojecting Shapefile...")
                 shapeReproject(src='data/shapefiles/temp/temp.shp',
                                dst='data/shapefiles/temp/temp.shp',
                                src_epsg=epsg, dst_epsg=4326)
@@ -1044,10 +1041,10 @@ for i in range(1, 3):
             # The admin class already has the resolution built in
             src = 'data/shapefiles/temp/temp.shp'
             dst = 'data/shapefiles/temp/temp1.tif'
-            print("Rasterizing Shapefile...")
+            # print("Rasterizing Shapefile...")
             admin.rasterize(src, dst, attribute=attr, all_touch=False)  # <---- Disk space errors on Ubunutu machine, all touch not working.
             # Cut to extent
-            print("Cutting shapefile to extent...")
+            # print("Cutting shapefile to extent...")
             tif = gdal.Translate('data/shapefiles/temp/temp.tif',
                                  'data/shapefiles/temp/temp1.tif',
                                  projWin=[-130, 50, -55, 20])
@@ -1291,7 +1288,7 @@ for i in range(1, 3):
             if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
                 idx = int(key) - 1
                 if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8, 12] for the full panel
-                    print("Preventing Update")
+                    # print("Preventing Update")
                     raise PreventUpdate
 
         if 'reset_map' in trig:
@@ -1300,7 +1297,7 @@ for i in range(1, 3):
             if 'On' not in sync:
                 idx = int(key) - 1
                 if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
-                    print("Preventing Update")
+                    # print("Preventing Update")
                     raise PreventUpdate
 
         print("Rendering Map #{}".format(int(key)))
@@ -1371,12 +1368,12 @@ for i in range(1, 3):
             array[~np.isin(grid, gridids)] = np.nan
 
         if 'corr' in function and location[1] != 'all':
-            print(str(location))
+            # print(str(location))
             flag, y, x, label, idx = location
             y = np.array(json.loads(y))
             x = np.array(json.loads(x))        
             gridid = grid[y, x]
-            print(str(gridid))
+            # print(str(gridid))
             if type(gridid) is np.ndarray:
                 gridid = [np.nanmin(gridid), np.nanmax(gridid)]
                 title = (indexnames[choice] + '<br>' +
@@ -1538,8 +1535,8 @@ for i in range(1, 3):
             if 'On' not in sync:
                 idx = int(key) - 1
                 if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <------------ [0, 4, 8] for the full panel
-                    print(str(sel_idx))
-                    print("Preventing Update")
+                    # print(str(sel_idx))
+                    # print("Preventing Update")
                     raise PreventUpdate
 
         # Create signal for the global_store
@@ -1550,7 +1547,7 @@ for i in range(1, 3):
         [[year_range, month_range], colorscale, reverse_override] = signal
 
         # Stand in for correlation default coloring
-        print(function)
+        # print(function)
         if 'corr' in function:
             cs = colorscale
 
@@ -1644,7 +1641,7 @@ for i in range(1, 3):
                           hovermode='y')
 
         if 'corr' in function:
-            print(cs)
+            # print(cs)
             if cs == 'Default':
                 colorscale = 'Viridis'
                 reverse=True
