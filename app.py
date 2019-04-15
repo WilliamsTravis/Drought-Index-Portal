@@ -170,8 +170,8 @@ function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
                          {'label': 'Minimum', 'value': 'omin'},
-                    # {'label': 'Coefficient of Variation', 'value': 'ocv'},
-                         {'label': 'Drought Severity Area', 'value':'oarea'},
+                       # {'label': 'Coefficient of Variation', 'value': 'ocv'},
+                         {'label': 'Drought Severity Area', 'value': 'oarea'},
                          {'label': 'Correlation', 'value': 'ocorr'}]
 
 function_names = {'pmean': 'Average Percentiles',
@@ -199,7 +199,7 @@ NCONUS = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']  # <----------- 
 states_df = states_df[~states_df.STUSAB.isin(NCONUS)]
 rows = [r for idx, r in states_df.iterrows()]
 state_options = [{'label': r['STUSAB'], 'value': r['STATE']} for
-                  r in rows]
+                 r in rows]
 state_options.insert(0, {'label': 'ALL STATES IN CONUS', 'value': 'all'})
 
 # Map type options
@@ -228,7 +228,7 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
 # Get time dimension from the first data set, assuming everything is uniform
 with xr.open_dataset(
         os.path.join(data_path,
-             'data/droughtindices/netcdfs/spi1.nc')) as data:
+                     'data/droughtindices/netcdfs/spi1.nc')) as data:
     sample_nc = data.load()
 
 min_date = sample_nc.time.data[0]
@@ -308,9 +308,10 @@ unselected_style = {'border-top-left-radius': '3px',
 on_button_style = {'background-color': '#C7D4EA',
                    'border-radius': '4px',
                    'font-family': 'Times New Roman'}
-off_button_style =  {'background-color': '#a8b3c4',
-                     'border-radius': '4px',
-                     'font-family': 'Times New Roman'}
+off_button_style = {'background-color': '#a8b3c4',
+                    'border-radius': '4px',
+                    'font-family': 'Times New Roman'}
+
 
 ################### Application Layout ########################################
 # Create a Div maker
@@ -451,7 +452,7 @@ def divMaker(id_num, index='noaa'):
                          title=
                          ('The Drought Severity ' +
                           'Coverage Index (DSCI) is a way to aggregate the ' +
-                          'five drought severity classifications into a '+
+                          'five drought severity classifications into a ' +
                           'single number. It is calculated by taking the ' +
                           'percentage of an area in each drought category, ' +
                           'weighting each by their severity, and adding ' +
@@ -466,7 +467,7 @@ def divMaker(id_num, index='noaa'):
                         id='download_link_{}'.format(id_num),
                         download='timeseries_{}.csv'.format(id_num),
                         title=('This csv includes information for only this ' +
-                               'element and is titled '+
+                               'element and is titled ' +
                                '"timeseries_{}.csv"'.format(id_num)),
                         href="", target='_blank'),
                 html.Div(id='key_{}'.format(id_num),
@@ -478,6 +479,7 @@ def divMaker(id_num, index='noaa'):
                          style={'display': 'none'}),
             ], className='six columns')
     return div
+
 
 app.layout = html.Div([  # <--------------------------------------------------- Line all brackets and parens up.
                html.Div([
@@ -517,22 +519,22 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                            'width': '200',
                            'float': 'right',
                            'position': 'relative'}),
-                    href = "https://www.drought.gov/drought/",
-                    target = "_blank"),
+                    href="https://www.drought.gov/drought/",
+                    target="_blank"),
                  html.A(
                    html.Img(
-                    src = ("https://github.com/WilliamsTravis/Pasture-" +
-                           "Rangeland-Forage/blob/master/data/" +
-                           "cires.png?raw=true"),
+                    src=("https://github.com/WilliamsTravis/Pasture-" +
+                         "Rangeland-Forage/blob/master/data/" +
+                         "cires.png?raw=true"),
                     className='one columns',
                     style={'height': '50',
                            'width': '100',
                            'float': 'right',
                            'position': 'relative',
                            'margin-right': '20'}),
-                    href = "https://cires.colorado.edu/",
-                    target = "_blank")],
-                className = 'row'),
+                    href="https://cires.colorado.edu/",
+                    target="_blank")],
+                className='row'),
 
         # Title
         html.Div([
@@ -682,8 +684,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                         type='button',
                         style={'background-color': '#C7D4EA',
                                'border-radius': '2px',
-                               'font-family': 'Times New Roman',})],
-            style={'text-align': 'center'}),
+                               'font-family': 'Times New Roman'})],
+                 style={'text-align': 'center'}),
 
         # Break line
         html.Hr(),
@@ -703,7 +705,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
         html.Div(id='choice_store', style={'display': 'none'}),
 
         ],
-    className='ten columns offset-by-one') # The end!
+    className='ten columns offset-by-one')  # The end!
 
 
 ################ App Callbacks ################################################
@@ -717,7 +719,7 @@ def monthSlider(year_range):
     If users select the most recent, adjust available months
     '''
     if year_range[0] == year_range[1]:
-        style={}
+        style = {}
         if year_range[1] == max_year:
             month2 = max_month
             marks = {key: value for key, value in monthmarks.items() if
@@ -733,7 +735,7 @@ def monthSlider(year_range):
         string = 'Study Period Year Range: {}'.format(year_range[0])
 
     else:
-        style={'display': 'none'}
+        style = {'display': 'none'}
         slider = [dcc.RangeSlider(id='month',
                                   value=[1, 12],
                                   min=1, max=12,
@@ -1719,6 +1721,7 @@ for i in range(1, 3):
 
         return figure, href
 
+# objgraph.show_most_common_types()
 # In[] Run Application through the server
 if __name__ == '__main__':
     app.run_server()

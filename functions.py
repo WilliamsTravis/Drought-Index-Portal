@@ -354,7 +354,7 @@ def percentileArrays(arrays):
         pct = rankdata(lst)/len(lst)
         return pct
 
-    # mask = arrays[-10, :, :] * 0 + 1  # Don't use the first or last (if empty)
+    # mask = arrays[-10, :, :] * 0 + 1
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
     # pcts = pcts*mask
     return pcts
