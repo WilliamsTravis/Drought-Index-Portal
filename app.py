@@ -59,7 +59,7 @@ else:
 warnings.filterwarnings("ignore")
 
 ######################## Default Values #######################################
-default_function = 'pmean'
+default_function = 'omean'
 default_sample = 'spi1'
 default_1 = 'pdsi'
 default_2 = 'spei6'
@@ -612,7 +612,9 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                               style={'display': 'none'},
                               )],
                      className="row",
-                     style={'margin-bottom': '55'}),
+                     style={'margin-bottom': '50'}),
+           
+            html.Br(),
 
             # Options
             html.Div(id='options_div',
@@ -631,7 +633,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                                  html.H3("Function"),
                                  dcc.Tabs(
                                     id='function_type',
-                                    value='perc',
+                                    value='index',
                                     style=tab_style,
                                     children=[
                                         dcc.Tab(label='Percentiles',
@@ -668,8 +670,8 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                                              value='Default')],
                                  className='three columns')],
                        className='row',
-                       style={'margin-bottom': '50',
-                              'margin-top': '0'}),
+                       # style={'margin-top': '50'}
+                       ),
         ]),
 
         # Break
@@ -772,17 +774,17 @@ def toggleOptions(click):
     if not click:
         click = 0
     if click % 2 == 0:
-        div_style = {'display': 'none'}
-        button_style = {'background-color': '#a8b3c4',
-                        'border-radius': '4px',
-                        'font-family': 'Times New Roman'}
-        children = "Display Options: Off"
-    else:
         div_style = {}
         button_style = {'background-color': '#c7d4ea',
                         'border-radius': '4px',
                         'font-family': 'Times New Roman'}
         children = "Display Options: On"
+    else:
+        div_style = {'display': 'none'}
+        button_style = {'background-color': '#a8b3c4',
+                        'border-radius': '4px',
+                        'font-family': 'Times New Roman'}
+        children = "Display Options: Off"
     return div_style, button_style, children
 
 
