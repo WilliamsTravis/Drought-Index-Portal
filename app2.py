@@ -4,8 +4,8 @@ An Application to visualize time series of drought indices.
 
 Things to do:
 
-    1) Much of the functionality of this was added in a rather ad hoc manner.
-       It's time to go through and modularize everyting! 
+    1) Much of the functionality of this was added in a rather ad hoc manner
+       for time's sake. It's time to go through and modularize everything! 
             a) Read this: "https://dev.to/ice_lenor/modularization-and-
                            dependency-management-three-steps-to-better-code":
             b) Also this: "https://docs.python-guide.org/writing/structure/"
@@ -20,7 +20,7 @@ Things to do:
             a) Move all styling to the css file for consistency and readability
             b) Learn to read the css locally. Periodically, depending on the
                browser and perhaps the position of the moon, the css fails to
-               load completely. It is possible that reading it directly from
+               load completely. It is possible that reading it directly from a
                local repository will fix this issue.
 
     3) The correlation function is new and simple. It would be good to talk
@@ -28,7 +28,7 @@ Things to do:
        to express a time series of the ranges of covariance when a point is
        clicked. That would mean fitting a model of semivariance to each
        selection in projected space and would likely require more computing
-       than any other part of the app, but if could be done. If there are non-
+       than any other part of the app, but it could be done. If there are non-
        parametric ways of doing this we could skip the model fitting step. Or,
        if one model does generally well with each index and location we could
        use established shapes. Myself, I would just use the average distance to
@@ -44,7 +44,9 @@ Things to do:
        I think that this would be useful in many ways beyond learning how to
        manage geographic data in a data base.
              a) Spinning up a new instance would not require downloading the
-                data a new each time.
+                data a new each time? How would connecting remotely work? At
+                the very least, it would not require all of the
+                transformations.
              b) It is possible that spatial querying could be done faster
                 through PostGIS.
              c) It would be more organized and possibly simpler to share data
@@ -136,12 +138,6 @@ app = dash.Dash(__name__)
 # Go to stylesheet, styled after a DASH example (how to serve locally?)  # <--- Check out criddyp's response about a third of the way down here <https://community.plot.ly/t/serve-locally-option-with-additional-scripts-and-style-sheets/6974/6>
 app.css.append_css({'external_url':
                     'https://codepen.io/williamstravis/pen/maxwvK.css'})
-# app.scripts.config.serve_locally = True
-
-
-# My CSS is starting to fail to load. Is it my code, css, or something else?
-# app.css.append_css({'external_url':
-#                     'https://codepen.io/chriddyp/pen/bWLwgP.css'})
 # app.scripts.config.serve_locally = True
 
 # For the Loading screen
@@ -393,184 +389,171 @@ def divMaker(id_num, index='noaa'):
                          dcc.Tab(value='shape',
                                  label='Shapefile',
                                  style=tablet_style,
-                                 selected_style=tablet_style)]),
-            html.Div(id='location_div_{}'.format(id_num),
-                     children=[
-                       html.Div(id='county_div_{}'.format(id_num),
-                                children=[
-                                  dcc.Dropdown(
-                                    id='county_{}'.format(id_num),
-                                    clearable=False,
-                                    options=county_options,
-                                    multi=False,
-                                    value=24098)]),
-                       html.Div(
-                         id='state_div_{}'.format(id_num),
-                         children=[
-                           dcc.Dropdown(
-                             id='state_{}'.format(id_num),
-                             options=state_options,
-                             clearable=False,
-                             multi=True,
-                             placeholder=('Contiguous United States'),
-                             value=None)],
-                           style={'display': 'none'}),
-                       html.Div(
-                         id='shape_div_{}'.format(id_num),
-                         title=
+                                 selected_style=tablet_style)
+                         ]),
+              html.Div(id='location_div_{}'.format(id_num),
+                       children=[
+                         html.Div(
+                           id='county_div_{}'.format(id_num),
+                           children=[
+                             dcc.Dropdown(
+                               id='county_{}'.format(id_num),
+                               clearable=False,
+                               options=county_options,
+                               multi=False,
+                               value=24098)]),
+                         html.Div(
+                           id='state_div_{}'.format(id_num),
+                           children=[
+                             dcc.Dropdown(
+                               id='state_{}'.format(id_num),
+                               options=state_options,
+                               clearable=False,
+                               multi=True,
+                               placeholder=('Contiguous United States'),
+                               value=None)],
+                             style={'display': 'none'}),
+                         html.Div(
+                           id='shape_div_{}'.format(id_num),
+                           title=
                            ('To use a shapefile as an area filter, upload ' +
                             'one as either a zipfile or a grouped selection ' +
                             'that includes the .shp, .shx, .sbn, .sbx, ' +
                             '.proj, and .sbx files. Make sure the file is ' +
                             'unprojected for now.'),
-                         children=[
-                           dcc.Upload(
-                             id='shape_{}'.format(id_num),
-                             children=['Drag and drop or ',
-                                       html.A('select files')],
-                             multiple=True,
-                             style={'borderWidth': '2px',
-                                    'borderStyle': 'dashed',
-                                    'borderRadius': '3px',
-                                    'borderColor': '#CCCCCC',
-                                    'textAlign': 'center',
-                                    'margin': '2px',
-                                    'padding': '2px'})]
-                    )
-                      ]
-                        )
-                          ],
-                          style={'width': '55%',
-                                 'float': 'left'}),
+                           children=[
+                             dcc.Upload(
+                               id='shape_{}'.format(id_num),
+                               children=['Drag and drop or ',
+                                         html.A('select files')],
+                               multiple=True,
+                               style={'borderWidth': '2px',
+                                      'borderStyle': 'dashed',
+                                      'borderRadius': '3px',
+                                      'borderColor': '#CCCCCC',
+                                      'textAlign': 'center',
+                                      'margin': '2px',
+                                      'padding': '2px'})])])],
+                            style={'width': '55%',
+                                   'float': 'left'}),
 
-                        html.Div([
-                                html.Button(
-                                    id='reset_map_{}'.format(id_num),
-                                    children='Reset',
-                                    title=('Remove area filters.'),
-                                    style={'width': '20%',
-                                           'font-size': '10',
-                                           'height': '26px',
-                                           'line-height': '4px',
-                                           'background-color': '#ffff',
-                                           'font-family': 'Times New Roman',
-                                           }),
-                                html.Button(
-                                    id='update_graphs_{}'.format(id_num),
-                                    children='Update',
-                                    title=('Update the map and ' +
-                                           'graphs below with ' +
-                                           'location choices (state ' +
-                                           'selections do not update ' +
-                                           'automatically).'),
-                                    style={'width': '20%',
-                                           'height': '34px',
-                                           'font-size': '10',
-                                           'line-height': '5px',
-                                           'background-color': '#F9F9F9',
-                                           'font-family': 'Times New Roman',
-                                           }),
-                                    ])
-                                ],
-                        className='row'),
+            html.Div([
+              html.Button(
+                id='reset_map_{}'.format(id_num),
+                children='Reset',
+                title=('Remove area filters.'),
+                style={'width': '20%',
+                       'font-size': '10',
+                       'height': '26px',
+                       'line-height': '4px',
+                       'background-color': '#ffff',
+                       'font-family': 'Times New Roman'}),
+              html.Button(
+                id='update_graphs_{}'.format(id_num),
+                children='Update',
+                title=('Update the map and  graphs with location choices '+
+                       '(state selections do not update automatically).'),
+                style={'width': '20%',
+                       'height': '34px',
+                       'font-size': '10',
+                       'line-height': '5px',
+                       'background-color': '#F9F9F9',
+                       'font-family': 'Times New Roman'})])],
+                className='row'),
 
-                 html.Div([
-                         dcc.Graph(id='map_{}'.format(id_num),
-                                   config={'showSendToCloud': True})]),
-                 html.Div([
-                         dcc.Graph(
-                                 id='series_{}'.format(id_num),
-                                 config={'showSendToCloud': True})]),
-                 html.Div(
-                         id='coverage_div_{}'.format(id_num),
-                         style={'margin-bottom': '25'}),
-                 html.Button(
-                         id='dsci_button_{}'.format(id_num),
-                         title=
-                         ('The Drought Severity ' +
-                          'Coverage Index (DSCI) is a way to aggregate the ' +
-                          'five drought severity classifications into a '+
-                          'single number. It is calculated by taking the ' +
-                          'percentage of an area in each drought category, ' +
-                          'weighting each by their severity, and adding ' +
-                          'them together:                                  ' +
-                          '%D0*1 + %D1*2 + %D2*3 + %D3*4 + %D4*5'),
-                          type='button',
-                          n_clicks=2,
-                          children=['Show DSCI: Off'],
-                          ),
-                 html.Hr(),
-                 html.A('Download Timeseries Data',
-                        id='download_link_{}'.format(id_num),
-                        download='timeseries_{}.csv'.format(id_num),
-                        title=('This csv includes information for only this ' +
-                               'element and is titled '+
-                               '"timeseries_{}.csv"'.format(id_num)),
-                        href="", target='_blank'),
-                html.Div(id='key_{}'.format(id_num),
-                         children='{}'.format(id_num),
-                         style={'display': 'none'}),
-                html.Div(id='label_store_{}'.format(id_num),
-                         style={'display': 'none'}),
-                html.Div(id='shape_store_{}'.format(id_num),
-                         style={'display': 'none'}),
-            ], className='six columns')
+            html.Div([
+              dcc.Graph(id='map_{}'.format(id_num),
+                        config={'showSendToCloud': True})]),
+            html.Div([
+              dcc.Graph(id='series_{}'.format(id_num),
+                        config={'showSendToCloud': True})]),
+            html.Div(id='coverage_div_{}'.format(id_num),
+                     style={'margin-bottom': '25'}),
+            html.Button(
+              id='dsci_button_{}'.format(id_num),
+              title=
+                ('The Drought Severity Coverage Index (DSCI) is a way to ' +
+                 'aggregate the five drought severity classifications into a '+
+                 'single number. It is calculated by taking the percentage '+
+                 'of an area in each drought category, weighting each by ' +
+                 'their severity, and adding them together:                 ' +
+                 '%D0*1 + %D1*2 + %D2*3 + %D3*4 + %D4*5'),
+              type='button',
+              n_clicks=2,
+              children=['Show DSCI: Off']),
+            html.Hr(),
+            html.A('Download Timeseries Data',
+                   id='download_link_{}'.format(id_num),
+                   download='timeseries_{}.csv'.format(id_num),
+                   title=
+                     ('This csv includes information for only this element ' +
+                      'and is titled "timeseries_{}.csv"'.format(id_num)),
+                   href="", target='_blank'),
+            html.Div(id='key_{}'.format(id_num),
+                     children='{}'.format(id_num),
+                     style={'display': 'none'}),
+            html.Div(id='label_store_{}'.format(id_num),
+                     style={'display': 'none'}),
+            html.Div(id='shape_store_{}'.format(id_num),
+                     style={'display': 'none'})],
+        className='six columns')
+
     return div
 
 app.layout = html.Div([  # <--------------------------------------------------- Line all brackets and parens up.
-               html.Div([
+      html.Div([
 
-                # Sponsers
-                html.A(
-                  html.Img(
-                    src=("https://github.com/WilliamsTravis/" +
-                         "Pasture-Rangeland-Forage/blob/master/" +
-                         "data/earthlab.png?raw=true"),
-                    className='one columns',
-                    style={'height': '40',
-                           'width': '100',
-                           'float': 'right',
-                           'position': 'static'}),
-                    href="https://www.colorado.edu/earthlab/",
-                    target="_blank"),
-                html.A(
-                  html.Img(
-                    src=('https://github.com/WilliamsTravis/Pasture-' +
-                         'Rangeland-Forage/blob/master/data/' +
-                         'wwa_logo2015.png?raw=true'),
-                    className='one columns',
-                    style={'height': '50',
-                           'width': '150',
-                           'float': 'right',
-                           'position': 'static'}),
-                    href = "http://wwa.colorado.edu/",
-                    target = "_blank"),
-                 html.A(
-                   html.Img(
-                    src=( "https://github.com/WilliamsTravis/Pasture-" +
-                          "Rangeland-Forage/blob/master/data/" +
-                          "nidis.png?raw=true"),
-                    className='one columns',
-                    style={'height': '50',
-                           'width': '200',
-                           'float': 'right',
-                           'position': 'relative'}),
-                    href = "https://www.drought.gov/drought/",
-                    target = "_blank"),
-                 html.A(
-                   html.Img(
-                    src = ("https://github.com/WilliamsTravis/Pasture-" +
-                           "Rangeland-Forage/blob/master/data/" +
-                           "cires.png?raw=true"),
-                    className='one columns',
-                    style={'height': '50',
-                           'width': '100',
-                           'float': 'right',
-                           'position': 'relative',
-                           'margin-right': '20'}),
-                    href = "https://cires.colorado.edu/",
-                    target = "_blank")],
-                className = 'row'),
+         # Sponsers
+         html.A(
+           html.Img(
+             src=("https://github.com/WilliamsTravis/" +
+                  "Pasture-Rangeland-Forage/blob/master/" +
+                  "data/earthlab.png?raw=true"),
+             className='one columns',
+             style={'height': '40',
+                    'width': '100',
+                    'float': 'right',
+                    'position': 'static'}),
+             href="https://www.colorado.edu/earthlab/",
+             target="_blank"),
+         html.A(
+           html.Img(
+             src=('https://github.com/WilliamsTravis/Pasture-' +
+                  'Rangeland-Forage/blob/master/data/' +
+                  'wwa_logo2015.png?raw=true'),
+             className='one columns',
+             style={'height': '50',
+                    'width': '150',
+                    'float': 'right',
+                    'position': 'static'}),
+             href="http://wwa.colorado.edu/",
+             target="_blank"),
+         html.A(
+           html.Img(
+             src=("https://github.com/WilliamsTravis/Pasture-" +
+                  "Rangeland-Forage/blob/master/data/" +
+                  "nidis.png?raw=true"),
+             className='one columns',
+             style={'height': '50',
+                    'width': '200',
+                    'float': 'right',
+                    'position': 'relative'}),
+             href="https://www.drought.gov/drought/",
+             target="_blank"),
+         html.A(
+           html.Img(
+             src=("https://github.com/WilliamsTravis/Pasture-" +
+                  "Rangeland-Forage/blob/master/data/" +
+                  "cires.png?raw=true"),
+             className='one columns',
+             style={'height': '50',
+                    'width': '100',
+                    'float': 'right',
+                    'position': 'relative',
+                    'margin-right': '20'}),
+             href="https://cires.colorado.edu/",
+             target="_blank")],
+         className='row'),
 
         # Title
         html.Div([
@@ -604,143 +587,139 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                 style={'margin-bottom': '30',
                        'text-align': 'center'}),
 
-    # Description
-        html.Div([
-            html.Div([dcc.Markdown(id='description')],
-                     style={'text-align':'center',
-                            'width':'70%',
-                            'margin':'0px auto'}),
-            html.Hr()],
-            style={'text-align':'center',
-                   'margin': '0 auto',
-                   'width': '100%'}),
+       # Description
+       html.Div([
+         html.Div([
+           dcc.Markdown(id='description')],
+                        style={'text-align':'center',
+                               'width':'70%',
+                               'margin':'0px auto'}),
+           html.Hr()],
+           style={'text-align':'center',
+                  'margin': '0 auto',
+                  'width': '100%'}),
 
-        # Year Slider
-        html.Div(id='options',
-                 children=[
-                     html.Div([
-                             html.H3(id='date_range',
-                                     children=['Study Period Year Range']),
-                             html.Div([dcc.RangeSlider(
-                                                     id='year_slider',
-                                                     value=default_years,
-                                                     min=min_year,
-                                                     max=max_year,
-                                                     updatemode='drag',
-                                                     marks=yearmarks)],
-                                      style={'margin-top': '0',
-                                             'margin-bottom': '40'}),
+       # Year Slider
+       html.Div(id='options',
+                children=[
+                  html.Div([
+                    html.H3(id='date_range',
+                            children=['Study Period Year Range']),
+                            html.Div([
+                              dcc.RangeSlider(id='year_slider',
+                                              value=default_years,
+                                              min=min_year,
+                                              max=max_year,
+                                              updatemode='drag',
+                                              marks=yearmarks)],
+                              style={'margin-top': '0',
+                                     'margin-bottom': '40'}),
 
-                     # Month Slider
-                     html.Div(id='month_slider',
-                              children=[
-                                      html.H3(id='month_range',
-                                              children=['Month Range']),
-                                      html.Div(id='month_slider_holder',
-                                               children=[
-                                                   dcc.RangeSlider(
-                                                       id='month',
-                                                       value=[1, 12],
-                                                       min=1, max=12,
-                                                       updatemode='drag',
-                                                       marks=monthmarks)],
-                                               style={'width': '35%'})],
-                              style={'display': 'none'},
-                              )],
-                     className="row",
-                     style={'margin-bottom': '55'}),
+                  # Month Slider
+                  html.Div(id='month_slider',
+                           children=[
+                             html.H3(id='month_range',
+                                     children=['Month Range']),
+                                     html.Div(id='month_slider_holder',
+                                              children=[
+                                                dcc.RangeSlider(
+                                                  id='month',
+                                                  value=[1, 12],
+                                                  min=1, max=12,
+                                                  updatemode='drag',
+                                                  marks=monthmarks)],
+                                              style={'width': '35%'})],
+                           style={'display': 'none'})],
+                   className="row",
+                   style={'margin-bottom': '55'}),
 
-            # Options
-            html.Div(id='options_div',
-                     children=[
-                        # Maptype
-                        html.Div([
-                                html.H3("Map Type"),
-                                 dcc.Dropdown(
-                                        id="map_type",
-                                        value="basic",
-                                        options=maptypes)],
-                                 className='two columns'),
+       # Options
+       html.Div(id='options_div',
+                children=[
+                  # Maptype
+                  html.Div([
+                    html.H3("Map Type"),
+                    dcc.Dropdown(id="map_type",
+                                 value="basic",
+                                 options=maptypes)],
+                    className='two columns'),
 
-                        # Functions
-                        html.Div([
-                                 html.H3("Function"),
-                                 dcc.Tabs(
-                                    id='function_type',
-                                    value='perc',
-                                    style=tab_style,
-                                    children=[
-                                        dcc.Tab(label='Percentiles',
-                                                value='perc',
-                                                style=tablet_style,
-                                                selected_style=tablet_style),
-                                        dcc.Tab(label='Index Values',
-                                                value='index',
-                                                style=tablet_style,
-                                                selected_style=tablet_style)]),
-                                 dcc.Dropdown(id='function_choice',
-                                                options=function_options_perc,
-                                                value='pmean')],
-                                 className='three columns'),
+                  # Functions
+                  html.Div([
+                    html.H3("Function"),
+                    dcc.Tabs(
+                      id='function_type',
+                      value='perc',
+                      style=tab_style,
+                      children=[
+                        dcc.Tab(label='Percentiles',
+                                value='perc',
+                                style=tablet_style,
+                                selected_style=tablet_style),
+                        dcc.Tab(label='Index Values',
+                                value='index',
+                                style=tablet_style,
+                                selected_style=tablet_style)]),
+                    dcc.Dropdown(id='function_choice',
+                                 options=function_options_perc,
+                                 value='pmean')],
+                    className='three columns'),
 
-                        # Customize Color Scales
-                        html.Div([
-                                html.H3('Color Gradient'),
-                                dcc.Tabs(
-                                    id='reverse',
-                                    value='no',
-                                    style=tab_style,
-                                    children=[
-                                        dcc.Tab(value='yes',
-                                                label='Reversed',
-                                                style=tab_style,
-                                                selected_style=tablet_style),
-                                        dcc.Tab(value='no',
-                                                label="Not Reversed",
-                                                style=tab_style,
-                                                selected_style=tablet_style)]),
-                                dcc.Dropdown(id='colors',
-                                             options=color_options,
-                                             value='Default')],
-                                 className='three columns')],
-                       className='row',
-                       style={'margin-bottom': '50',
-                              'margin-top': '0'}),
-        ]),
+                  # Customize Color Scales
+                  html.Div([
+                    html.H3('Color Gradient'),
+                    dcc.Tabs(
+                      id='reverse',
+                      value='no',
+                      style=tab_style,
+                      children=[
+                        dcc.Tab(value='yes',
+                                label='Reversed',
+                                style=tab_style,
+                                selected_style=tablet_style),
+                        dcc.Tab(value='no',
+                                label="Not Reversed",
+                                style=tab_style,
+                                selected_style=tablet_style)]),
+                    dcc.Dropdown(id='colors',
+                                 options=color_options,
+                                 value='Default')],
+                    className='three columns')],
+                className='row',
+                style={'margin-bottom': '50',
+                       'margin-top': '0'})]),
 
-        # Break
-        html.Br(style={'line-height': '500%'}),
+       # Break
+       html.Br(style={'line-height': '500%'}),
 
-        # Submission Button
-        html.Div([
-            html.Button(id='submit',
-                        title=('Submit the option settings ' +
-                               'above and update the graphs below.'),
-                        children='Submit Options',
-                        type='button',
-                        style={'background-color': '#C7D4EA',
-                               'border-radius': '2px',
-                               'font-family': 'Times New Roman',})],
-            style={'text-align': 'center'}),
+       # Submission Button
+       html.Div([
+         html.Button(id='submit',
+                     title=('Submit the option settings ' +
+                            'above and update the graphs below.'),
+                     children='Submit Options',
+                     type='button',
+                     style={'background-color': '#C7D4EA',
+                            'border-radius': '2px',
+                            'font-family': 'Times New Roman'})],
+         style={'text-align': 'center'}),
 
-        # Break line
-        html.Hr(),
+       # Break line
+       html.Hr(),
 
-        # Four by Four Map Layout
-        # Row 1
-        html.Div([divMaker(1, default_1), divMaker(2, default_2)],
-                 className='row'),
+       # Four by Four Map Layout
+       # Row 1
+       html.Div([divMaker(1, default_1), divMaker(2, default_2)],
+                className='row'),
 
-        # Row 2
-        # html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],  # <----------- Consider only including two until we free more memory/get better machine
-        #          className='row'),
+       # Row 2
+       # html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],  # <----------- Consider only including two until we free more memory/get better machine
+       #          className='row'),
 
-        # Signals
-        html.Div(id='signal', style={'display': 'none'}),
-        html.Div(id='location_store', style={'display': 'none'}),
-        html.Div(id='choice_store', style={'display': 'none'}),
-
-        ],
+       # Signals
+       html.Div(id='signal', style={'display': 'none'}),
+       html.Div(id='location_store', style={'display': 'none'}),
+       html.Div(id='choice_store', style={'display': 'none'})],
     className='ten columns offset-by-one') # The end!
 
 
