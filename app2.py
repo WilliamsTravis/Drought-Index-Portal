@@ -751,36 +751,14 @@ app.layout = html.Div([  # <--------------------------------------------------- 
 # Option Callbacks
 @app.callback(Output('date_range', 'children'),
               [Input('year_slider', 'value')])
-def monthSlider(year_range):
+def adjustYear(year_range):
     '''
-    If users select the most recent, adjust available months
+    If users select one year, only print it once
     '''
     if year_range[0] == year_range[1]:
-        style={}
-        if year_range[1] == max_year:
-            month2 = max_month
-            marks = {key: value for key, value in monthmarks.items() if
-                      key <= month2}
-        else:
-            month2 = 12
-            marks = monthmarks
-        slider = [dcc.RangeSlider(id='month',
-                                  value=[1, month2],
-                                  min=1, max=month2,
-                                  updatemode='drag',
-                                  marks=marks)]
-        string = 'Study Period Year Range: {}'.format(year_range[0])
-
+        string = 'Year Range: {}'.format(year_range[0])
     else:
-        style={'display': 'none'}
-        slider = [dcc.RangeSlider(id='month',
-                                  value=[1, 12],
-                                  min=1, max=12,
-                                  updatemode='drag',
-                                  marks=monthmarks)]
-        string = 'Year Range: {} - {}'.format(year_range[0],
-                                                            year_range[1])
-
+        string = 'Year Range: {} - {}'.format(year_range[0], year_range[1])
     return string
 
 
