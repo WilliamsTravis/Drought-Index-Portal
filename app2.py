@@ -291,7 +291,13 @@ years = [int(y) for y in range(min_year, max_year + 1)]
 yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
-
+monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',
+                   5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September',
+                   10: 'October', 11: 'November', 12: 'December'}
+monthoptions = [{'label': monthmarks[i], 'value': i} for
+                 i in range(1, 13)]
+monthoptions_full = [{'label': monthmarks_full[i], 'value': i} for
+                      i in range(1, 13)]
 # Only display every 5 years for space
 for y in yearmarks:
     if y % 5 != 0:
@@ -500,6 +506,7 @@ def divMaker(id_num, index='noaa'):
 
     return div
 
+
 app.layout = html.Div([  # <--------------------------------------------------- Line all brackets and parens up.
       html.Div([
 
@@ -599,41 +606,56 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                   'margin': '0 auto',
                   'width': '100%'}),
 
-       # Year Slider
+       # Date Options
        html.Div(id='options',
                 children=[
+
+                  # Year Slider
                   html.Div([
                     html.H3(id='date_range',
-                            children=['Study Period Year Range']),
-                            html.Div([
-                              dcc.RangeSlider(id='year_slider',
-                                              value=default_years,
-                                              min=min_year,
-                                              max=max_year,
-                                              updatemode='drag',
-                                              marks=yearmarks)],
-                              style={'margin-top': '0',
-                                     'margin-bottom': '40'}),
+                            children=['Year Range']),
+                    html.Div([
+                      dcc.RangeSlider(id='year_slider',
+                                      value=default_years,
+                                      min=min_year,
+                                      max=max_year,
+                                      updatemode='drag',
+                                      marks=yearmarks)],
+                      style={'margin-top': '0',
+                             'margin-bottom': '40'})]),
 
                   # Month Slider
                   html.Div(id='month_slider',
                            children=[
-                             html.H3(id='month_range',
-                                     children=['Month Range']),
-                                     html.Div(id='month_slider_holder',
-                                              children=[
-                                                dcc.RangeSlider(
-                                                  id='month',
-                                                  value=[1, 12],
-                                                  min=1, max=12,
-                                                  updatemode='drag',
-                                                  marks=monthmarks)],
-                                              style={'width': '35%'})],
-                           style={'display': 'none'})],
-                   className="row",
-                   style={'margin-bottom': '55'}),
+                             html.Div([
+                               html.H5('Beginning Month'),
+                               dcc.Dropdown(id='month_1',
+                                            options=monthoptions_full,
+                                            value=1,
+                                            style={'width': '80%'})],
+                               className='two columns'),
+                             html.Div([
+                              html.H5('Ending Month'),
+                              dcc.Dropdown(id='month_2',
+                                           options=monthoptions_full,
+                                           value=12,
+                                           style={'width': '80%'})],
+                              className='two columns'),
+                            html.Div(id='month_slider_holder',
+                                     children=[
+                                       html.H5('Month Filter'),
+                                       dcc.Checklist(
+                                         id='month',
+                                         options=monthoptions,
+                                         values=list(range(1, 13)),
+                                         labelStyle={'display':
+                                                     'inline-block'})],
+                                      className='eight columns')
+                               ])],
+                    className="row",
+                   style={'margin-bottom': '75'}),
 
-       # Options
+       # Rendering Options
        html.Div(id='options_div',
                 children=[
                   # Maptype
@@ -649,17 +671,18 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                     html.H3("Function"),
                     dcc.Tabs(
                       id='function_type',
-                      value='perc',
+                      value='index',
                       style=tab_style,
                       children=[
+                        dcc.Tab(label='Index Values',
+                                value='index',
+                                style=tablet_style,
+                                selected_style=tablet_style),
                         dcc.Tab(label='Percentiles',
                                 value='perc',
                                 style=tablet_style,
                                 selected_style=tablet_style),
-                        dcc.Tab(label='Index Values',
-                                value='index',
-                                style=tablet_style,
-                                selected_style=tablet_style)]),
+                        ]),
                     dcc.Dropdown(id='function_choice',
                                  options=function_options_perc,
                                  value='pmean')],
@@ -687,7 +710,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                     className='three columns')],
                 className='row',
                 style={'margin-bottom': '50',
-                       'margin-top': '0'})]),
+                       'margin-top': '50'}),
 
        # Break
        html.Br(style={'line-height': '500%'}),
@@ -720,60 +743,60 @@ app.layout = html.Div([  # <--------------------------------------------------- 
        html.Div(id='signal', style={'display': 'none'}),
        html.Div(id='location_store', style={'display': 'none'}),
        html.Div(id='choice_store', style={'display': 'none'})],
-    className='ten columns offset-by-one') # The end!
+    className='ten columns offset-by-one')  # The end!
 
 
 ################ App Callbacks ################################################
 # Option Callbacks
-@app.callback([Output('month_slider', 'style'),
-               Output('month_slider_holder', 'children'),
-               Output('date_range', 'children')],
-              [Input('year_slider', 'value')])
-def monthSlider(year_range):
-    '''
-    If users select the most recent, adjust available months
-    '''
-    if year_range[0] == year_range[1]:
-        style={}
-        if year_range[1] == max_year:
-            month2 = max_month
-            marks = {key: value for key, value in monthmarks.items() if
-                     key <= month2}
-        else:
-            month2 = 12
-            marks = monthmarks
-        slider = [dcc.RangeSlider(id='month',
-                                  value=[1, month2],
-                                  min=1, max=month2,
-                                  updatemode='drag',
-                                  marks=marks)]
-        string = 'Study Period Year Range: {}'.format(year_range[0])
+# @app.callback([Output('month_slider', 'style'),
+#                Output('month_slider_holder', 'children'),
+#                Output('date_range', 'children')],
+#               [Input('year_slider', 'value')])
+# def monthSlider(year_range):
+#     '''
+#     If users select the most recent, adjust available months
+#     '''
+#     if year_range[0] == year_range[1]:
+#         style={}
+#         if year_range[1] == max_year:
+#             month2 = max_month
+#             marks = {key: value for key, value in monthmarks.items() if
+#                      key <= month2}
+#         else:
+#             month2 = 12
+#             marks = monthmarks
+#         slider = [dcc.RangeSlider(id='month',
+#                                   value=[1, month2],
+#                                   min=1, max=month2,
+#                                   updatemode='drag',
+#                                   marks=marks)]
+#         string = 'Study Period Year Range: {}'.format(year_range[0])
 
-    else:
-        style={'display': 'none'}
-        slider = [dcc.RangeSlider(id='month',
-                                  value=[1, 12],
-                                  min=1, max=12,
-                                  updatemode='drag',
-                                  marks=monthmarks)]
-        string = 'Study Period Year Range: {} - {}'.format(year_range[0],
-                                                           year_range[1])
+#     else:
+#         style={'display': 'none'}
+#         slider = [dcc.RangeSlider(id='month',
+#                                   value=[1, 12],
+#                                   min=1, max=12,
+#                                   updatemode='drag',
+#                                   marks=monthmarks)]
+#         string = 'Study Period Year Range: {} - {}'.format(year_range[0],
+#                                                            year_range[1])
 
-    return style, slider, string
+#     return style, slider, string
 
 
-@app.callback(Output('month_range', 'children'),
-              [Input('month', 'value')])
-def printMonthRange(months):
-    '''
-    Output text of the month range/single month selection
-    '''
-    if months[0] != months[1]:
-        string = 'Month Range: {} - {}'.format(monthmarks[months[0]],
-                                               monthmarks[months[1]])
-    else:
-        string = 'Month Range: {}'.format(monthmarks[months[0]])
-    return string
+# @app.callback(Output('month_range', 'children'),
+#               [Input('month', 'value')])
+# def printMonthRange(months):
+#     '''
+#     Output text of the month range/single month selection
+#     '''
+#     if months[0] != months[1]:
+#         string = 'Month Range: {} - {}'.format(monthmarks[months[0]],
+#                                                monthmarks[months[1]])
+#     else:
+#         string = 'Month Range: {}'.format(monthmarks[months[0]])
+#     return string
 
 
 @app.callback([Output('options', 'style'),
@@ -787,17 +810,17 @@ def toggleOptions(click):
     if not click:
         click = 0
     if click % 2 == 0:
-        div_style = {'display': 'none'}
-        button_style = {'background-color': '#a8b3c4',
-                        'border-radius': '4px',
-                        'font-family': 'Times New Roman'}
-        children = "Display Options: Off"
-    else:
         div_style = {}
         button_style = {'background-color': '#c7d4ea',
                         'border-radius': '4px',
                         'font-family': 'Times New Roman'}
         children = "Display Options: On"
+    else:
+        div_style = {'display': 'none'}
+        button_style = {'background-color': '#a8b3c4',
+                        'border-radius': '4px',
+                        'font-family': 'Times New Roman'}
+        children = "Display Options: Off"
     return div_style, button_style, children
 
 
@@ -863,10 +886,11 @@ def functionOptions(function_type):
 @cache.memoize() # To be replaced with something more efficient
 def retrieve_data(signal, function, choice):
     # Retrieve signal elements
-    [time_range, colorscale, reverse_override] = signal
+    [[year_range, month1, month2, month_filter], colorscale, reverse] = signal
+    time_data = [year_range, month1, month2, month_filter]
 
     # Retrieve data package
-    data = Index_Maps(time_range, colorscale, reverse_override, choice)
+    data = Index_Maps(time_data, colorscale, reverse, choice)
 
     # Choose which function with which to transform data
     [array, arrays, dates, colorscale,
@@ -894,14 +918,16 @@ def choiceStore(choice1, choice2):
               [State('colors', 'value'),
                State('reverse', 'value'),
                State('year_slider', 'value'),
-               State('month', 'value')])
-def submitSignal(click, colorscale, reverse, year_range, month_range):
+               State('month_1', 'value'),
+               State('month_2', 'value'),
+               State('month', 'values')])
+def submitSignal(click, colorscale, reverse, year_range, month1, month2,
+                 month_filter):
     '''
     Collect and hide the options signal in the hidden div.
     '''
-    if not month_range:
-        month_range = [1, 1]
-    signal = [[year_range, month_range], colorscale, reverse]
+    print(str(month_filter))
+    signal = [[year_range, month1, month2, month_filter], colorscale, reverse]
     return json.dumps(signal)
 
 
@@ -1326,7 +1352,8 @@ for i in range(1, 3):
         signal = json.loads(signal)
 
         # Collect and adjust signal
-        [[year_range, month_range], colorscale, reverse_override] = signal
+        [[year_range, month1, month2, month_filter],
+         colorscale, reverse_override] = signal
 
         # Stand in for correlation default coloring
         if 'corr' in function:
@@ -1364,16 +1391,30 @@ for i in range(1, 3):
         # There are several possible date ranges to display
         y1 = year_range[0]
         y2 = year_range[1]
-        m1 = month_range[0]
-        m2 = month_range[1]
+        m1 = month1
+        m2 = month2
 
         if y1 != y2:
-            date_print = '{} - {}'.format(y1, y2)
-        elif y1 == y2 and m1 != m2:
-            date_print = "{} - {}, {}".format(monthmarks[m1],
-                                              monthmarks[m2], y1)
-        else:
-            date_print = "{}, {}".format(monthmarks[m1], y1)
+            if len(month_filter) == 12:
+                if m1 == 1 and m2 == 12:
+                    date_print = '{} - {}'.format(y1, y2)
+                elif m1 != 1 or m2 != 12:
+                    date_print = (monthmarks[m1] + ' ' + str(y1) + ' - ' +
+                                  monthmarks[m2] + ' ' + str(y2))
+            else:
+                letters = "".join([monthmarks[m][0] for m in month_filter])
+                date_print =  '{} - {}'.format(y1, y2) + ' ' + letters            
+        elif y1 == y2:
+            if len(month_filter) == 12:
+                if m1 == 1 and m2 == 12:
+                    date_print = '{}'.format(y1)
+                elif m1 != 1 or m2 != 12:
+                    date_print = (monthmarks[m1] + ' - ' +
+                                  monthmarks[m2] + ' ' + str(y2))
+            else:
+                letters = "".join([monthmarks[m][0] for m in month_filter])
+                date_print =  '{}'.format(y1) + ' ' + letters
+
 
         # Filter by x, y positions in location
         flag = location[0]
@@ -1385,12 +1426,10 @@ for i in range(1, 3):
             array[~np.isin(grid, gridids)] = np.nan
 
         if 'corr' in function and location[1] != 'all':
-            # print(str(location))
             flag, y, x, label, idx = location
             y = np.array(json.loads(y))
             x = np.array(json.loads(x))        
             gridid = grid[y, x]
-            # print(str(gridid))
             if type(gridid) is np.ndarray:
                 gridid = [np.nanmin(gridid), np.nanmax(gridid)]
                 title = (indexnames[choice] + '<br>' +
@@ -1561,7 +1600,8 @@ for i in range(1, 3):
         signal = json.loads(signal)
 
         # Collect signals
-        [[year_range, month_range], colorscale, reverse_override] = signal
+        [[year_range, month1, month2, month_filter],
+         colorscale, reverse_override] = signal
 
         # Stand in for correlation default coloring
         # print(function)

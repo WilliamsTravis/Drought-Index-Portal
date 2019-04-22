@@ -1371,7 +1371,8 @@ class Index_Maps():
         It also returns information needed for rendering.
 
         Initializing arguments:
-            timerange (list)    = [[Year1, Year2], [Month1, Month2]]
+            time_data (list)    = [[Year1, Year2], Month1, Month2,
+                                   Month_Filter]
             function (string)   = 'mean_perc': 'Average Percentiles',
                                   'max': 'Maxmium Percentile',
                                   'min': 'Minimum Percentile',
@@ -1394,20 +1395,17 @@ class Index_Maps():
     '''
 
     # Reduce memory by preallocating attribute slots
-    __slots__ = ('year1', 'year2', 'month1', 'month2', 'function',
-                 'colorscale', 'reverse', 'choice')
+    __slots__ = ('year1', 'year2', 'month1', 'month2', 'month_filter',
+                 'function', 'colorscale', 'reverse', 'choice')
 
     # Create Initial Values
-    def __init__(self, time_range=[[2000, 2017], [1, 12]],
+    def __init__(self, time_data=[[2000, 2018], 1, 12, list(range(1, 13))],
                  colorscale='Viridis',reverse='no', choice='pdsi'):
-        self.year1 = time_range[0][0]
-        self.year2 = time_range[0][1]
-        if self.year1 == self.year2:
-            self.month1 = time_range[1][0]
-            self.month2 = time_range[1][1]
-        else:
-            self.month1 = 1
-            self.month2 = 12
+        self.year1 = time_data[0][0]
+        self.year2 = time_data[0][1]
+        self.month1 = time_data[1]
+        self.month2 = time_data[2]
+        self.month_filter = time_data[3]
         self.colorscale = colorscale
         self.reverse = reverse
         self.choice = choice
@@ -1486,7 +1484,8 @@ class Index_Maps():
     def getData(self, array_path):
         '''
         The challenge is to read as little as possible into memory without
-        slowing the app down.
+        slowing the app down. We need to slice by month and year first, then
+        filter by the month filter.
         '''
         # Get time series of values
         # filter by date and location
@@ -1496,8 +1495,10 @@ class Index_Maps():
 
         with xr.open_dataset(array_path) as data:
             data = data.sel(time=slice(d1, d2))
+            data = data.sel(time=np.in1d(data['time.month'],
+                                         self.month_filter))
+            res = data.crs.GeoTransform[1]
             indexlist = data
-            res = indexlist.crs.GeoTransform[1]
             del data
         
         if 'leri' in self.choice:
