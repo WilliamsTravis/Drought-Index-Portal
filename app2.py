@@ -63,6 +63,7 @@ Created on April 15th 2019
 import netCDF4  # Leave this, without it there are problems in Linux
 import base64
 import copy
+from collections import OrderedDict
 import dash
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
@@ -70,7 +71,6 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
 import datetime as dt
-from collections import OrderedDict
 import fiona
 from flask_caching import Cache
 import gc
@@ -645,6 +645,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                                      children=[
                                        html.H5('Month Filter'),
                                        dcc.Checklist(
+                                         className='check_blue',
                                          id='month',
                                          options=monthoptions,
                                          values=list(range(1, 13)),
@@ -748,41 +749,41 @@ app.layout = html.Div([  # <--------------------------------------------------- 
 
 ################ App Callbacks ################################################
 # Option Callbacks
-# @app.callback([Output('month_slider', 'style'),
-#                Output('month_slider_holder', 'children'),
-#                Output('date_range', 'children')],
-#               [Input('year_slider', 'value')])
-# def monthSlider(year_range):
-#     '''
-#     If users select the most recent, adjust available months
-#     '''
-#     if year_range[0] == year_range[1]:
-#         style={}
-#         if year_range[1] == max_year:
-#             month2 = max_month
-#             marks = {key: value for key, value in monthmarks.items() if
-#                      key <= month2}
-#         else:
-#             month2 = 12
-#             marks = monthmarks
-#         slider = [dcc.RangeSlider(id='month',
-#                                   value=[1, month2],
-#                                   min=1, max=month2,
-#                                   updatemode='drag',
-#                                   marks=marks)]
-#         string = 'Study Period Year Range: {}'.format(year_range[0])
+@app.callback([Output('month_slider', 'style'),
+                Output('month_slider_holder', 'children'),
+                Output('date_range', 'children')],
+              [Input('year_slider', 'value')])
+def monthSlider(year_range):
+    '''
+    If users select the most recent, adjust available months
+    '''
+    if year_range[0] == year_range[1]:
+        style={}
+        if year_range[1] == max_year:
+            month2 = max_month
+            marks = {key: value for key, value in monthmarks.items() if
+                      key <= month2}
+        else:
+            month2 = 12
+            marks = monthmarks
+        slider = [dcc.RangeSlider(id='month',
+                                  value=[1, month2],
+                                  min=1, max=month2,
+                                  updatemode='drag',
+                                  marks=marks)]
+        string = 'Study Period Year Range: {}'.format(year_range[0])
 
-#     else:
-#         style={'display': 'none'}
-#         slider = [dcc.RangeSlider(id='month',
-#                                   value=[1, 12],
-#                                   min=1, max=12,
-#                                   updatemode='drag',
-#                                   marks=monthmarks)]
-#         string = 'Study Period Year Range: {} - {}'.format(year_range[0],
-#                                                            year_range[1])
+    else:
+        style={'display': 'none'}
+        slider = [dcc.RangeSlider(id='month',
+                                  value=[1, 12],
+                                  min=1, max=12,
+                                  updatemode='drag',
+                                  marks=monthmarks)]
+        string = 'Study Period Year Range: {} - {}'.format(year_range[0],
+                                                            year_range[1])
 
-#     return style, slider, string
+    return style, slider, string
 
 
 # @app.callback(Output('month_range', 'children'),
