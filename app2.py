@@ -749,9 +749,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
 
 ################ App Callbacks ################################################
 # Option Callbacks
-@app.callback([Output('month_slider', 'style'),
-                Output('month_slider_holder', 'children'),
-                Output('date_range', 'children')],
+@app.callback(Output('date_range', 'children'),
               [Input('year_slider', 'value')])
 def monthSlider(year_range):
     '''
@@ -780,10 +778,10 @@ def monthSlider(year_range):
                                   min=1, max=12,
                                   updatemode='drag',
                                   marks=monthmarks)]
-        string = 'Study Period Year Range: {} - {}'.format(year_range[0],
+        string = 'Year Range: {} - {}'.format(year_range[0],
                                                             year_range[1])
 
-    return style, slider, string
+    return string
 
 
 # @app.callback(Output('month_range', 'children'),
