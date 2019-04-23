@@ -93,7 +93,7 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions and classes
-from functions import Admin_Elements, areaSeries, correlationField
+from functions import Admin_Elements, areaSeries, correlationField, datePrint
 from functions import droughtArea, Index_Maps, Location_Builder, makeMap
 from functions import shapeReproject
 
@@ -108,12 +108,16 @@ warnings.filterwarnings("ignore")
 
 ######################## Default Values #######################################
 # For testing
-source_signal = [[[2000, 2017], [1, 12]], 'Viridis', 'no']
+source_signal = [[[2000, 2017], 1, 12,
+                  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 'Viridis', 'no']
 source_choice = 'pdsi'
 source_function = 'pmean'
 
 # Initializing Values
 default_function = 'pmean'
+default_sample = 'leri1'
+default_1 = 'leri1'
+default_2 = 'leri3'
 default_sample = 'spi1'
 default_1 = 'pdsi'
 default_2 = 'spei6'
@@ -270,7 +274,7 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
 # Get time dimension from the first data set, assuming netcdfs are uniform
 with xr.open_dataset(
         os.path.join(data_path,
-             'data/droughtindices/netcdfs/spi1.nc')) as data:
+             'data/droughtindices/netcdfs/' + default_sample + '.nc')) as data:
     sample_nc = data.load()
 
 min_date = sample_nc.time.data[0]
@@ -305,13 +309,12 @@ for y in yearmarks:
 
 ################## Map Section ################################################
 # NA map for when empty maps are selected
-with np.load("data/npy/NA_overlay.npz") as data:  # <-------------------------- Redo this to look more professional and match resolutions
+with np.load("data/npy/NA_overlay.npz") as data:
     na = data.f.arr_0
     data.close()
 
-# Make the NA map color scale stand out
-for i in range(na.shape[0]):
-    na[i] = na[i]*i
+# Make the NA map a single color
+na = na * 0 + 1
 
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
@@ -341,7 +344,6 @@ layout = dict(
         zoom=2))
 
 ################### Temporary CSS Items #######################################
-# For css later
 tab_height = '25px'
 tab_style = {'height': tab_height, 'padding': '0'}
 tablet_style = {'line-height': tab_height, 'padding': '0'}
@@ -359,8 +361,10 @@ on_button_style = {'background-color': '#C7D4EA',
 off_button_style =  {'background-color': '#a8b3c4',
                      'border-radius': '4px',
                      'font-family': 'Times New Roman'}
+###############################################################################
 
-################### Application Layout ########################################
+
+# In[]: Application Structure
 # Create a Div maker
 def divMaker(id_num, index='noaa'):
     div = html.Div([
@@ -632,14 +636,14 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                                dcc.Dropdown(id='month_1',
                                             options=monthoptions_full,
                                             value=1,
-                                            style={'width': '80%'})],
+                                            style={'width': '85%'})],
                                className='two columns'),
                              html.Div([
                               html.H5('Ending Month'),
                               dcc.Dropdown(id='month_2',
                                            options=monthoptions_full,
                                            value=12,
-                                           style={'width': '80%'})],
+                                           style={'width': '85%'})],
                               className='two columns'),
                             html.Div(id='month_slider_holder',
                                      children=[
@@ -747,8 +751,7 @@ app.layout = html.Div([  # <--------------------------------------------------- 
     className='ten columns offset-by-one')  # The end!
 
 
-################ App Callbacks ################################################
-# Option Callbacks
+# In[]: App Callbacks
 @app.callback(Output('date_range', 'children'),
               [Input('year_slider', 'value')])
 def adjustYear(year_range):
@@ -792,7 +795,7 @@ def toggleOptions(click):
               [Input('click_sync', 'n_clicks')])
 def toggleSyncButton(click):
     '''
-    change the color of on/off location syncing button  - for css
+    Change the color of on/off location syncing button  - for css
     '''
     if not click:
         click = 0
@@ -845,9 +848,13 @@ def functionOptions(function_type):
         return function_options_orig, 'omean'
 
 
-# Function callbacks
-@cache.memoize() # To be replaced with something more efficient
+@cache.memoize()
 def retrieve_data(signal, function, choice):
+    '''
+    This takes the user defined signal and uses the Index_Map class to filter'
+    by the selected dates and return the singular map, the 3d timeseries array,
+    and the colorscale.
+    '''
     # Retrieve signal elements
     [[year_range, month1, month2, month_filter], colorscale, reverse] = signal
     time_data = [year_range, month1, month2, month_filter]
@@ -862,8 +869,18 @@ def retrieve_data(signal, function, choice):
     return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
 
 
-@cache2.memoize()  # <--------------------------------------------------------- Cached for DCSI, done here to add more data when more memory is available
+@cache2.memoize()
 def retrieve_area_data(arrays, choice):
+    '''
+    This is here just to cache the output of 'droughtArea', which returns both
+    the 5 categorical drought coverages (% area) and the singlular DSCI. The
+    DSCI cannot be calculated from the 5 coverages because these are inclusive
+    for display purposes while the DSCI uses only the percentage of area in
+    each category. 
+
+    When there is enough memory to use this, toggling the DSCI on and off will
+    be immediate because it will not need to be recalculated each time.
+    '''
     return droughtArea(arrays, choice)
 
 
@@ -872,10 +889,12 @@ def retrieve_area_data(arrays, choice):
               [Input('choice_1', 'value'),
                Input('choice_2', 'value')])
 def choiceStore(choice1, choice2):
+    ''' 
+    Collect and hide both data choices in the hidden 'choice_store' div
+    '''
     return (json.dumps([choice1, choice2]))
 
 
-# Store data in the cache and hide the signal to activate it in the hidden div
 @app.callback(Output('signal', 'children'),
               [Input('submit', 'n_clicks')],
               [State('colors', 'value'),
@@ -887,7 +906,7 @@ def choiceStore(choice1, choice2):
 def submitSignal(click, colorscale, reverse, year_range, month1, month2,
                  month_filter):
     '''
-    Collect and hide the options signal in the hidden div.
+    Collect and hide the options signal in the hidden 'signal' div.
     '''
     print(str(month_filter))
     signal = [[year_range, month1, month2, month_filter], colorscale, reverse]
@@ -927,15 +946,16 @@ def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
 
         # The update graph button activates state selections
         if 'update_graph' in trigger:
-            # When you switch from county to state, there is no initial value  <-- This is also the initializing condition, by chance 
+            # When you switch from county to state, there is no initial value 
             if triggered_value is None:
                 triggered_value = 'all'
                 sel_idx = 0
             else:
-                update_idx = updates.index(triggered_value) - 2  # <----------- We need the position of the most recent update...
+                # The position of the most recent update needs to be -2 or -1
+                update_idx = updates.index(triggered_value) - 2
                 if locations[update_idx] is None:
                     raise PreventUpdate
-                triggered_value = locations[update_idx]  # <------------------- ...to be -2 or -1 to serve as the index to the selected state
+                triggered_value = locations[update_idx]
                 sel_idx = locations.index(triggered_value)
         else:
             sel_idx = locations.index(triggered_value)
@@ -958,17 +978,25 @@ for i in range(1, 3):
     @app.callback([Output('county_div_{}'.format(i), 'style'),
                    Output('state_div_{}'.format(i), 'style'),
                    Output('shape_div_{}'.format(i), 'style')],
-                  [Input('location_tab_{}'.format(i), 'value')],
+                  [Input('location_tab_{}'.format(i), 'value'),
+                   Input('state_{}'.format(i), 'value')],
                   [State('key_{}'.format(i), 'children')])
-    def displayLocOptions(tab_choice, key):
+    def displayLocOptions(tab_choice, states, key):
         key = int(key)
         if tab_choice == 'county':
             county_style = {}
             state_style = {'display': 'none'}
             shape_style = {'display': 'none'}
         elif tab_choice == 'state':
+            if states is not None:
+                if len(states) <= 5:
+                    font_size = 15
+                else:
+                    font_size = 8
+            else:
+                font_size = 15
             county_style = {'display': 'none'}
-            state_style = {}
+            state_style = {'font-size': font_size}
             shape_style = {'display': 'none'}
         else:
             county_style = {'display': 'none'}
@@ -1014,7 +1042,7 @@ for i in range(1, 3):
                     with open(fname, 'wb') as f:
                         f.write(decoded)
 
-            # Now let's just rasterize it for a mask  # <---------------------- It may be more precise to calculate points within the shapefile, though it would still matter whether the point represents the center or a corner. We could also do an 'all-touch' rasterization
+            # Now let's just rasterize it for a mask
             shp = gpd.read_file('data/shapefiles/temp/temp.shp')
 
             # Check CRS, reproject if needed
@@ -1067,7 +1095,8 @@ for i in range(1, 3):
         '''
         if function == 'oarea':
             try:
-                date = dt.datetime.strptime(hover['points'][0]['x'], '%Y-%m-%d')
+                date = dt.datetime.strptime(hover['points'][0]['x'],
+                                            '%Y-%m-%d')
                 date = dt.datetime.strftime(date, '%b, %Y')
                 if click1 % 2 == 0:
                     ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
@@ -1089,54 +1118,55 @@ for i in range(1, 3):
                                                 'D4 (Exceptional)': ds[4],
                                                 'DSCI':ds[5]},
                                                index=[0])
-                children=[html.H6([date],
-                                  style={'text-align': 'left'}),
-                          dash_table.DataTable(
-                           data=coverage_df.to_dict('rows'),
-                           columns=[
-                              {"name": i, "id": i} for i in coverage_df.columns],
-                           style_cell={'textAlign': 'center'},
-                           style_header={'fontWeight': 'bold'},
-                           style_header_conditional=[
-                                   {'if': {'column_id': 'D0 - D4 (Dry)'},
-                                           'backgroundColor': '#ffff00',
-                                           'color': 'black'},
-                                   {'if': {'column_id': 'D1 - D4 (Moderate)'},
-                                               'backgroundColor': '#fcd37f',
-                                               'color': 'black'},
-                                   {'if': {'column_id': 'D2 - D4 (Severe)'},
-                                          'backgroundColor': '#ffaa00',
-                                          'color': 'black'},
-                                   {'if': {'column_id': 'DSCI'},
-                                          'backgroundColor': '#27397F',
-                                          'color': 'white',
-                                          'width': '75'},
-                                   {'if': {'column_id': 'D3 - D4 (Extreme)'},
-                                          'backgroundColor': '#e60000',
-                                          'color': 'white'},
-                                   {'if': {'column_id': 'D4 (Exceptional)'},
-                                           'backgroundColor': '#730000',
-                                           'color': 'white'}],
-                           style_data_conditional=[
-                                   {'if': {'column_id': 'D0 - D4 (Dry)'},
-                                           'backgroundColor': '#ffffa5',
-                                           'color': 'black'},
-                                   {'if': {'column_id': 'D1 - D4 (Moderate)'},
-                                           'backgroundColor': '#ffe5af',
-                                           'color': 'black'},
-                                   {'if': {'column_id': 'D2 - D4 (Severe)'},
-                                           'backgroundColor': '#ffc554',
-                                           'color': 'black'},
-                                   {'if': {'column_id': 'DSCI'},
-                                          'backgroundColor': '#5c678e',
-                                          'color': 'white',
-                                          'width': '75'},
-                                   {'if': {'column_id': 'D3 - D4 (Extreme)'},
-                                           'backgroundColor': '#dd6666',
-                                           'color': 'white'},
-                                   {'if': {'column_id': 'D4 (Exceptional)'},
-                                           'backgroundColor': '#a35858',
-                                           'color': 'white'}])]
+                children=[
+                    html.H6([date],
+                            style={'text-align': 'left'}),
+                    dash_table.DataTable(
+                      data=coverage_df.to_dict('rows'),
+                        columns=[
+                          {"name": i, "id": i} for i in coverage_df.columns],
+                        style_cell={'textAlign': 'center'},
+                        style_header={'fontWeight': 'bold'},
+                        style_header_conditional=[
+                                {'if': {'column_id': 'D0 - D4 (Dry)'},
+                                        'backgroundColor': '#ffff00',
+                                        'color': 'black'},
+                                {'if': {'column_id': 'D1 - D4 (Moderate)'},
+                                            'backgroundColor': '#fcd37f',
+                                             'color': 'black'},
+                                 {'if': {'column_id': 'D2 - D4 (Severe)'},
+                                        'backgroundColor': '#ffaa00',
+                                        'color': 'black'},
+                                 {'if': {'column_id': 'DSCI'},
+                                        'backgroundColor': '#27397F',
+                                        'color': 'white',
+                                        'width': '75'},
+                                 {'if': {'column_id': 'D3 - D4 (Extreme)'},
+                                        'backgroundColor': '#e60000',
+                                        'color': 'white'},
+                                 {'if': {'column_id': 'D4 (Exceptional)'},
+                                         'backgroundColor': '#730000',
+                                         'color': 'white'}],
+                         style_data_conditional=[
+                                 {'if': {'column_id': 'D0 - D4 (Dry)'},
+                                         'backgroundColor': '#ffffa5',
+                                         'color': 'black'},
+                                 {'if': {'column_id': 'D1 - D4 (Moderate)'},
+                                         'backgroundColor': '#ffe5af',
+                                         'color': 'black'},
+                                 {'if': {'column_id': 'D2 - D4 (Severe)'},
+                                         'backgroundColor': '#ffc554',
+                                         'color': 'black'},
+                                 {'if': {'column_id': 'DSCI'},
+                                         'backgroundColor': '#5c678e',
+                                         'color': 'white',
+                                         'width': '75'},
+                                 {'if': {'column_id': 'D3 - D4 (Extreme)'},
+                                         'backgroundColor': '#dd6666',
+                                         'color': 'white'},
+                                 {'if': {'column_id': 'D4 (Exceptional)'},
+                                         'backgroundColor': '#a35858',
+                                         'color': 'white'}])]
             except:
                 raise PreventUpdate
         else:
@@ -1150,6 +1180,10 @@ for i in range(1, 3):
                    Input('dsci_button_{}'.format(i), 'n_clicks')],
                   [State('function_choice', 'value')])
     def displayDSCI(click1, click2, function):
+        '''
+        Toggle the blue Drought Severity Coverage Index on and off for the
+        drought area option.
+        '''
         if function == 'oarea':
             if click2 % 2 == 0:
                 style = {'background-color': '#a8b3c4',
@@ -1175,6 +1209,10 @@ for i in range(1, 3):
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
     def dropState(update1, update2, location, key, sync):
+        '''
+        This is supposed to update the opposite placeholder of the updated map
+        to reflect the state selection if there was a state selection. 
+        '''
         # Check which element the selection came from
         sel_idx = location[-1]
         if 'On' not in sync:
@@ -1183,25 +1221,11 @@ for i in range(1, 3):
                 raise PreventUpdate
         try:
             if 'state' in location[0]:
-                fips = json.loads(location[1])
-                states = [states_df['STUSAB'][states_df['STATE'] == s].item() +
-                          ', ' for s in fips]
-                states[-1] = states[-1][:states[-1].index(',')]
+                states = location[-2]
             return states
-        except:
+        except Exception as e:
             raise PreventUpdate
 
-    # @app.callback(Output('state_{}'.format(i), 'style'),
-    #               [Input('state_{}'.format(i), 'value')])
-    # def stateSize(states):
-    #     length = len(states)
-    #     # print('stateSize: ' + str(length))
-    #     if length <= 5:
-    #         font_size = 12
-    #     else:
-    #         font_size = 12 - (length / 48)*10
-    #     style = {'font-size': font_size}
-    #     return style
 
     @app.callback([Output('county_{}'.format(i), 'options'),
                    Output('county_{}'.format(i), 'placeholder'),
@@ -1277,24 +1301,22 @@ for i in range(1, 3):
     def makeGraph(choice1, choice2, map_type, signal, location, reset1, reset2,
                   function, key, sync):
         '''
-        This actually renders the map. There are a lot of thing that could
-        be modularized:
-            1) 
-        
+        This actually renders the map. I want to modularize, but am struggling
+        on this.        
         '''
         # Prevent update from location unless it is a state or shape filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
         if trig == 'location_store.children':
             if 'corr' not in function:
-                if 'grid' in location[0] or 'county' in location[0]:  # <---------- 'mask' not in location[0] to include county areas
+                if 'grid' in location[0] or 'county' in location[0]:
                     raise PreventUpdate
 
             # Check which element the selection came from
             sel_idx = location[-1]
-            if 'On' not in sync:  # <---------------------------------------------- If the triggering click index doesn't match the key, prevent update
+            if 'On' not in sync:
                 idx = int(key) - 1
-                if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <--------------- [0, 4, 8, 12] for the full panel
+                if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
                     raise PreventUpdate
 
         if 'reset_map' in trig:
@@ -1313,15 +1335,19 @@ for i in range(1, 3):
         # Create signal for the global_store
         signal = json.loads(signal)
 
-        # Collect and adjust signal
+        # Collect signal elements
         [[year_range, month1, month2, month_filter],
          colorscale, reverse_override] = signal
+
+        # To create the map title, there are several conditions based on dates
+        year1 = year_range[0]
+        year2 = year_range[1]
 
         # Stand in for correlation default coloring
         if 'corr' in function:
             cs = colorscale
 
-        # Figure which choice is this panel's and which the other
+        # Figure which choice is this panel's and which is the other
         key = int(key) - 1
         choices = [choice1, choice2]
         choice = choices[key]
@@ -1338,11 +1364,14 @@ for i in range(1, 3):
         # Now, we want to use the same  value range for colors
         if function == 'pmean':
             # Get the data for the other panel for its value range
-            array2 = retrieve_data(signal, function, choice2)[0]
+            comparison_package = retrieve_data(signal, function, choice2)
+            array2 = comparison_package[0]
             amax2 = np.nanmax(array2)
             amin2 = np.nanmin(array2)        
             amax = np.nanmax([amax, amax2])        
             amin = np.nanmin([amin, amin2])
+            del array2
+            del comparison_package
 
         # Experimenting with leri
         if 'leri' in choice:
@@ -1350,42 +1379,19 @@ for i in range(1, 3):
             amin = 0
             amax = np.nanmax(array)
 
-        # There are several possible date ranges to display
-        y1 = year_range[0]
-        y2 = year_range[1]
-        m1 = month1
-        m2 = month2
-
-        if y1 != y2:
-            if len(month_filter) == 12:
-                if m1 == 1 and m2 == 12:
-                    date_print = '{} - {}'.format(y1, y2)
-                elif m1 != 1 or m2 != 12:
-                    date_print = (monthmarks[m1] + ' ' + str(y1) + ' - ' +
-                                  monthmarks[m2] + ' ' + str(y2))
-            else:
-                letters = "".join([monthmarks[m][0] for m in month_filter])
-                date_print =  '{} - {}'.format(y1, y2) + ' ' + letters            
-        elif y1 == y2:
-            if len(month_filter) == 12:
-                if m1 == 1 and m2 == 12:
-                    date_print = '{}'.format(y1)
-                elif m1 != 1 or m2 != 12:
-                    date_print = (monthmarks[m1] + ' - ' +
-                                  monthmarks[m2] + ' ' + str(y2))
-            else:
-                letters = "".join([monthmarks[m][0] for m in month_filter])
-                date_print =  '{}'.format(y1) + ' ' + letters
-
+        # Get the right print statement for the date used
+        date_print = datePrint(year1, year2, month1, month2, month_filter,
+                               monthmarks)
 
         # Filter by x, y positions in location
         flag = location[0]
-        if 'id' not in flag and flag != 'county_mask' and location[1] != 'all' and 'corr' not in function:
-            flag, y, x, label, idx = location
-            y = np.array(json.loads(y))
-            x = np.array(json.loads(x))        
-            gridids = grid[y, x]
-            array[~np.isin(grid, gridids)] = np.nan
+        if 'id' not in flag and flag != 'county_mask':
+            if location[1] != 'all' and 'corr' not in function:
+                flag, y, x, label, idx = location
+                y = np.array(json.loads(y))
+                x = np.array(json.loads(x))        
+                gridids = grid[y, x]
+                array[~np.isin(grid, gridids)] = np.nan
 
         if 'corr' in function and location[1] != 'all':
             flag, y, x, label, idx = location
@@ -1403,28 +1409,26 @@ for i in range(1, 3):
                 title = (indexnames[choice] + '<br>' +
                          function_names[function] + 'With Grid ' +
                          str(int(gridid))  + '  ('  + date_print+ ')')
+
             timeseries, arrays2, label = areaSeries(location, arrays, dates,
-                                                   mask, state_array,
-                                                   albers_source, crdict,
-                                                   reproject=False)
-            
+                                                    mask, state_array,
+                                                    albers_source, crdict,
+                                                    reproject=False)
+
             array = correlationField(timeseries, arrays)
             title_size = 20
 
         else:
-            title = (indexnames[choice] + '<br>' +
-                     function_names[function] + ': ' + date_print)
+            title = (indexnames[choice] + '<br>' + function_names[function] +
+                     ': ' + date_print)
             title_size = 20
-
-        # Check on Memory
-        print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
-                                        psutil.virtual_memory().percent))
 
         # There's a lot of colorscale switching in the default settings
         if reverse_override == 'yes':
             reverse = not reverse
 
-        # Because EDDI only extends back to 1980
+        # Render a big "NA" if there isn't any data available
+        print(str(len(arrays)))
         if len(arrays) == 0:
             source.data[0] = na
         else:
@@ -1481,8 +1485,7 @@ for i in range(1, 3):
             amax = alimit
             amin = alimit * -1
             colorscale = RdWhBu
-        elif function == 'oarea' and 'leri' in choice:
-            # So Leri's index values already appear to be in percentile space!
+        elif function == 'oarea' and 'leri' in choice:  # <-------------------- Leri's index values already appear to already be in percentile space
             colorscale = RdWhBu
         elif 'corr' in function:
             amax = 1
@@ -1491,31 +1494,24 @@ for i in range(1, 3):
                 colorscale = 'Viridis'
 
         # Create the scattermapbox object
-        data = [
-            dict(
-                type='scattermapbox',
-                lon=df['lonbin'],
-                lat=df['latbin'],
-                text=df['printdata'],
-                mode='markers',
-                hoverinfo='text',
-                hovermode='closest',
-                marker=dict(
-                    colorscale=colorscale,
-                    reversescale=reverse,
-                    color=df['data'],
-                    cmax=amax,
-                    cmin=amin,
-                    opacity=1.0,
-                    size=source.res[0] * 20,
-                    colorbar=dict(
-                        textposition="auto",
-                        orientation="h",
-                        font=dict(size=15,
-                                  fontweight='bold')
-                    )
-                )
-            )]
+        data = [dict(type='scattermapbox',
+                     lon=df['lonbin'],
+                     lat=df['latbin'],
+                     text=df['printdata'],
+                     mode='markers',
+                     hoverinfo='text',
+                     hovermode='closest',
+                     marker=dict(colorscale=colorscale,
+                                 reversescale=reverse,
+                                 color=df['data'],
+                                 cmax=amax,
+                                 cmin=amin,
+                                 opacity=1.0,
+                                 size=source.res[0] * 20,
+                                 colorbar=dict(textposition="auto",
+                                               orientation="h",
+                                               font=dict(size=15,
+                                                         fontweight='bold'))))]
 
         layout_copy = copy.deepcopy(layout)
         layout_copy['mapbox'] = dict(
@@ -1528,6 +1524,11 @@ for i in range(1, 3):
                                       fontweight='bold')
         layout_copy['title'] = title
         figure = dict(data=data, layout=layout_copy)
+
+        # Check on Memory
+        print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
+                                        psutil.virtual_memory().percent))
+
         return figure
 
 
@@ -1552,9 +1553,7 @@ for i in range(1, 3):
             sel_idx = location[-1]
             if 'On' not in sync:
                 idx = int(key) - 1
-                if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):  # <------------ [0, 4, 8] for the full panel
-                    # print(str(sel_idx))
-                    # print("Preventing Update")
+                if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
                     raise PreventUpdate
 
         # Create signal for the global_store
@@ -1566,7 +1565,6 @@ for i in range(1, 3):
          colorscale, reverse_override] = signal
 
         # Stand in for correlation default coloring
-        # print(function)
         if 'corr' in function:
             cs = colorscale
 
@@ -1581,7 +1579,7 @@ for i in range(1, 3):
             dmax = 100
 
         # There's a lot of color scale switching in the default settings...
-        # ...so sorry any one who's trying to figure this out, I will fix this
+        # ...so sorry any one who's trying to figure this out
         if reverse_override == 'yes':
             reverse = not reverse
 
@@ -1592,7 +1590,7 @@ for i in range(1, 3):
                                                    albers_source, crdict,
                                                    reproject=False)
 
-            # Save to file for download option
+            # Create data frame as string for download option
             df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
                         d in dates]
             columns = OrderedDict({'month': df_dates,
@@ -1641,16 +1639,15 @@ for i in range(1, 3):
         # The y-axis depends on the chosen function
         if 'p' in function and function != 'oarea':
             yaxis = dict(title='Percentiles',
-                          range=[0, 100])
+                         range=[0, 100])
         elif 'o' in function and 'cv' not in function and function != 'oarea':
             yaxis = dict(range=[dmin, dmax],
-                          title='Index')
+                         title='Index')
             sd = np.nanstd(arrays)
             if 'eddi' in choice:
                 sd = sd*-1
             dmin = 3*sd
             dmax = 3*sd*-1
-
         elif 'min' in function or 'max' in function:
             dmin = dmin
             dmax = dmax
@@ -1660,7 +1657,6 @@ for i in range(1, 3):
                           hovermode='y')
 
         if 'corr' in function:
-            # print(cs)
             if cs == 'Default':
                 colorscale = 'Viridis'
                 reverse=True
@@ -1671,33 +1667,41 @@ for i in range(1, 3):
 
         # Build the data dictionaries that plotly reads
         if function != 'oarea':
-            data = [
-                dict(
-                    type='bar',
-                    x=dates,
-                    y=timeseries,
-                    marker=dict(color=timeseries,
-                                colorscale=colorscale,
-                                reversescale=reverse,
-                                autocolorscale=False,
-                                cmin=dmin,
-                                cmax=dmax,
-                                line=dict(width=0.2, color="#000000")))]
+            data = [dict(type='bar',
+                         x=dates,
+                         y=timeseries,
+                         marker=dict(color=timeseries,
+                                     colorscale=colorscale,
+                                     reversescale=reverse,
+                                     autocolorscale=False,
+                                     cmin=dmin,
+                                     cmax=dmax,
+                                     line=dict(width=0.2,
+                                               color="#000000")))]
+
         else:
             colors = ['rgb(255, 255, 0)','rgb(252, 211, 127)',
                       'rgb(255, 170, 0)', 'rgb(230, 0, 0)', 'rgb(115, 0, 0)']
             if year_range[0] != year_range[1]:
-                line_width = 1 + ((1/(year_range[1] - year_range[0])) * 50)
+                line_width = 1 + ((1/(year_range[1] - year_range[0])) * 25)
             else:
                 line_width = 12
             data = []
             for i in range(5):
-                trace = dict(type='scatter', fill='tozeroy', mode='none',
-                             showlegend=False, x=dates, y=ts_series[i],
-                             hoverinfo='x', fillcolor=colors[i])
+                trace = dict(type='scatter',
+                             fill='tozeroy',
+                             mode='none',
+                             showlegend=False, 
+                             x=dates,
+                             y=ts_series[i],
+                             hoverinfo='x',
+                             fillcolor=colors[i])
                 data.append(trace)
             if show_dsci % 2 != 0:
-                data.insert(5, dict(x=dates, y=dsci, yaxis='y2', hoverinfo='x',
+                data.insert(5, dict(x=dates,
+                                    y=dsci,
+                                    yaxis='y2',
+                                    hoverinfo='x',
                                     showlegend=False,
                                     line=dict(color='rgba(39, 57, 127, 0.85)',
                                               width=line_width)))
@@ -1706,8 +1710,7 @@ for i in range(1, 3):
         if label is None:
             label = 'Existing Shapefile'
         layout_copy = copy.deepcopy(layout)
-        layout_copy['title'] = (indexnames[choice] +
-                                "<Br>" + label)
+        layout_copy['title'] = indexnames[choice] + "<Br>" + label
         layout_copy['plot_bgcolor'] = "white"
         layout_copy['paper_bgcolor'] = "white"
         layout_copy['height'] = 300
@@ -1725,18 +1728,24 @@ for i in range(1, 3):
                                          side='right',
                                          position=0.15,
                                          font=dict(size=8))
-            layout_copy['margin'] = dict(l=55, r=55, b=25, t=90, pad=10)
+            layout_copy['margin'] = dict(l=55,
+                                         r=55,
+                                         b=25,
+                                         t=90,
+                                         pad=10)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
-                                      y=-.5, markers=dict(size=10),
-                                      font=dict(size=10))
+                                     y=-.5,
+                                     markers=dict(size=10),
+                                     font=dict(size=10))
         layout_copy['titlefont']['color'] = '#636363'
         layout_copy['font']['color'] = '#636363'
 
         figure = dict(data=data, layout=layout_copy)
 
         return figure, href
+
 
 # In[] Run Application through the server
 if __name__ == '__main__':

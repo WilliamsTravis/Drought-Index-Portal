@@ -212,7 +212,7 @@ for index in indices:
                         os.remove(out_path)
 
                     ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4326',
-                                   xRes=0.25, yRes=0.25,
+                                   xRes=0.25, yRes=0.25,  # <------------------ maybe specify this in argv...with a default value of .25
                                    outputBounds=[-130, 20, -55, 50])
                     del ds
 

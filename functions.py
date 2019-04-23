@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Support functions for Ubunut-Practice-Machine
+
 Created on Tue Jan 22 18:02:17 2019
 
 @author: User
 """
+
+# In[]: Environment
 import datetime as dt
 from dash.exceptions import PreventUpdate
 from dateutil.relativedelta import relativedelta
@@ -23,7 +26,6 @@ import pandas as pd
 from pyproj import Proj
 import salem
 from scipy.stats import rankdata
-import time
 from tqdm import tqdm
 import sys
 import xarray as xr
@@ -36,7 +38,7 @@ else:
     data_path = '/root/Sync'
 
 
-####### Variables #############################################################
+# In[]: Variables
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'pdsi': 'Palmer Drought Severity Index',
              'scpdsi': 'Self-Calibrated Palmer Drought Severity Index',
@@ -61,7 +63,7 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'leri3': 'Landscape Evaporative Response Index - 3 month'}
 
 
-######## Functions ############################################################
+# In[]: Functions
 def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
                reproject=False):
     '''
@@ -88,7 +90,7 @@ def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
         flag, states, label, idx = location
         timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
 
-    # If we are sending the output to the drought area function  # < ---------- Why not just put that in the drought area function? Because this could be useful here later.
+    # If we are sending the output to the drought area function
     if reproject:
         arrays = wgsToAlbers(arrays, cd, albers_source)
 
@@ -125,24 +127,6 @@ def calculateCV(indexlist):
 
     return covs
 
-def coordinateDictionaries(source):
-        # Geometry
-        x_length = source.shape[2]
-        y_length = source.shape[1]
-        res = source.res[0]
-        lon_min = source.transform[0]
-        lat_max = source.transform[3] - res
-        xs = range(x_length)
-        ys = range(y_length)
-        lons = [lon_min + res*x for x in xs]
-        lats = [lat_max - res*y for y in ys]
-
-        # Dictionaires with coordinates and array index positions
-        londict = dict(zip(lons, xs))
-        latdict = dict(zip(lats, ys))
-
-        return londict, latdict, res
-
 
 @jit(nopython=True)
 def correlationField(ts, arrays):
@@ -159,6 +143,30 @@ def correlationField(ts, arrays):
             one_field[i, j] = cor
 
     return one_field
+
+
+def datePrint(y1, y2, m1, m2, month_filter, monthmarks):
+    if y1 != y2:
+        if len(month_filter) == 12:
+            if m1 == 1 and m2 == 12:
+                date_print = '{} - {}'.format(y1, y2)
+            elif m1 != 1 or m2 != 12:
+                date_print = (monthmarks[m1] + ' ' + str(y1) + ' - ' +
+                              monthmarks[m2] + ' ' + str(y2))
+        else:
+            letters = "".join([monthmarks[m][0] for m in month_filter])
+            date_print =  '{} - {}'.format(y1, y2) + ' ' + letters            
+    elif y1 == y2:
+        if len(month_filter) == 12:
+            if m1 == 1 and m2 == 12:
+                date_print = '{}'.format(y1)
+            elif m1 != 1 or m2 != 12:
+                date_print = (monthmarks[m1] + ' - ' +
+                              monthmarks[m2] + ' ' + str(y2))
+        else:
+            letters = "".join([monthmarks[m][0] for m in month_filter])
+            date_print =  '{}'.format(y1) + ' ' + letters
+    return date_print
 
 
 def droughtArea(arrays, choice, inclusive=False):
@@ -201,10 +209,6 @@ def droughtArea(arrays, choice, inclusive=False):
     cat_key = [key for key in drought_cats.keys() if key in choice][0]
     cats = drought_cats[cat_key]
 
-    # Total number of pixels
-    mask = arrays[0] * 0 + 1  # <---------------------------------------------- With Leri, NA values change the total area for each time step
-    total_area = np.nansum(mask)
-
     def singleFilter(array, d, inclusive=False):
         '''
         There is some question about the Drought Severity Coverage Index. The
@@ -226,7 +230,7 @@ def droughtArea(arrays, choice, inclusive=False):
     def filter(arrays, d, inclusive=False):
         values = np.array([singleFilter(a, d, inclusive=inclusive) for
                             a in arrays])
-        totals = [len(a[~np.isnan(a)]) for a in arrays]  # <------------------- Because the available area for LERI changes, this adjust the total area for each time step
+        totals = [len(a[~np.isnan(a)]) for a in arrays]  # <------------------- Because the available area for LERI changes, this adjusts the total area for each time step
         ps = np.array([(len(values[i])/totals[i]) * 100 for
                        i in range(len(values))])
         return ps
@@ -234,10 +238,9 @@ def droughtArea(arrays, choice, inclusive=False):
     # print("starting offending loops...")
     pnincs = np.array([filter(arrays, cats[i]) for i in range(5)])
     DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-    pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]  # <---------------- ~60 microseconds with 18 year record (compare to 150 milliseconds to start over :)
+    pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]
 
     # Return the list of five layers
-    # print("drought area calculations complete.")
     return pincs, pnincs, DSCI
 
 
@@ -263,10 +266,12 @@ def isInt(string):
 
 def makeMap(maps, function):
     '''
-    To choose which function to return from Index_Maps
+    To choose which function to return from Index_Maps. 
 
     Production Notes:
-
+        This could be make into a dictionary rather than all of these if
+        statements. Perhaps it could be built into the Index_Maps class
+        to make that independently functional.
     '''
     gc.collect()
     if function == "omean":
@@ -294,7 +299,9 @@ def makeMap(maps, function):
 
 def movie(array, titles=None, axis=0):
     '''
-    if the time axis is not 0, specify which it is.
+    This takes a three dimensional numpy array and animates it. If the time
+    axis is not 0, specify which it is. Just a heads up, some functions
+    organize along different axes; consider np.dstack vs np.array. 
     '''
     if titles is None:
         titles = ["" for t in range(len(array))]
@@ -354,9 +361,8 @@ def percentileArrays(arrays):
         pct = rankdata(lst)/len(lst)
         return pct
 
-    # mask = arrays[-10, :, :] * 0 + 1
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
-    # pcts = pcts*mask
+
     return pcts
 
 
@@ -384,7 +390,6 @@ def readRaster(rasterpath, band, navalue=-9999):
     return(array, geometry, arrayref)
 
 
-############ Construction Zone ###############################################
 def shapeReproject(src, dst, src_epsg, dst_epsg):
     '''
     There doesn't appear to be an ogr2ogr analog in Python's OGR module.
@@ -472,7 +477,6 @@ def shapeReproject(src, dst, src_epsg, dst_epsg):
         for df in dst_files:
             os.rename(df, df.replace('2', ''))
 
-############ Construction Zone ###############################################
 
 def standardize(indexlist):
     '''
@@ -507,6 +511,7 @@ def toNetCDF(file, ncfile, savepath, index, epsg=4326, wmode='w'):
     todays_date = dt.datetime.today()
     today = np.datetime64(todays_date)
 
+    # Create data set
     nco = Dataset(savepath, mode=wmode, format='NETCDF4')
 
     # We need some things from the old nc file
@@ -690,15 +695,14 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     try:
         test = Dataset(ncfiles[0])
         test.close()
-        # print("Combining data using netcdf dates..")
         date_tifs = {}
         for i in range(len(ncfiles)):
             nc = Dataset(ncfiles[i])
-            days = nc.variables['day'][:]  # This is in days since 1900
+            days = nc.variables['day'][:]
             rasters = gdal.Open(tfiles[i])
             arrays = rasters.ReadAsArray()
             for y in range(len(arrays)):
-                date_tifs[days[y]] = arrays[y]  # <-------------------------------- I believe this is whats breaking the WWDT script, different length arrays.
+                date_tifs[days[y]] = arrays[y]
     
         # okay, that was just in case the dates wanted to bounce around
         date_tifs = OrderedDict(sorted(date_tifs.items()))
@@ -724,10 +728,10 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
 
     # Filter out dates
     base = dt.datetime(1900, 1, 1)
-    start = dt.datetime(year1, month1, 1) # <--------------------------------- Careful about this day figure
+    start = dt.datetime(year1, month1, 1)
     day1 = start - base
     day1 = day1.days
-    end = dt.datetime(year2, month2, 1)  # <---------------------------------- This is also important because of empty slots in the wwdt data, specify the current date in the call
+    end = dt.datetime(year2, month2, 1)
     day2 = end - base
     day2 = day2.days
     idx = len(days) - len(days[np.where(days >= day1)])
@@ -821,7 +825,7 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
     nco.projection = 'WGS 1984 EPSG: 4326'
     nco.citation = ('Westwide Drought Tracker, ' +
                     'http://www.wrcc.dri.edu/monitor/WWDT')
-    nco.Conventions = 'CF-1.6'  # Should I include this if I am not sure?
+    nco.Conventions = 'CF-1.6'
 
     # Variable Attrs
     times.units = 'days since 1900-01-01'
@@ -838,10 +842,10 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
 
     # Make sure there are the same number of time steps
     if ntime != len(nc.variables['time']):
-        # print("Time lengths don't match.")
+        print("Time lengths don't match.")
         sys.exit(1)
 
-    days = nc.variables['time'][:]  # This is in days since 1900
+    days = nc.variables['time'][:]
 
     # This allows the option to store the data as percentiles
     if percentiles:
@@ -859,8 +863,10 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
 
 def toNetCDFPercentile(src_path, dst_path):
     '''
-    This causes memory problems in less powerful computers.
-    
+    Take an existing netcdf file and simply transform the data into percentile
+    space
+
+    Sample arguments:
     src_path = 'f:/data/droughtindices/netcdfs/spi2.nc'
     dst_path = 'f:/data/droughtindices/netcdfs/percentiles/spi2.nc'
     
@@ -922,6 +928,9 @@ def toNetCDFPercentile(src_path, dst_path):
 
 def toRaster(array, path, geometry, srs, navalue=-9999):
     """
+    Writes a single array to a raster with coordinate system and geometric
+    information.
+
     path = target path
     srs = spatial reference system
     """
@@ -936,8 +945,10 @@ def toRaster(array, path, geometry, srs, navalue=-9999):
     image.GetRasterBand(1).SetNoDataValue(navalue)
       
 
-def toRasters(arraylist,path,geometry,srs):
+def toRasters(arraylist, path, geometry, srs):
     """
+    Writes a list of 2d arrays, or a 3d array, to a series of tif files.
+
     Arraylist format = [[name,array],[name,array],....]
     path = target path
     geometry = gdal geometry object
@@ -959,8 +970,11 @@ def toRasters(arraylist,path,geometry,srs):
         image.GetRasterBand(1).WriteArray(ray[1])
           
 
-# WGS
 def wgsToAlbers(arrays, cd, albers_source):
+    '''
+    Takes a 3d array, or list of 2d arrays, in WGS 84 (epsg: 4326) to Alber's
+    North American Equal Area Conic (epsg: 102008).
+    '''
     dates = range(len(arrays))
     wgs_proj = Proj(init='epsg:4326')
     geom = cd.source.transform
@@ -1000,11 +1014,10 @@ def wgsToAlbers(arrays, cd, albers_source):
     return(arrays)
 
 
-################################ classes ######################################
+# In[]:Classes
 class Admin_Elements:
     def __init__(self, resolution):
         self.resolution = resolution
-
 
     def buildAdmin(self):
         resolution = self.resolution
@@ -1021,7 +1034,6 @@ class Admin_Elements:
                        extent=[-130, 50, -55, 20])
         self.rasterize(src_path, state_path, attribute='STATEFP',
                        extent=[-130, 50, -55, 20])
-
 
     def buildAdminDF(self):
         resolution = self.resolution
@@ -1118,6 +1130,19 @@ class Admin_Elements:
                  geom, proj, -9999)
         return grid, gradient
 
+    def buildNA(self):
+        '''
+        For when there isn't any data I am printing NA across the screen. So
+        all this will do is reproject an existing 'NA' raster to the specified
+        resolution.
+        '''
+        res = self.resolution
+        res_print = str(res).replace('.', '_')
+        src_path = 'data/rasters/na_banner.tif'
+        out_path = 'data/rasters/na_banner_' + res_print + '.tif'
+        ds = gdal.Warp(out_path, src_path, dstSRS='EPSG:4326',
+                       xRes=res, yRes=res, outputBounds=[-130, 20, -55, 50])
+        del ds
     
     def buildSource(self):
         '''
@@ -1187,7 +1212,6 @@ class Admin_Elements:
             data.close()
 
         # We actually want full state-county fips for counties
-        # Stack both into one
         state_counties = np.stack([states, cnty])
 
         # Our function will take as the input a list [state fips, county fips]
@@ -1206,7 +1230,6 @@ class Admin_Elements:
 
         return states, cnty, grid, mask, source, albers_source, cd, admin_df
 
-
     def pathRequest(self):
         # Set paths to each element then make sure they exist
         resolution = self.resolution
@@ -1219,6 +1242,7 @@ class Admin_Elements:
         source_path = 'data/rasters/source_array' + res_ext + '.nc'
         albers_path = 'data/rasters/source_albers' + res_ext + '.tif'
         admin_path = 'data/tables/admin_df' + res_ext + '.csv'
+        na_path = 'data/rasters/na_banner' + res_ext + '.tif'
 
         if not os.path.exists(county_path) or not os.path.exists(state_path):
             self.buildAdmin()
@@ -1228,13 +1252,14 @@ class Admin_Elements:
             self.buildSource()
         if not os.path.exists(admin_path):
             self.buildAdminDF()
-    
+        if not os.path.exists(na_path):
+            self.buildNA()
+
         # Return everything at once
         path_package = [grid_path, gradient_path, county_path, state_path,
                         source_path, albers_path, admin_path]
     
         return path_package
-
 
     def rasterize(self, src, dst, attribute, all_touch=False,
                   epsg=4326, na=-9999):
@@ -1268,7 +1293,7 @@ class Admin_Elements:
     
         # Set options
         if all_touch is True:
-            ops = ['-at', '-a ' + attribute]
+            ops = ['-at', 'ATTRIBUTE=' + attribute]
         else:
             ops = ['ATTRIBUTE=' + attribute]
 
@@ -1278,6 +1303,8 @@ class Admin_Elements:
         # Close target raster
         trgt = None
         src_data = None
+
+
     
 class Cacher:
     '''
@@ -1305,22 +1332,13 @@ class Cacher:
 
 class Coordinate_Dictionaries:
     '''
-    This translates numpy coordinates to geographic coordinates and back.
-    
-    Production notes:
-        - I think this would also be a good place to parameterize all
-            resolution specific elements of the application
-        - These elements include:
-            1) the grid
-            2) the grid gradient
-            3) the counties raster
-            4) the counties data frame
-            5) the states raster
-            6) the states data frame
-            7) the source array
-            8) the source albers nc file
+    This translates cartesian coordinates to geographic coordinates and back.
+    It also provides information about the coordinate system used in the
+    source data set, and methods to translate grid ids to plotly point objects
+    and back. 
     '''
     def __init__(self, source_path, grid):
+        # Source Data Array
         self.source = xr.open_dataarray(source_path)
 
         # Geometry
@@ -1367,10 +1385,10 @@ class Coordinate_Dictionaries:
 class Index_Maps():
     '''
     This class creates a singular map as a function of some timeseries of
-        rasters for use in the Ubuntu-Practice-Machine index comparison app.
-        It also returns information needed for rendering.
+    rasters for use in the Ubuntu-Practice-Machine index comparison app.
+    It also returns information needed for rendering.
 
-        Initializing arguments:
+    Initializing arguments:
             time_data (list)    = [[Year1, Year2], Month1, Month2,
                                    Month_Filter]
             function (string)   = 'mean_perc': 'Average Percentiles',
@@ -1385,7 +1403,7 @@ class Index_Maps():
                                   'spei3', 'spei6', 'eddi1', 'eddi2', 'eddi3',
                                   'eddi6'
 
-        Each function returns:
+    Each function returns:
 
             array      = Singular 2D Numpy array of function output
             arrays     = Timeseries of 2D Numpy arrays within time range
@@ -1396,7 +1414,7 @@ class Index_Maps():
 
     # Reduce memory by preallocating attribute slots
     __slots__ = ('year1', 'year2', 'month1', 'month2', 'month_filter',
-                 'function', 'colorscale', 'reverse', 'choice')
+                 'function', 'colorscale', 'reverse', 'choice', 'na')
 
     # Create Initial Values
     def __init__(self, time_data=[[2000, 2018], 1, 12, list(range(1, 13))],
@@ -1409,7 +1427,6 @@ class Index_Maps():
         self.colorscale = colorscale
         self.reverse = reverse
         self.choice = choice
-
 
     def setColor(self, default='percentile'):
         '''
@@ -1487,20 +1504,38 @@ class Index_Maps():
         slowing the app down. We need to slice by month and year first, then
         filter by the month filter.
         '''
-        # Get time series of values
-        # filter by date and location
+        # Get time series of values and filter by date and location
         d1 = dt.datetime(self.year1, self.month1, 1)
         d2 = dt.datetime(self.year2, self.month2, 1)
-        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)  # last day
+        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)
 
         with xr.open_dataset(array_path) as data:
+            res = data.crs.GeoTransform[1]
             data = data.sel(time=slice(d1, d2))
             data = data.sel(time=np.in1d(data['time.month'],
                                          self.month_filter))
-            res = data.crs.GeoTransform[1]
             indexlist = data
             del data
-        
+
+        if len(indexlist.time) == 0:
+            res_print = str(res).replace('.', '_')
+            na_path = 'data/rasters/na_banner_' + res_print + '.tif'
+            na = readRaster(na_path, 1, -9999)[0]
+            na = na * 0 - 9999
+            date_range = ((d2.year - d1.year) * 12) + d2.month - d1.month + 1
+            data = np.repeat(na[np.newaxis, :, :], date_range, axis=0)
+            days = [d1 + relativedelta(months=m) for m in range(date_range)]
+            lats = indexlist.coords['lat'].data
+            lons = indexlist.coords['lon'].data
+            darray = xr.DataArray(data,
+                                  coords={'time': days,
+                                          'lat': lats,
+                                          'lon': lons,},
+                                  dims={'time': len(days),
+                                        'lat': len(lats),
+                                        'lon': len(lons)})
+            indexlist = xr.Dataset({'value': darray})
+
         if 'leri' in self.choice:
             arrays = indexlist.value.data
             arrays[arrays < 0] = np.nan
@@ -1517,8 +1552,11 @@ class Index_Maps():
                                   "data/droughtindices/netcdfs/",
                                   self.choice + '.nc')
         indexlist, res = self.getData(array_path)
-        limits = [abs(np.nanmin(indexlist.value.data)),
-                  abs(np.nanmax(indexlist.value.data))]
+        if len(indexlist.time) != 0:
+            limits = [abs(np.nanmin(indexlist.value.data)),
+                      abs(np.nanmax(indexlist.value.data))]
+        else:
+            limits = [0, 0]
         dmax = max(limits)  # Makes an even graph
         dmin = dmax*-1
         gc.collect()
@@ -1533,11 +1571,15 @@ class Index_Maps():
                                   "data/droughtindices/netcdfs/percentiles",
                                   self.choice + '.nc')
         indexlist, res = self.getData(array_path)
-        indexlist.value.data = indexlist.value.data * 100
+        if len(indexlist.time) != 0:
+            indexlist.value.data = indexlist.value.data * 100
 
-        # We want the color scale to be centered on 50, first get max/min
-        dmax = np.nanmax(indexlist.value.data)
-        dmin = np.nanmin(indexlist.value.data)
+            # We want the color scale to be centered on 50, first get max/min
+            dmax = np.nanmax(indexlist.value.data)
+            dmin = np.nanmin(indexlist.value.data)
+        else:
+            dmax = 0
+            dmin = 0
 
         # The maximum distance from 50
         delta = max([dmax - 50, 50 - dmin])
@@ -1555,44 +1597,50 @@ class Index_Maps():
         '''
         Retrieve Percentiles of Original Timeseries in North American
         Albers Equal Area Conic.
+        
+        I don't believe this is used in the application, and also depends on an
+        external file so I think it can be nixed
         '''
         array_path = os.path.join(data_path,
                                   "data/droughtindices/netcdfs/albers",
                                   self.choice + '.nc')
         indexlist, res = self.getData(array_path)
-        limits = [abs(np.nanmin(indexlist.value.data)),
-                  abs(np.nanmax(indexlist.value.data))]
+        if len(indexlist.time) != 0:
+            limits = [abs(np.nanmin(indexlist.value.data)),
+                      abs(np.nanmax(indexlist.value.data))]
+        else:
+            limits = [0, 0]
         dmax = max(limits)  # Makes an even graph
         dmin = dmax*-1
         gc.collect()
         return [indexlist, dmin, dmax, res]
 
 
-    def calculateCV(indexlist):
+    def calculateCV(arraylist):
         '''
          A single array showing the distribution of coefficients of variation
              throughout the time period represented by the chosen rasters
         '''
         # is it a named list or not?
-        if type(indexlist[0]) is list:
+        if type(arraylist[0]) is list:
             # Get just the arrays from this
-            indexlist = [a[1] for a in indexlist]
+            arraylist = [a[1] for a in arraylist]
         else:
-            indexlist = indexlist
+            arraylist = arraylist
 
         # Adjust for outliers
-        sd = np.nanstd(indexlist)
+        sd = np.nanstd(arraylist)
         thresholds = [-3*sd, 3*sd]
-        for a in indexlist:
+        for a in arraylist:
             a[a <= thresholds[0]] = thresholds[0]
             a[a >= thresholds[1]] = thresholds[1]
 
         # Standardize Range
-        indexlist = standardize(indexlist)
+        arraylist = standardize(arraylist)
 
         # Simple Cellwise calculation of variance
-        sds = np.nanstd(indexlist, axis=0)
-        avs = np.nanmean(indexlist, axis=0)
+        sds = np.nanstd(arraylist, axis=0)
+        avs = np.nanmean(arraylist, axis=0)
         covs = sds/avs
 
         return covs
@@ -1606,7 +1654,7 @@ class Index_Maps():
         [indexlist, dmin, dmax, res] = self.getOriginal()
 
         # Get data
-        array = indexlist.mean('time').value.data  # <------------------------- This seems to be miscalculating 
+        array = indexlist.mean('time').value.data
         arrays = indexlist.value.data
         dates = indexlist.time.data
         del indexlist
@@ -1781,7 +1829,7 @@ class Location_Builder:
         self.trig_id = trig_id
         self.trig_val = trig_val
         self.cd = coordinate_dictionary
-        self.admin_df = admin_df  # <------------------------------------------ Here down can be read in with a resolution value
+        self.admin_df = admin_df
         self.states_df = admin_df[['state', 'state_abbr',
                                    'state_fips']].drop_duplicates().dropna()
         self.state_array = state_array  
@@ -1802,7 +1850,6 @@ class Location_Builder:
             'county_2.value',
             'state_1.value',
             'state_2.value'
-
         '''
         trig_id = self.trig_id
         trig_val = self.trig_val
@@ -1837,7 +1884,6 @@ class Location_Builder:
         elif 'selectedData' in trig_id:
             if trig_val is not None:
                 selections = trig_val['points']
-    
                 y = list([cd.latdict[d['lat']] for d in selections])
                 x = list([cd.londict[d['lon']] for d in selections])
                 try:
@@ -1854,10 +1900,7 @@ class Location_Builder:
                     local_df['gradient'] == min(local_df['gradient'])].item()
                 SE = local_df['place'][
                     local_df['gradient'] == max(local_df['gradient'])].item()
-                # if NW != SE:
                 label = NW + " to " + SE
-                # else:
-                    # label = NW
                 location = ['grid_ids', str(y), str(x), label]        
             else:
                 raise PreventUpdate
@@ -1885,15 +1928,8 @@ class Location_Builder:
                 if len(state) < 4:  # Spell out full state name in title
                     state = [states_df['state'][
                              states_df['state_abbr']==s].item() for s in state]
-                
                 states = ", ".join(state)
-
-                # Now get the right x, y positions
-                # state_mask = state_array.copy()
-                
                 y, x = np.where(np.isin(state_array, trig_val))
-                # state_mask[~np.isin(state_mask, trig_val)] = np.nan
-                # area_mask = state_mask * 0 + 1
 
                 # And return the location information
                 location = ['state_mask', str(list(y)), str(list(x)), states]
