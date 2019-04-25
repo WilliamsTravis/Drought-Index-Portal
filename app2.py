@@ -93,9 +93,9 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions and classes
-from functions import Admin_Elements, areaSeries, correlationField, datePrint
-from functions import droughtArea, Index_Maps, Location_Builder, makeMap
-from functions import shapeReproject
+from functions2 import Admin_Elements, areaSeries, correlationField, datePrint
+from functions2 import droughtArea, Index_Maps, Location_Builder, makeMap
+from functions2 import shapeReproject
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
