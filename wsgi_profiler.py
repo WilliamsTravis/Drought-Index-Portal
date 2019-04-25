@@ -8,7 +8,6 @@ import os
 import time
 '''
 An older profiler script found here:
-    
     https://medium.com/@maxmaxmaxmax/measuring-performance-of-python-
                             based-apps-using-gunicorn-and-cprofile-ee4027b2be41
 
@@ -44,8 +43,8 @@ if profile_method is not None:
     method_expr = '\(' + profile_method
 if profile_file is not None:
     print("Profiled file: " + profile_file + '\n')
-    
-    
+
+
 def profiler_enable(worker, req):
     worker.profile = cProfile.Profile()
     worker.profile.enable()
