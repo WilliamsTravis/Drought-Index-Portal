@@ -1506,10 +1506,9 @@ class Index_Maps():
         with xr.open_dataset(array_path, chunks={'time': 256}) as data:
             res = data.crs.GeoTransform[1]
             data = data.sel(time=slice(d1, d2))
-            data = data.sel(time=np.in1d(data['time.month'],
+            indexlist = data.sel(time=np.in1d(data['time.month'],
                                          self.month_filter))
-            indexlist = data
-            del data
+            data.close()
 
         if len(indexlist.time) == 0:
             res_print = str(res).replace('.', '_')
@@ -1538,12 +1537,6 @@ class Index_Maps():
         return indexlist, res
 
 
-
-
-
-
-
-
     def getOriginal(self):
         '''
         Retrieve Original Timeseries
@@ -1559,7 +1552,9 @@ class Index_Maps():
             limits = [0, 0]
         dmax = max(limits)  # Makes an even graph
         dmin = dmax*-1
+
         gc.collect()
+
         return [indexlist, dmin, dmax, res]
 
 
@@ -1655,8 +1650,8 @@ class Index_Maps():
 
         # Get data
         array = indexlist.mean('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
+        arrays = indexlist.value.values  # <----------------------------------- We are pulling the array list into memory here, room for improvement? (use.data to keep as dask array)
+        dates = indexlist.time.values # --------------------------------------- We should check to see if we can alter the makeSeries functions to only pull in the needed data..
         del indexlist
 
         # Get color scale
@@ -1680,8 +1675,8 @@ class Index_Maps():
 
         # Get data
         array = indexlist.max('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
+        arrays = indexlist.value.values
+        dates = indexlist.time.values
         del indexlist
 
         # Get color scale
@@ -1705,8 +1700,8 @@ class Index_Maps():
 
         # Get data
         array = indexlist.min('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
+        arrays = indexlist.value.values
+        dates = indexlist.time.values
         del indexlist
 
         # Get color scale
@@ -1729,8 +1724,8 @@ class Index_Maps():
 
         # Get data
         array = indexlist.mean('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
+        arrays = indexlist.value.values
+        dates = indexlist.time.values
         del indexlist
 
         # Get color scale
@@ -1753,8 +1748,8 @@ class Index_Maps():
 
         # Get data
         array = indexlist.max('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
+        arrays = indexlist.value.values
+        dates = indexlist.time.values
         del indexlist
 
         # Get color scale
@@ -1778,8 +1773,8 @@ class Index_Maps():
 
         # Get data
         array = indexlist.min('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
+        arrays = indexlist.value.values
+        dates = indexlist.time.values
         del indexlist
 
         # Get color scale
@@ -1802,9 +1797,9 @@ class Index_Maps():
         [indexlist, dmin, dmax, res] = self.getOriginal()
 
         # Get data
-        arrays = indexlist.value.data
+        arrays = indexlist.value.values
         array = calculateCV(arrays)
-        dates = indexlist.time.data
+        dates = indexlist.time.values
         del indexlist
 
         # Get color scale
