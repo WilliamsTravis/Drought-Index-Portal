@@ -94,8 +94,8 @@ os.chdir(path)
 
 # Import functions and classes
 from functions2 import Admin_Elements, areaSeries, correlationField, datePrint
-from functions2 import droughtArea, Index_Maps, Location_Builder, makeMap
-from functions2 import shapeReproject
+from functions2 import droughtArea, Index_Maps, Location_Builder
+from functions2 import shapeReproject, xMask
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -275,20 +275,17 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
 with xr.open_dataset(
         os.path.join(data_path,
              'data/droughtindices/netcdfs/' + default_sample + '.nc')) as data:
-    sample_nc = data.load()
-
-min_date = sample_nc.time.data[0]
-max_date = sample_nc.time.data[-1]
+    min_date = data.time.data[0]
+    max_date = data.time.data[-1]
+    resolution = data.crs.GeoTransform[1]
 max_year = pd.Timestamp(max_date).year
 min_year = pd.Timestamp(min_date).year
 max_month = pd.Timestamp(max_date).month
 
 # Get spatial dimensions from the sample data set above
-resolution = sample_nc.crs.GeoTransform[1]
 admin = Admin_Elements(resolution)
 [state_array, county_array, grid, mask,
  source, albers_source, crdict, admin_df] = admin.getElements()
-del sample_nc
 
 # Create the date options
 years = [int(y) for y in range(min_year, max_year + 1)]
@@ -309,14 +306,6 @@ for y in yearmarks:
         yearmarks[y] = ""
 
 ################## Map Section ################################################
-# NA map for when empty maps are selected
-with np.load("data/npy/NA_overlay.npz") as data:
-    na = data.f.arr_0
-    data.close()
-
-# Make the NA map a single color
-na = na * 0 + 1
-
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
@@ -383,7 +372,8 @@ def divMaker(id_num, index='noaa'):
                                  selected_style=tablet_style)),
               dcc.Dropdown(id='choice_{}'.format(id_num),
                            options=indices, value=index)],
-                           style={'width': '25%', 'float': 'left'}),
+              style={'width': '25%', 'float': 'left'},
+              title='Select a drought index for this element'),
             html.Div([
               dcc.Tabs(id='location_tab_{}'.format(id_num),
                        value='county',
@@ -512,7 +502,7 @@ def divMaker(id_num, index='noaa'):
     return div
 
 
-app.layout = html.Div([  # <--------------------------------------------------- Line all brackets and parens up.
+app.layout = html.Div([
       html.Div([
 
          # Sponsers
@@ -636,27 +626,32 @@ app.layout = html.Div([  # <--------------------------------------------------- 
                                html.H5('Beginning Month'),
                                dcc.Dropdown(id='month_1',
                                             options=monthoptions_full,
-                                            value=1,
-                                            style={'width': '85%'})],
-                               className='two columns'),
+                                            value=1)],
+                               className='two columns',
+                               title=('Choose the first month of the first ' +
+                                      'year of the study period')),
                              html.Div([
-                              html.H5('Ending Month'),
-                              dcc.Dropdown(id='month_2',
-                                           options=monthoptions_full,
-                                           value=12,
-                                           style={'width': '85%'})],
-                              className='two columns'),
-                            html.Div(id='month_slider_holder',
-                                     children=[
-                                       html.H5('Month Filter'),
-                                       dcc.Checklist(
-                                         className='check_blue',
-                                         id='month',
-                                         options=monthoptions,
-                                         values=list(range(1, 13)),
-                                         labelStyle={'display':
-                                                     'inline-block'})],
-                                      className='eight columns')])],
+                               html.H5('Ending Month'),
+                               dcc.Dropdown(id='month_2',
+                                            options=monthoptions_full,
+                                            value=12)],
+                               className='two columns',
+                               title=('Choose the last month of the last ' +
+                                      'year of the study period')),
+                            html.Div(
+                              id='month_slider_holder',
+                              children=[
+                                html.H5('Month Filter'),
+                                  dcc.Checklist(
+                                    className='check_blue',
+                                    id='month',
+                                    options=monthoptions,
+                                    values=list(range(1, 13)),
+                                    labelStyle={'display':
+                                                'inline-block'})],
+                               className='eight columns',
+                               title=('Choose which months of the year to ' +
+                                      'be included'))])],
                     className="row",
                    style={'margin-bottom': '75'}),
 
@@ -739,10 +734,6 @@ app.layout = html.Div([  # <--------------------------------------------------- 
        html.Div([divMaker(1, default_1), divMaker(2, default_2)],
                 className='row'),
 
-       # Row 2
-       # html.Div([divMaker(3, 'spei6'), divMaker(4, 'spi3')],  # <----------- Consider only including two until we free more memory/get better machine
-       #          className='row'),
-
        # Signals
        html.Div(id='signal', style={'display': 'none'}),
        html.Div(id='location_store', style={'display': 'none'}),
@@ -806,6 +797,7 @@ def toggleSyncButton(click):
         style = off_button_style
     return style, children
 
+
 @app.callback([Output('description', 'children'),
                Output('desc_button', 'style'),
                Output('desc_button', 'children')],
@@ -848,28 +840,34 @@ def functionOptions(function_type):
 
 
 @cache.memoize()
-def retrieve_data(signal, function, choice):
+def retrieveData(signal, function, choice): 
     '''
     This takes the user defined signal and uses the Index_Map class to filter'
     by the selected dates and return the singular map, the 3d timeseries array,
     and the colorscale.
+    
+    sample arguments:
+        signal = [[[2000, 2017], 1, 12, [ 4, 5, 6, 7]], 'Viridis', 'no']
+        choice = 'pdsi'
+        function = 'omean'
     '''
     # Retrieve signal elements
-    [[year_range, month1, month2, month_filter], colorscale, reverse] = signal
-    time_data = [year_range, month1, month2, month_filter]
+    time_data = signal[0]
+    colorscale = signal[1]
+    reverse = signal[2]
 
     # Retrieve data package
     data = Index_Maps(time_data, colorscale, reverse, choice)
 
     # Choose which function with which to transform data
-    [array, arrays, dates, colorscale,
-         dmax, dmin, reverse, res] = makeMap(data, function)
+    [array, arrays, colorscale, dmax, dmin, reverse] = data.makeMap(function)
+    dates = arrays.time.values
 
-    return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
+    return [array, arrays, dates, colorscale, dmax, dmin, reverse]
 
 
 @cache2.memoize()
-def retrieve_area_data(arrays, choice):
+def retrieveAreaData(arrays, choice):
     '''
     This is here just to cache the output of 'droughtArea', which returns both
     the 5 categorical drought coverages (% area) and the singlular DSCI. The
@@ -1078,7 +1076,7 @@ for i in range(1, 3):
             tif = gdal.Translate('data/shapefiles/temp/temp.tif',
                                  'data/shapefiles/temp/temp1.tif',
                                  projWin=[-130, 50, -55, 20])
-            tif = None
+            tif = None  # <---------------------------------------------------- Check if this is necessary
 
             return basename
 
@@ -1301,7 +1299,12 @@ for i in range(1, 3):
                   function, key, sync):
         '''
         This actually renders the map. I want to modularize, but am struggling
-        on this.        
+        on this.
+        
+        Sample arguments
+        location =  ['state_mask', 'all', 'Contiguous United States', 0]
+        
+        
         '''
         # Prevent update from location unless it is a state or shape filter
         trig = dash.callback_context.triggered[0]['prop_id']
@@ -1354,7 +1357,10 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-         dmax, dmin, reverse, res] = retrieve_data(signal, function, choice)
+         dmax, dmin, reverse] = retrieveData(signal, function, choice)
+
+        # Pull array and dates into memory
+        array = array.compute()
 
         # Individual array min/max
         amax = np.nanmax(array)
@@ -1363,13 +1369,12 @@ for i in range(1, 3):
         # Now, we want to use the same  value range for colors
         if function == 'pmean':
             # Get the data for the other panel for its value range
-            comparison_package = retrieve_data(signal, function, choice2)
+            comparison_package = retrieveData(signal, function, choice2)
             array2 = comparison_package[0]
             amax2 = np.nanmax(array2)
             amin2 = np.nanmin(array2)        
             amax = np.nanmax([amax, amax2])        
             amin = np.nanmin([amin, amin2])
-            del array2
             del comparison_package
 
         # Experimenting with leri
@@ -1383,6 +1388,7 @@ for i in range(1, 3):
                                monthmarks)
 
         # Filter by x, y positions in location
+        # print("location: " + str(location))
         flag = location[0]
         if 'id' not in flag and flag != 'county_mask':
             if location[1] != 'all' and 'corr' not in function:
@@ -1414,7 +1420,7 @@ for i in range(1, 3):
                                                     albers_source, crdict,
                                                     reproject=False)
 
-            array = correlationField(timeseries, arrays)
+            array = correlationField(timeseries, arrays.value.values)  # <----- Another area that should cause a memory spike I think
             title_size = 20
         else:
             title = (indexnames[choice] + '<br>' + function_names[function] +
@@ -1565,10 +1571,10 @@ for i in range(1, 3):
 
         # Get/cache data
         [array, arrays, dates, colorscale,
-         dmax, dmin, reverse, res] = retrieve_data(signal, function, choice)
+         dmax, dmin, reverse] = retrieveData(signal, function, choice)
 
         # Experimenting with LERI
-        if 'leri' in choice:
+        if 'leri' in choice:  # <---------------------------------------------- Try a different method to avoid pulling into memory
             arrays[arrays < 0] = np.nan  
             dmin = 0
             dmax = 100
@@ -1608,7 +1614,7 @@ for i in range(1, 3):
                                                    albers_source, crdict,
                                                    reproject=True)
 
-            # ts_series, ts_series_ninc, dsci = retrieve_area_data(arrays, choice) # <------------ For caching later, when we have more space
+            # ts_series, ts_series_ninc, dsci = retrieveAreaData(arrays, choice) # <------------ For caching later, when we have more space
             ts_series, ts_series_ninc, dsci = droughtArea(arrays, choice)
 
             # Save to file for download option
@@ -1638,7 +1644,8 @@ for i in range(1, 3):
         elif 'o' in function and 'cv' not in function and function != 'oarea':
             yaxis = dict(range=[dmin, dmax],
                          title='Index')
-            sd = np.nanstd(arrays)
+            xmask = xMask(mask, crdict)
+            sd = float(arrays.where(xmask == 1).std().compute().value.data)
             if 'eddi' in choice:
                 sd = sd*-1
             dmin = 3*sd
@@ -1656,7 +1663,7 @@ for i in range(1, 3):
                 colorscale = 'Viridis'
                 reverse=True
 
-        # Trying to free up space for more workers
+        # Trying to free up space for more workers, does this do anything?
         del array
         del arrays
 
