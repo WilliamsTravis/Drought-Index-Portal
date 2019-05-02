@@ -82,7 +82,6 @@ def xMask(array, crdict):
                               'lon': len(lons)})
     return mask
 
-
 def areaSeries(location, arrays, dates, mask, state_array, albers_source,
                crdict, reproject=False):
     '''
@@ -269,10 +268,6 @@ def im(array):
     '''
     This just plots an array as an image
     '''
-    # plt.close()
-    # window = plt.get_current_fig_manager()
-    # window.canvas.manager.window.raise_()
-    # plt.close()
     fig = plt.imshow(array)
     fig.figure.canvas.raise_()
 
@@ -346,7 +341,7 @@ def percentileArrays(arrays):
         import scipy.stats
         scipy.stats.moment(lst, 1)
 
-        pct = rankdata(lst)/len(lst)
+        pct = (rankdata(lst)/len(lst)) * 100
         return pct
 
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
@@ -849,6 +844,118 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
     nco.close()
 
 
+def toNetCDFAlbers(src, dst, epsg=102008, percentiles=False, wmode='w'):
+    '''
+    For some reason it is incredibly difficult to project a netcdf file without
+    splitting the data into separate bands. I found this OSGEO ticket from a
+    while ago that called for a reconstruction of the dataset upon a gdalwarp
+    call, but no comments and then it was closed earlier this year :/.
+
+    Anyways, what we'll do instead is reproject to a multiband tiff, pull that
+    into memory, create the dataset, setup up the crs attributes needed for
+    Alber's specifically, and copy the other attributes from the old nc file,
+    then write to a new one
+    '''
+    # For attributes
+    todays_date = dt.datetime.today()
+    today = np.datetime64(todays_date)
+
+    # Warp to tiff in epsg:102008
+
+    
+    # Use one tif (one array) for spatial attributes
+    data = gdal.Open(tfile)
+    geom = data.GetGeoTransform()
+    proj = data.GetProjection()
+    arrays = data.ReadAsArray()
+    ntime, nlat, nlon = np.shape(arrays)
+    lons = np.arange(nlon) * geom[1] + geom[0]
+    lats = np.arange(nlat) * geom[5] + geom[3]
+    del data
+
+    # use osr for more spatial attributes
+    refs = osr.SpatialReference()
+    refs.ImportFromEPSG(epsg)
+
+    # Create Dataset
+    nco = Dataset(dst, mode=wmode, format='NETCDF4')
+
+    # Dimensions
+    nco.createDimension('y', nlat)
+    nco.createDimension('x', nlon)
+    nco.createDimension('time', None)
+
+    # Variables
+    latitudes = nco.createVariable('lat', 'f4', ('lat',))
+    longitudes = nco.createVariable('lon', 'f4', ('lon',))
+    times = nco.createVariable('time', 'f8', ('time',))
+    variable = nco.createVariable('value', 'f4', ('time', 'lat', 'lon'),
+                                  fill_value=-9999)
+    variable.standard_name = 'index'
+    variable.units = 'unitless'
+    variable.long_name = 'Index Value'
+
+    # Appending the CRS information
+    crs = nco.createVariable('crs', 'c')
+    variable.setncattr('grid_mapping', 'crs')
+    crs.spatial_ref = proj
+    crs.epsg_code = "EPSG:" + str(epsg)
+    crs.GeoTransform = geom
+    crs.grid_mapping_name = 'albers_conical_equal_area'
+    crs.standard_parallel = [20.0, 60.0]
+    crs.longitude_of_central_meridian = -32.0
+    crs.latitude_of_projection_origin = 40.0
+    crs.false_easting = 0.0
+    crs.false_northing = 0.0
+
+    # Attributes
+    # Global Attrs
+    nco.title = title_map[index]
+    nco.subtitle = "Monthly Index values since 1948-01-01"
+    nco.description = ('Monthly gridded data at 0.25 decimal degree' +
+                       ' (15 arc-minute resolution, calibrated to 1895-2010 ' +
+                       ' for the continental United States.'),
+    nco.original_author = 'John Abatzoglou - University of Idaho'
+    nco.date = pd.to_datetime(str(today)).strftime('%Y-%m-%d')
+    nco.projection = 'WGS 1984 EPSG: 4326'
+    nco.citation = ('Westwide Drought Tracker, ' +
+                    'http://www.wrcc.dri.edu/monitor/WWDT')
+    nco.Conventions = 'CF-1.6'
+
+    # Variable Attrs
+    times.units = 'days since 1900-01-01'
+    times.standard_name = 'time'
+    times.calendar = 'gregorian'
+    latitudes.units = 'meters'
+    latitudes.standard_name = 'projection_y_coordinate'
+    longitudes.units = 'meters'
+    longitudes.standard_name = 'projection_x_coordinate'
+
+    # Now getting the data, which is not in order because of how wwdt does it
+    # We need to associate each day with its array
+    nc = Dataset(ncfile)
+
+    # Make sure there are the same number of time steps
+    if ntime != len(nc.variables['time']):
+        print("Time lengths don't match.")
+        sys.exit(1)
+
+    days = nc.variables['time'][:]
+
+    # This allows the option to store the data as percentiles
+    if percentiles:
+        arrays = percentileArrays(arrays)
+
+    # Write - set this to write one or multiple
+    latitudes[:] = lats
+    longitudes[:] = lons
+    times[:] = days.astype(int)
+    variable[:, :, :] = arrays
+
+    # Done
+    nco.close()
+
+
 def toNetCDFPercentile(src_path, dst_path):
     '''
     Take an existing netcdf file and simply transform the data into percentile
@@ -972,7 +1079,7 @@ def wgsToAlbers(arrays, crdict, albers_source):
     lats = np.unique(wgrid.xy_coordinates[1])
     lats = lats[::-1]
     lons = np.unique(wgrid.xy_coordinates[0])
-    data_array = xr.DataArray(data=arrays.value,  # <-------------------------- I'm not sure what this does yet, but it will certainly be read into memory :/
+    data_array = xr.DataArray(data=arrays.value,  # <-------------------------- I'm not sure what this does yet
                               coords=[dates, lats, lons],
                               dims=['time', 'lat', 'lon'])
     wgs_data = xr.Dataset(data_vars={'value': data_array})
@@ -1036,7 +1143,8 @@ class Admin_Elements:
         admin_path = 'data/tables/admin_df' + res_ext + '.csv'
     
         # There are several administrative elements used in the app
-        fips = pd.read_csv('data/tables/US_FIPS_Codes.csv', skiprows=1, index_col=0)
+        fips = pd.read_csv('data/tables/US_FIPS_Codes.csv', skiprows=1,
+                           index_col=0)
         res_ext = '_' + str(resolution).replace('.', '_')
         states = pd.read_table('data/tables/state_fips.txt', sep='|')
         states = states[['STATE_NAME', 'STUSAB', 'STATE']]
@@ -1081,7 +1189,6 @@ class Admin_Elements:
                       'county_fips','state_fips', 'fips', 'state_abbr']
 
         df.to_csv(admin_path, index=False)
-
 
     def buildGrid(self):
         '''
@@ -1174,8 +1281,7 @@ class Admin_Elements:
         grid_path = 'data/rasters/grid' + res_ext + '.tif'
         albers_path = 'data/rasters/source_albers' + res_ext + '.tif'
         ds = gdal.Warp(albers_path, grid_path, dstSRS='EPSG:102008')
-        ds = None
-
+        del ds
 
     def getElements(self):
         '''
@@ -1186,7 +1292,7 @@ class Admin_Elements:
         [grid_path, gradient_path, county_path, state_path,
          source_path, albers_path, admin_path] = self.pathRequest()
     
-        # Read in objects
+        # Read in/create objects  # <------------------------------------------ We could create xarray masks here (xMask)
         states = gdal.Open(state_path).ReadAsArray()
         states[states==-9999] = np.nan
         cnty = gdal.Open(county_path).ReadAsArray()
@@ -1199,13 +1305,11 @@ class Admin_Elements:
         albers_source = gdal.Open(albers_path)
         with xr.open_dataarray(source_path) as data:
             source = data.load()
-            data.close()
 
         # We actually want full state-county fips for counties
         state_counties = np.stack([states, cnty])
 
-        # Our function will take as the input a list [state fips, county fips]
-        # for each index position on the map
+        # Format fips as 3-digit strings with leading zeros
         def formatFIPS(lst):
             try:
                 fips1 = '{:03d}'.format(int(lst[0]))
@@ -1290,10 +1394,9 @@ class Admin_Elements:
         # Finally rasterize
         gdal.RasterizeLayer(trgt, [1], layer, options=ops)
 
-        # Close target raster
-        trgt = None
-        src_data = None
-
+        # Close target an source rasters
+        del trgt
+        del src_data
 
     
 class Cacher:
@@ -1377,6 +1480,10 @@ class Index_Maps():
     This class creates a singular map as a function of some timeseries of
     rasters for use in the Ubuntu-Practice-Machine index comparison app.
     It also returns information needed for rendering.
+    
+    I think I could also incorporate the location data into this, include the
+    correlation and area series functions, and simplify the logic built into
+    the call backs.
 
     Initializing arguments:
             time_data (list)    = [[Year1, Year2], Month1, Month2,
@@ -1392,33 +1499,97 @@ class Index_Maps():
                                   'spi2', 'spi3', 'spi6', 'spei1', 'spei2',
                                   'spei3', 'spei6', 'eddi1', 'eddi2', 'eddi3',
                                   'eddi6'
-
-    Each function returns:
-
-            array      = Singular 2D Numpy array of function output
-            arrays     = Timeseries of 2D Numpy arrays within time range
-            dates      = List of Posix time stamps
-            dmax       = maximum value of array
-            dmin       = minimum value of array
     '''
-
-    # Reduce memory by preallocating attribute slots
-    __slots__ = ('year1', 'year2', 'month1', 'month2', 'month_filter',
-                 'function', 'colorscale', 'reverse', 'choice', 'na')
-
     # Create Initial Values
-    def __init__(self, time_data=[[2000, 2018], 1, 12, list(range(1, 13))],
-                 colorscale='Viridis',reverse='no', choice='pdsi'):
-        self.year1 = time_data[0][0]
-        self.year2 = time_data[0][1]
-        self.month1 = time_data[1]
-        self.month2 = time_data[2]
-        self.month_filter = time_data[3]
-        self.colorscale = colorscale
-        self.reverse = reverse
+    def __init__(self, choice='pdsi', choice_type='original',
+                 time_data=[[2000, 2018], [1, 12], list(range(1, 13))],
+                 color_class='Default'):
         self.choice = choice
+        self.choice_type = choice_type
+        self.color_class = color_class
+        self.setData()
+        self.index_ranges = pd.read_csv('data/tables/index_ranges.csv')
+        self.time_data = time_data
 
-    def setColor(self, default='percentile'):
+    @property
+    def time_data(self):
+        return self.time_data
+
+    @property
+    def color_class(self):
+        return self.color_class
+
+    @time_data.setter
+    def time_data(self, time_data):
+        '''
+        To avoid reading in a new dataset when only changing dates, this
+        method is separate. It sets the beginning and end dates and months used
+        in all of the calculations and updates an xarray reference called
+        "dataset_interval".
+        '''
+        # Get the full data set
+        dataset = self.dataset
+
+        # Split up time information
+        year1 = time_data[0][0]
+        year2 = time_data[0][1]
+        month1 = time_data[1][0]
+        month2 = time_data[1][1]
+        month_filter = time_data[2]
+
+        # Filter the dataset by date and location
+        d1 = dt.datetime(year1, month1, 1)
+        d2 = dt.datetime(year2, month2, 1)
+        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)
+        data = dataset.sel(time=slice(d1, d2))
+        data = data.sel(time=np.in1d(data['time.month'], month_filter))
+
+        # If this filters all of the data out, return a special "NA" data set
+        if len(data.time) == 0:
+
+            # Get the right resolution file
+            res = data.crs.GeoTransform[1]
+            res_print = str(res).replace('.', '_')
+            na_path = 'data/rasters/na_banner_' + res_print + '.tif'
+
+            # The whole data set just says "NA" using the value -9999
+            today = dt.datetime.now()
+            start = dt.datetime(1895, 1, 1)
+            base = dt.datetime(1900, 1, 1)
+            na = readRaster(na_path, 1, -9999)[0]
+            na = na * 0 - 9999
+            date_range = ((today.year - 1) - start.year) * 12 + today.month
+            data = np.repeat(na[np.newaxis, :, :], date_range, axis=0)
+            days = [base + relativedelta(months=m) for m in range(date_range)]
+            lats = data.coords['lat'].data
+            lons = data.coords['lon'].data
+            array = xr.DataArray(data,
+                                 coords={'time': days,
+                                         'lat': lats,
+                                         'lon': lons},
+                                 dims={'time': len(days),
+                                       'lat': len(lats),
+                                       'lon': len(lons)})
+            data = xr.Dataset({'value': array})
+    
+        self.dataset_interval = data
+
+        # I am also setting index ranges from the full data sets
+        if self.choice_type =='percentile':
+            self.data_min = 0
+            self.data_max = 100
+        else:
+            ranges = self.index_ranges
+            minimum = ranges['min'][ranges['index'] == self.choice].values[0]
+            maximum = ranges['max'][ranges['index'] == self.choice].values[0]
+
+            # For index value we want to be centered on zero
+            limits = [abs(minimum), abs(maximum)]
+            self.data_max = max(limits)
+            self.data_min = self.data_max * -1
+
+    @color_class.setter
+    def color_class(self, value):
         '''
         This is tricky because the color can be a string pointing to
         a predefined plotly color scale, or an actual color scale, which is
@@ -1460,310 +1631,153 @@ class Index_Maps():
                                   [0.5, 'rgb(76, 145, 33)'],
                                   [0.85, 'rgb(0, 92, 221)'],
                                    [1.00, 'rgb(0, 46, 110)']],
-                   'BrGn':  [[0.00, 'rgb(91, 74, 35)'],  #darkest brown
-                             [0.10, 'rgb(122, 99, 47)'], # almost darkest brown
-                             [0.15, 'rgb(155, 129, 69)'], # medium brown
-                             [0.25, 'rgb(178, 150, 87)'],  # almost meduim brown
-                             [0.30, 'rgb(223,193,124)'],  # light brown
-                             [0.40, 'rgb(237, 208, 142)'],  #lighter brown
-                             [0.45, 'rgb(245,245,245)'],  # white
-                             [0.55, 'rgb(245,245,245)'],  # white
-                             [0.60, 'rgb(198,234,229)'],  #lighter green
-                             [0.70, 'rgb(127,204,192)'],  # light green
-                             [0.75, 'rgb(62, 165, 157)'],  # almost medium green
-                             [0.85, 'rgb(52,150,142)'],  # medium green
-                             [0.90, 'rgb(1,102,94)'],  # almost darkest green
-                             [1.00, 'rgb(0, 73, 68)']], # darkest green
-                   }
+                   'BrGn':  [[0.00, 'rgb(91, 74, 35)'],
+                             [0.10, 'rgb(122, 99, 47)'],
+                             [0.15, 'rgb(155, 129, 69)'],
+                             [0.25, 'rgb(178, 150, 87)'],
+                             [0.30, 'rgb(223,193,124)'],
+                             [0.40, 'rgb(237, 208, 142)'],
+                             [0.45, 'rgb(245,245,245)'],
+                             [0.55, 'rgb(245,245,245)'],
+                             [0.60, 'rgb(198,234,229)'],
+                             [0.70, 'rgb(127,204,192)'],
+                             [0.75, 'rgb(62, 165, 157)'],
+                             [0.85, 'rgb(52,150,142)'],
+                             [0.90, 'rgb(1,102,94)'],
+                             [1.00, 'rgb(0, 73, 68)']]}
 
-        if self.colorscale == 'Default':
-            if default == 'percentile':
+        if value == 'Default':
+            if self.choice_type == 'percentile':
                 scale = options['RdWhBu']
-            elif default == 'original':
+            else:
                 scale = options['BrGn']
-            elif default == 'cv':
-                scale = options['Portland']
+            # elif self.choice_type == 'correlation':
+            #     scale = 'Viridis'
+                # self.reverse = self.reverse * -1
         else:
-            scale = options[self.colorscale]
-        return scale
+            scale = options[value]
 
-    def getData(self, array_path):
+        self.color_scale = scale
+
+    def setData(self):
         '''
         The challenge is to read as little as possible into memory without
-        slowing the app down. We need to slice by month and year first, then
-        filter by the month filter.
+        slowing the app down. So xarray and dask are lazy loaders, which means
+        we can access the full dataset hear without worrying about that.
         '''
-        # Get time series of values and filter by date and location
-        d1 = dt.datetime(self.year1, self.month1, 1)
-        d2 = dt.datetime(self.year2, self.month2, 1)
-        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)
+        # There are three types of datsets
+        type_paths = {'original': 'data/droughtindices/netcdfs/',
+                      'percentile': 'data/droughtindices/netcdfs/percentiles',
+                      'projected': 'data/droughtindices/netcdfs/albers'}
 
-        data = xr.open_dataset(array_path, chunks=100)
-        res = data.crs.GeoTransform[1]
-        arrays = data.sel(time=slice(d1, d2))
-        arrays = arrays.sel(time=np.in1d(arrays['time.month'],
-                                         self.month_filter))
+        # Build path and retrieve the data set
+        netcdf_path =  type_paths[self.choice_type]
+        file_path = os.path.join(data_path, netcdf_path, self.choice + '.nc')
+        dataset = xr.open_dataset(file_path, chunks=100)  # <------------------ Best chunk size/shape?
 
-        if len(arrays.time) == 0:
-            res_print = str(res).replace('.', '_')
-            na_path = 'data/rasters/na_banner_' + res_print + '.tif'
-            na = readRaster(na_path, 1, -9999)[0]
-            na = na * 0 - 9999
-            date_range = ((d2.year - d1.year) * 12) + d2.month - d1.month + 1
-            data = np.repeat(na[np.newaxis, :, :], date_range, axis=0)
-            days = [d1 + relativedelta(months=m) for m in range(date_range)]
-            lats = arrays.coords['lat'].data
-            lons = arrays.coords['lon'].data
-            darray = xr.DataArray(data,
-                                  coords={'time': days,
-                                          'lat': lats,
-                                          'lon': lons,},
-                                  dims={'time': len(days),
-                                        'lat': len(lats),
-                                        'lon': len(lons)})
-            arrays = xr.Dataset({'value': darray})
-
+        # Leri is the only dataset that has missing information
         if 'leri' in self.choice:
-            arrays = arrays.value.data
-            arrays[arrays < 0] = np.nan
-            arrays.value.data = arrays
+            dataset.value.data[dataset.value.data < 0] = np.nan
 
-        return arrays
+        # Set this as an attribute for easy retrieval
+        self.dataset = dataset
 
-    def getOriginal(self):
+    def getMean(self):
+        return self.dataset_interval.mean('time').value.data
+
+    def getMin(self):
+        return self.dataset_interval.min('time').value.data
+
+    def getMax(self):
+        return self.dataset_interval.max('time').value.data
+
+    def setMask(self, location, crdict):
         '''
-        Retrieve Original Timeseries
+        Take a location object and the coordinate dictionary to create an
+        xarray for masking the dask datasets without pulling into memory.
+        
+        location = location from Location_Builder
+        crdict = coordinate dictionary
         '''
-        array_path = os.path.join(data_path,
-                                  "data/droughtindices/netcdfs/",
-                                  self.choice + '.nc')
-        arrays = self.getData(array_path)
-        if len(arrays.time) != 0:
-            limits = [abs(arrays.value.min().compute().values),
-                      abs(arrays.value.max().compute().values)]
+        # Get x, y coordinates from location
+        flag, y, x, label, idx = location
+        mask = crdict.grid.copy()
+
+        # Create mask array
+        if flag != 'all':
+            y = json.loads(y)
+            x = json.loads(x)
+            gridids = crdict.grid[y, x]
+            mask[~np.isin(crdict.grid, gridids)] = np.nan
+            mask = mask * 0 + 1
         else:
-            limits = [0, 0]
-        dmax = max(limits)  # Makes an even graph
-        dmin = dmax * -1
+            mask = mask * 0 + 1
 
-        return [arrays, dmin, dmax]
+        # Set up grid info from coordinate dictionary
+        geom = crdict.source.transform
+        nlat, nlon = mask.shape   
+        lons = np.arange(nlon) * geom[1] + geom[0]
+        lats = np.arange(nlat) * geom[5] + geom[3]
 
-    def getPercentile(self):
+        # Create mask xarray
+        xmask = xr.DataArray(mask,
+                             coords={'lat': lats,
+                                     'lon': lons},
+                             dims={'lat': len(lats),
+                                   'lon': len(lons)})
+        self.mask = xmask
+
+    def getSeries(self, location, crdict):
         '''
-        Retrieve Percentiles of Original Timeseries
+        This uses the mask to get a monthly time series of values at a
+        specified location.
         '''
-        array_path = os.path.join(data_path,
-                                  "data/droughtindices/netcdfs/percentiles",
-                                  self.choice + '.nc')
-        arrays = self.getData(array_path)
-        if len(arrays.time) != 0:
-            arrays.value.data = arrays.value.data * 100
+        # Get filtered dataset
+        data = self.dataset_interval
 
-            # We want the color scale to be centered on 50, first get max/min
-            dmax = arrays.value.max().compute().values
-            dmin = arrays.value.min().compute().values
+        # Get the location coordinates
+        flag, y, x, label, idx = location
+
+        # Filter if needed and generate timeseries
+        if flag == 'all':
+            timeseries = data.mean(dim=('lat', 'lon'))
+            timeseries = timeseries.value.values
         else:
-            dmax = 0
-            dmin = 0
+            y = json.loads(y)
+            x = json.loads(x)
+            if flag == 'grid':
+                timeseries = data.value[:, y, x].values
+            else:
+                self.setMask(location, crdict)
+                data = data.where(self.mask == 1)
+                timeseries = data.mean(dim=('lat', 'lon'))
+                timeseries = timeseries.value.values
 
-        # The maximum distance from 50
-        delta = max([dmax - 50, 50 - dmin])
+        # # If we are sending the output to the drought area function
+        # if reproject:
+        #     data = wgsToAlbers(data, crdict, albers_source)
+    
+        # print("Area fitlering complete.")
+        return timeseries, label
 
-        # The same distance above and below 50
-        dmin = 50 - delta
-        dmax = 50 + delta
+    def getCorr(self, location):
+        return []
 
-        return [arrays, dmin, dmax]
-
-    # def calculateCV(arraylist):
-    #     '''
-    #      A single array showing the distribution of coefficients of variation
-    #          throughout the time period represented by the chosen rasters
-    #     '''
-    #     # is it a named list or not?
-    #     if type(arraylist[0]) is list:
-    #         # Get just the arrays from this
-    #         arraylist = [a[1] for a in arraylist]
-    #     else:
-    #         arraylist = arraylist
-
-    #     # Adjust for outliers
-    #     sd = np.nanstd(arraylist)
-    #     thresholds = [-3*sd, 3*sd]
-    #     for a in arraylist:
-    #         a[a <= thresholds[0]] = thresholds[0]
-    #         a[a >= thresholds[1]] = thresholds[1]
-
-    #     # Standardize Range
-    #     arraylist = standardize(arraylist)
-
-    #     # Simple Cellwise calculation of variance
-    #     sds = np.nanstd(arraylist, axis=0)
-    #     avs = np.nanmean(arraylist, axis=0)
-    #     covs = sds/avs
-
-    #     return covs
-
-    def meanOriginal(self):
+    def getFunction(self, function):
         '''
-        Calculate mean of original index values
+        To choose which function to return using a string from a dropdown app. 
         '''
-        # Get time series of values
-        [arrays, dmin, dmax] = self.getOriginal()
-
-        # Get data
-        array = arrays.mean('time').value.data
-
-        # Get color scale
-        colorscale = self.setColor(default='original')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-
-        return [array, arrays, colorscale, dmax, dmin, reverse]
-
-    def maxOriginal(self):
-        '''
-        Calculate max of original index values
-        '''
-        # Get time series of values
-        [arrays, dmin, dmax] = self.getOriginal()
-
-        # Get data
-        array = arrays.max('time').value.data
-
-        # Get color scale
-        colorscale = self.setColor(default='original')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-
-        return [array, arrays, colorscale, dmax, dmin, reverse]
-
-    def minOriginal(self):
-        '''
-        Calculate max of original index values
-        '''
-        # Get time series of values
-        [arrays, dmin, dmax] = self.getOriginal()
-
-        # Get data
-        array = arrays.min('time').value.data
-
-        # Get color scale
-        colorscale = self.setColor(default='original')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-        return [array, arrays, colorscale, dmax, dmin, reverse]
-
-    def meanPercentile(self):
-        '''
-        Calculate mean of percentiles of original index values
-        '''
-        # Get time series of values
-        [arrays, dmin, dmax] = self.getPercentile()
-
-        # Get data
-        array = arrays.mean('time').value.data
-
-        # Get color scale
-        colorscale = self.setColor(default='percentile')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-        return [array, arrays, colorscale, dmax, dmin, reverse]
-
-    def maxPercentile(self):
-        '''
-        Calculate mean of percentiles of original index values
-        '''
-         # Get time series of values
-        [arrays, dmin, dmax] = self.getPercentile()
-
-        # Get data
-        array = arrays.max('time').value.data
-
-        # Get color scale
-        colorscale = self.setColor(default='percentile')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-
-        return [array, arrays, colorscale, dmax, dmin, reverse]
-
-    def minPercentile(self):
-        '''
-        Calculate mean of percentiles of original index values
-        '''
-         # Get time series of values
-        [arrays, dmin, dmax] = self.getPercentile()
-
-        # Get data
-        array = arrays.min('time').value.data
-
-        # Get color scale
-        colorscale = self.setColor(default='percentile')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-
-        return [array, arrays, colorscale, dmax, dmin, reverse]
-
-    # def coefficientVariation(self):
-    #     '''
-    #     Calculate mean of percentiles of original index values
-    #     '''
-    #     # Get time series of values
-    #     [arrays, dmin, dmax] = self.getOriginal()
-
-    #     # Get data
-    #     arrays = indexlist.value.data
-    #     array = calculateCV(arrays)
-    #     dates = indexlist.time.data
-    #     del indexlist
-
-    #     # Get color scale
-    #     colorscale = self.setColor(default='cv')
-
-    #     # The colorscale will always mean the same thing
-    #     reverse = False
-
-    #     return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
-
-    def makeMap(self, function):
-        '''
-        To choose which function to return using a string from the app. 
-        '''
-        functions = {"omean": self.meanOriginal,
-                     "omax": self.maxOriginal,
-                     "omin": self.minOriginal,
-                     "pmean": self.meanPercentile,
-                     "pmax": self.maxPercentile,
-                     "pmin": self.minPercentile,
-                     # "ocv": self.coefficientVariation,
-                     "oarea": self.meanOriginal,
-                     "ocorr": self.meanOriginal,
-                     "pcorr": self.meanPercentile}
+        functions = {"omean": self.getMean,
+                     "omin": self.getMin,
+                     "omax": self.getMax,
+                     "pmean": self.getMean,
+                     "pmin": self.getMin,
+                     "pmax": self.getMax,
+                      # "oarea": self.getArea,
+                      # "ocorr": self.getCorr,
+                     }
         function = functions[function]
+
         return function()
 
 
@@ -1817,7 +1831,7 @@ class Location_Builder:
         if 'county' in trig_id:
             county = admin_df['place'][admin_df.fips == trig_val].unique()[0]
             y, x = np.where(county_array == trig_val)
-            location = ['county_id', str(list(y)), str(list(x)), county]
+            location = ['county', str(list(y)), str(list(x)), county]
 
         # 2: Selection is a single grid IDs
         elif 'clickData' in trig_id:
@@ -1829,7 +1843,7 @@ class Location_Builder:
             counties = admin_df['place'][admin_df.grid == gridid]
             county = counties.unique()
             label = county[0] + ' (Grid ' + str(int(gridid)) + ')'
-            location = ['grid_id',str(y), str(x), label]        
+            location = ['grid', str(y), str(x), label]        
 
         # 3: Selection is a set of grid IDs
         elif 'selectedData' in trig_id:
@@ -1852,7 +1866,7 @@ class Location_Builder:
                 SE = local_df['place'][
                     local_df['gradient'] == max(local_df['gradient'])].item()
                 label = NW + " to " + SE
-                location = ['grid_ids', str(y), str(x), label]        
+                location = ['grids', str(y), str(x), label]        
             else:
                 raise PreventUpdate
 
@@ -1860,15 +1874,15 @@ class Location_Builder:
         elif 'update' in trig_id:
             # Selection is the default 'all'
             if type(trig_val) is str:
-                location = ['state_mask', 'all', 'Contiguous United States']
+                location = ['all',  'y', 'x', 'Contiguous United States']
         
             # Empty list, default to CONUS
             elif len(trig_val) == 0:
-                location = ['state_mask', 'all', 'Contiguous United States']
+                location = ['all',  'y', 'x', 'Contiguous United States']
 
             # A selection of 'all' within a list
             elif len(trig_val) == 1 and trig_val[0] == 'all':
-                location = ['state_mask', 'all', 'Contiguous United States']
+                location = ['all',  'y', 'x', 'Contiguous United States']
 
             # Single or multiple, not 'all' or empty, state or list of states
             elif len(trig_val) >= 1:
@@ -1883,7 +1897,7 @@ class Location_Builder:
                 y, x = np.where(np.isin(state_array, trig_val))
 
                 # And return the location information
-                location = ['state_mask', str(list(y)), str(list(x)), states]
+                location = ['state', str(list(y)), str(list(x)), states]
 
         # 3: location is the basename of a shapefile saved as temp.shp
         elif 'shape' in trig_id:
@@ -1892,7 +1906,8 @@ class Location_Builder:
                 shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
                 shp[shp==-9999] = np.nan
                 y, x = np.where(~np.isnan(shp))
-                location = ['shape_mask', str(list(y)), str(list(x)), trig_val]
+                location = ['shape', str(list(y)), str(list(x)), trig_val]
             except:
-                location = ['state_mask', 'all', 'Contiguous United States']
+                location = ['all', 'y', 'x', 'Contiguous United States']
+
         return location

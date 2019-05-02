@@ -75,7 +75,10 @@ from functions import toNetCDF2, toNetCDFPercentile
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
-# Set up paths and urls
+# Get resolution from file call
+res = float(sys.argv[1])
+
+# In[] Set up paths and urls
 wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM' 
 local_path1 = os.path.join(data_path,
                           'data/droughtindices/netcdfs/wwdt/tifs')
@@ -123,7 +126,7 @@ print("############")
 print("#######################")
 print("#######################################")
 print("####################################################")
-print("\nRunning Get_WWDT.py:")
+print("\nRunning Get_WWDT.py using a " + str(res) + " degree resolution:\n")
 print(str(today) + '\n')
 
 ############ Get and Build Data Sets ########################################
@@ -212,9 +215,12 @@ for index in indices:
                         os.remove(out_path)
 
                     ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4326',
-                                   xRes=0.25, yRes=0.25,  # <------------------ maybe specify this in argv...with a default value of .25
+                                   xRes=res, yRes=res,  # <------------------ maybe specify this in argv...with a default value of .25
                                    outputBounds=[-130, 20, -55, 50])
                     del ds
+
+                    # Also create an alber's equal area projection
+                    # ...
 
                     # Open old data set
                     old = Dataset(nc_path, 'r+')
@@ -237,13 +243,16 @@ for index in indices:
                     values[n] = array
                     old.close()
 
+                    # Do the same to the alber's file
+                    # ...
+
                 # Now recreate the entire percentile data set
                 print('Reranking percentiles...')
                 pc_path = os.path.join(data_path,
                                      'data/droughtindices/netcdfs/percentiles',
                                      index_map[index] + '.nc')    
                 os.remove(pc_path)
-                toNetCDFPercentile(nc_path, pc_path)                    
+                toNetCDFPercentile(nc_path, pc_path) 
 
     else:
         ############## If we need to start over #######################
@@ -287,9 +296,12 @@ for index in indices:
                 os.remove(out_path)
 
             ds = gdal.Warp(out_path, source_path, format='GTiff',
-                           dstSRS='EPSG:4326', xRes=.25,
-                           yRes=.25, outputBounds=[-130, 20, -55, 50])
+                           dstSRS='EPSG:4326', xRes=res,
+                           yRes=res, outputBounds=[-130, 20, -55, 50])
             del ds
+
+            # Do the same for alber's
+            # ...
 
         # These are lists of all the temporary files
         tfiles = glob(os.path.join(local_path, 'tifs', 'temp_*[0-9]*.tif'))
@@ -312,6 +324,8 @@ for index in indices:
                                index_map[index] + '.nc')
         print("Calculating Percentiles...")
         toNetCDFPercentile(nc_path, pc_path)
+
+        # Now create the alber's netcdf (let's skip percentiles)
 
 print("Update Complete.")
 print("####################################################")

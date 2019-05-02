@@ -41,6 +41,9 @@ from functions import toNetCDF2, isInt, toNetCDFPercentile
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
+# Get resolution from file call
+res = float(sys.argv[1])
+
 # In[] Data source and target directory
 ftp_path = 'ftp://ftp.cdc.noaa.gov/Projects/EDDI/CONUS_archive/data'
 temp_folder = os.path.join(data_path, 'data/droughtindices/temps')
@@ -105,7 +108,7 @@ print("############")
 print("#######################")
 print("#######################################")
 print("####################################################")
-print("\nRunning Get_EDDI.py:")
+print("\nRunning Get_EDDI.py using a " + str(res) + " degree resolution:\n")
 print(str(today) + '\n')
 
 # In[] Get time series of currently available values
@@ -186,7 +189,7 @@ for index in indices:
                 # Resample each, working from disk
                 ds = gdal.Warp(tif_path, file_path,
                                dstSRS='EPSG:4326',
-                               xRes=0.25, yRes=0.25,
+                               xRes=res, yRes=res,
                                outputBounds=[-130, 20, -55, 50])
                 del ds
 
@@ -261,7 +264,7 @@ for index in indices:
             # Resample each, working from disk
             ds = gdal.Warp(tif_path, file_path,
                            dstSRS='EPSG:4326',
-                           xRes=0.25, yRes=0.25,
+                           xRes=res, yRes=res,
                            outputBounds=[-130, 20, -55, 50])
             del ds
 

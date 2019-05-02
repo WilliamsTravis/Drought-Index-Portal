@@ -54,6 +54,9 @@ from functions import toNetCDF2, isInt
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
+# Get resolution from file call
+res = float(sys.argv[1])
+
 # In[] Data Source and target directories
 ftp_path = 'ftp://ftp.cdc.noaa.gov/Projects/LERI/CONUS_archive/data/'
 temp_folder = os.path.join(data_path, 'data/droughtindices/temps')
@@ -92,7 +95,7 @@ print("############")
 print("#######################")
 print("#######################################")
 print("####################################################")
-print("\nRunning Get_LERI.py:")
+print("\nRunning Get_LERI.py using a " + str(res) + " degree resolution:\n")
 print(str(today) + '\n')
 
 # In[] Get time series of currently available values
@@ -162,7 +165,7 @@ for index in indices:
             # Resample each, working from disk
             ds = gdal.Warp(tif_path, file_path,
                            dstSRS='EPSG:4326',
-                           xRes=0.125, yRes=0.125,
+                           xRes=res, yRes=res,
                            outputBounds=[-130, 20, -55, 50])
             del ds
 
@@ -192,6 +195,8 @@ for index in indices:
                   index=index, year1=1980, month1=1, year2=todays_date.year,
                   month2=todays_date.month, epsg=4326, percentiles=True,
                   wmode='w')
+
+        # Let's also get albers projections (disk space is cheap right? :)
 
 # Close connection with FTP server
 ftp.quit()

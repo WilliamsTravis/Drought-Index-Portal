@@ -1540,6 +1540,7 @@ for i in range(1, 3):
                    State('function_choice', 'value')])
     def makeSeries(submit, signal, choice, choice_store,  location,
                    show_dsci, key, sync, function):
+        print(str(location))
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
 

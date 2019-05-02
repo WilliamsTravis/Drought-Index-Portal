@@ -9,12 +9,9 @@ Things to do:
             a) Read this: "https://dev.to/ice_lenor/modularization-and-
                            dependency-management-three-steps-to-better-code":
             b) Also this: "https://docs.python-guide.org/writing/structure/"
-            c) Create a separate module for each function, perhaps with the
-               function name as the key in a dictionary of functions?
             d) Within each function, determine the selection type (point,
-               multi-point, county, state, shapefile).
-            e) Decorate each of these with a profile function to find the
-               "memory bottlenecks" that Max mentioned.
+               multi-point, county, state, shapefile), rather than using if
+               statements.
 
     2) Also, less important, the styling needs help on two fronts:
             a) Move all styling to the css file for consistency and readability
@@ -52,6 +49,10 @@ Things to do:
              c) It would be more organized and possibly simpler to share data
                 with a GIS.
 
+    5) Fully integrate DASK. It turns out that xarray already uses dask and
+       was keeping much of the data on disk. Explicitly setting chunk sizes
+       seemed to help only slightly, and not at all for the correlation and
+       drought severity calcualtions (in memory numba and reprojection calls).
 
 Created on April 15th 2019
 
@@ -122,7 +123,7 @@ default_sample = 'spi1'
 default_1 = 'pdsi'
 default_2 = 'spei6'
 default_years = [2000, 2019]
-default_location = ['state_mask', 'all', 'Contiguous United States']
+default_location = ['all', 'y', 'x', 'Contiguous United States']
 
 # Default click before the first click for any map (might not be necessary)
 default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
@@ -692,15 +693,15 @@ app.layout = html.Div([
                     html.H3('Color Gradient'),
                     dcc.Tabs(
                       id='reverse',
-                      value='no',
+                      value=False,
                       style=tab_style,
                       children=[
-                        dcc.Tab(value='yes',
-                                label='Reversed',
+                        dcc.Tab(value=False,
+                                label="Not Reversed",
                                 style=tab_style,
                                 selected_style=tablet_style),
-                        dcc.Tab(value='no',
-                                label="Not Reversed",
+                        dcc.Tab(value=True,
+                                label='Reversed',
                                 style=tab_style,
                                 selected_style=tablet_style)]),
                     dcc.Dropdown(id='colors',
@@ -847,23 +848,24 @@ def retrieveData(signal, function, choice):
     and the colorscale.
     
     sample arguments:
-        signal = [[[2000, 2017], 1, 12, [ 4, 5, 6, 7]], 'Viridis', 'no']
+        signal = [[[2000, 2017], [1, 12], [ 4, 5, 6, 7]], 'Viridis', 'no']
         choice = 'pdsi'
         function = 'omean'
     '''
     # Retrieve signal elements
     time_data = signal[0]
     colorscale = signal[1]
-    reverse = signal[2]
 
-    # Retrieve data package
-    data = Index_Maps(time_data, colorscale, reverse, choice)
+    # Determine if it is percentiles or original values
+    if function[0] == 'o':
+        choice_type = 'original'
+    else:
+        choice_type = 'percentile'
 
-    # Choose which function with which to transform data
-    [array, arrays, colorscale, dmax, dmin, reverse] = data.makeMap(function)
-    dates = arrays.time.values
+    # Retrieve data package (how to only update time_data)
+    data = Index_Maps(choice, choice_type, time_data, colorscale)
 
-    return [array, arrays, dates, colorscale, dmax, dmin, reverse]
+    return data
 
 
 @cache2.memoize()
@@ -906,7 +908,8 @@ def submitSignal(click, colorscale, reverse, year_range, month1, month2,
     Collect and hide the options signal in the hidden 'signal' div.
     '''
     print(str(month_filter))
-    signal = [[year_range, month1, month2, month_filter], colorscale, reverse]
+    signal = [[year_range, [month1, month2], month_filter], colorscale,
+              reverse]
     return json.dumps(signal)
 
 
@@ -956,10 +959,11 @@ def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
                 sel_idx = locations.index(triggered_value)
         else:
             sel_idx = locations.index(triggered_value)
+
         selector = Location_Builder(trigger, triggered_value, crdict, admin_df,
                                     state_array, county_array)
         location = selector.chooseRecent()
-        if 'shape' in location [0] and location[3] is None:
+        if 'shape' in location[0] and location[3] is None:
             default_loc = copy.deepcopy(default_location)
             location = default_loc
         try:
@@ -1076,7 +1080,7 @@ for i in range(1, 3):
             tif = gdal.Translate('data/shapefiles/temp/temp.tif',
                                  'data/shapefiles/temp/temp1.tif',
                                  projWin=[-130, 50, -55, 20])
-            tif = None  # <---------------------------------------------------- Check if this is necessary
+            del tif
 
             return basename
 
@@ -1302,9 +1306,8 @@ for i in range(1, 3):
         on this.
         
         Sample arguments
-        location =  ['state_mask', 'all', 'Contiguous United States', 0]
-        
-        
+        location =  ['all', 'y', 'x', 'Contiguous United States', 0]
+
         '''
         # Prevent update from location unless it is a state or shape filter
         trig = dash.callback_context.triggered[0]['prop_id']
@@ -1323,7 +1326,7 @@ for i in range(1, 3):
 
         if 'reset_map' in trig:
             sel_idx = location[-1]
-            location = ['state_mask', 'all', 'Everything', sel_idx]
+            location = ['all', 'y', 'x', 'CONUS', sel_idx]
             if 'On' not in sync:
                 idx = int(key) - 1
                 if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
@@ -1331,23 +1334,12 @@ for i in range(1, 3):
 
         print("Rendering Map #{}".format(int(key)))
 
-        # Clear memory space
-        gc.collect()
-
         # Create signal for the global_store
         signal = json.loads(signal)
 
         # Collect signal elements
-        [[year_range, month1, month2, month_filter],
-         colorscale, reverse_override] = signal
-
-        # To create the map title, there are several conditions based on dates
-        year1 = year_range[0]
-        year2 = year_range[1]
-
-        # Stand in for correlation default coloring
-        if 'corr' in function:
-            cs = colorscale
+        [[year_range, [month1, month2], month_filter],
+         colorscale, reverse] = signal
 
         # Figure which choice is this panel's and which is the other
         key = int(key) - 1
@@ -1355,88 +1347,79 @@ for i in range(1, 3):
         choice = choices[key]
         choice2 = choices[~key]
 
-        # Get/cache data
-        [array, arrays, dates, colorscale,
-         dmax, dmin, reverse] = retrieveData(signal, function, choice)
+        # Get/cache data <----------------------------------------------------- Is this caching properly?
+        data = retrieveData(signal, function, choice)
 
-        # Pull array and dates into memory
-        array = array.compute()
+        # Pull array into memory
+        array = data.getFunction(function).compute()
 
         # Individual array min/max
         amax = np.nanmax(array)
         amin = np.nanmin(array)
 
-        # Now, we want to use the same  value range for colors
+        # Now, we want to use the same value range for colors for both maps
         if function == 'pmean':
             # Get the data for the other panel for its value range
-            comparison_package = retrieveData(signal, function, choice2)
-            array2 = comparison_package[0]
+            data2 = retrieveData(signal, function, choice2)
+            array2 = data2.getFunction(function).compute()
             amax2 = np.nanmax(array2)
             amin2 = np.nanmin(array2)        
             amax = np.nanmax([amax, amax2])        
             amin = np.nanmin([amin, amin2])
-            del comparison_package
+            del array2
+        else:
+            limit = np.nanmax([abs(amin), abs(amax)])
+            amax = limit
+            amin = limit * -1
 
-        # Experimenting with leri
+        # Experimenting with leri  # <----------------------------------------- Temporary
         if 'leri' in choice:
-            array[array < 0] = np.nan
             amin = 0
-            amax = np.nanmax(array)
+
+        # Eddi has an inverse scale
+        if 'eddi' in choice:
+            print("Reversing EDDI")
+            reverse = not reverse
+ 
+        # Filter for state filters
+        print("location: " + str(location))
+        flag, y, x, label, idx = location
+        if flag == 'state':
+            data.setMask(location, crdict)
+            array = array * data.mask
 
         # Get the right print statement for the date used
-        date_print = datePrint(year1, year2, month1, month2, month_filter,
-                               monthmarks)
+        date_print = datePrint(year_range[0], year_range[1], month1, month2,
+                               month_filter, monthmarks)
 
-        # Filter by x, y positions in location
-        # print("location: " + str(location))
-        flag = location[0]
-        if 'id' not in flag and flag != 'county_mask':
-            if location[1] != 'all' and 'corr' not in function:
-                flag, y, x, label, idx = location
-                y = np.array(json.loads(y))
-                x = np.array(json.loads(x))        
-                gridids = grid[y, x]
-                array[~np.isin(grid, gridids)] = np.nan
-
-        if 'corr' in function and location[1] != 'all':
-            flag, y, x, label, idx = location
+        # If it is a correlation recreate the array
+        if 'corr' in function and flag != 'all':
             y = np.array(json.loads(y))
             x = np.array(json.loads(x))        
             gridid = grid[y, x]
             if type(gridid) is np.ndarray:
-                gridid = [np.nanmin(gridid), np.nanmax(gridid)]
+                grids = [np.nanmin(gridid), np.nanmax(gridid)]
                 title = (indexnames[choice] + '<br>' +
                          function_names[function] + 'With Grids ' +
-                         str(int(gridid[0]))  + ' to ' + str(int(gridid[1])) +
+                         str(int(grids[0]))  + ' to ' + str(int(grids[1])) +
                          '  ('  + date_print + ')')
                 title_size = 15
             else:
                 title = (indexnames[choice] + '<br>' +
                          function_names[function] + 'With Grid ' +
-                         str(int(gridid))  + '  ('  + date_print+ ')')
+                         str(int(gridid))  + '  ('  + date_print + ')')
 
-            timeseries, arrays2, label = areaSeries(location, arrays, dates,
-                                                    mask, state_array,
-                                                    albers_source, crdict,
-                                                    reproject=False)
-
-            array = correlationField(timeseries, arrays.value.values)  # <----- Another area that should cause a memory spike I think
+            # This is the only map interaction that alters the map
+            timeseries, label = data.getSeries(location, crdict)
+            array = correlationField(timeseries, data.value.values)  # <------- Expected memory spike
             title_size = 20
         else:
             title = (indexnames[choice] + '<br>' + function_names[function] +
                      ': ' + date_print)
             title_size = 20
 
-        # There's a lot of colorscale switching in the default settings
-        if reverse_override == 'yes':
-            reverse = not reverse
-
         # Replace the source array with the data from above
         source.data[0] = array * mask
-
-        # Trying to free up space for more workers
-        del array
-        del arrays
 
         # Create a data frame of coordinates, index values, labels, etc
         dfs = xr.DataArray(source, name="data")
@@ -1456,43 +1439,11 @@ for i in range(1, 3):
         pdf = pd.merge(pdf, admin_df, how='inner')
         pdf['data'] = pdf['data'].astype(float)
         pdf['printdata'] = (pdf['place'] + " (grid: " + 
-                            pdf['grid'].apply(int).apply(str) + ")<br>      " + 
+                            pdf['grid'].apply(int).apply(str) + ")<br>     " + 
                             pdf['data'].round(3).apply(str))
 
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
-
-
-        # The y-axis depends on the chosen function
-        if 'p' in function and 'mean' in function:
-            # The maximum distance from 50
-            delta = max([amax - 50, 50 - amin])
-    
-            # The same distance above and below 50
-            amin = 50 - delta
-            amax = 50 + delta
-        # elif 'min' in function or 'max' in function:
-        #     amin = amin
-        #     amax = amax
-        elif 'o' in function and 'mean' in function and function != 'oarea':
-            if 'leri' in choice:
-                pass
-            else:
-                alimit = max([abs(amax), abs(amin)])
-                amax = alimit
-                amin = alimit * -1
-        elif function == 'oarea' and 'leri' not in choice:
-            alimit = max([abs(amax), abs(amin)])
-            amax = alimit
-            amin = alimit * -1
-            colorscale = RdWhBu
-        elif function == 'oarea' and 'leri' in choice:  # <-------------------- Leri's index values already appear to already be in percentile space
-            colorscale = RdWhBu
-        elif 'corr' in function:
-            amax = 1
-            amin = 0
-            if cs == 'Default':
-                colorscale = 'Viridis'
 
         # Create the scattermapbox object
         data = [dict(type='scattermapbox',
@@ -1502,7 +1453,7 @@ for i in range(1, 3):
                      mode='markers',
                      hoverinfo='text',
                      hovermode='closest',
-                     marker=dict(colorscale=colorscale,
+                     marker=dict(colorscale=data.color_scale,
                                  reversescale=reverse,
                                  color=df['data'],
                                  cmax=amax,
@@ -1526,6 +1477,9 @@ for i in range(1, 3):
         layout_copy['title'] = title
         figure = dict(data=data, layout=layout_copy)
 
+        # Clear memory space
+        gc.collect()
+
         # Check on Memory
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                         psutil.virtual_memory().percent))
@@ -1546,6 +1500,9 @@ for i in range(1, 3):
                    State('function_choice', 'value')])
     def makeSeries(submit, signal, choice, choice_store,  location,
                    show_dsci, key, sync, function):
+        '''
+        This makes the time series graph below the map.        
+        '''
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
@@ -1562,41 +1519,31 @@ for i in range(1, 3):
         signal = json.loads(signal)
 
         # Collect signals
-        [[year_range, month1, month2, month_filter],
-         colorscale, reverse_override] = signal
-
-        # Stand in for correlation default coloring
-        if 'corr' in function:
-            cs = colorscale
+        [[year_range, [month1, month2], 
+         month_filter], colorscale, reverse] = signal
 
         # Get/cache data
-        [array, arrays, dates, colorscale,
-         dmax, dmin, reverse] = retrieveData(signal, function, choice)
+        data = retrieveData(signal, function, choice)
+        dates = data.dataset_interval.time.values
+        dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
+        dmin = data.data_min
+        dmax = data.data_max
+        data.setMask(location, crdict)
 
         # Experimenting with LERI
-        if 'leri' in choice:  # <---------------------------------------------- Try a different method to avoid pulling into memory
-            arrays[arrays < 0] = np.nan  
+        if 'leri' in choice:  # <---------------------------------------------- Temporary
             dmin = 0
             dmax = 100
 
-        # There's a lot of color scale switching in the default settings...
-        # ...so sorry any one who's trying to figure this out
-        if reverse_override == 'yes':
-            reverse = not reverse
-
         # If the function is oarea, we plot five overlapping timeseries
         if function != 'oarea':
-            timeseries, arrays, label = areaSeries(location, arrays, dates,
-                                                   mask, state_array,
-                                                   albers_source, crdict,
-                                                   reproject=False)
+            # Get the time series from the data object
+            timeseries, label = data.getSeries(location, crdict)
 
             # Create data frame as string for download option
-            df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
-                        d in dates]
-            columns = OrderedDict({'month': df_dates,
+            columns = OrderedDict({'month': dates,
                                    'value': list(timeseries), 
-                                   'function': function_names[function],
+                                   'function': function_names[function],  # <-- This doesn't always make sense
                                    'location': location[-2],
                                    'index': indexnames[choice]})
             df = pd.DataFrame(columns)
@@ -1605,17 +1552,14 @@ for i in range(1, 3):
             bar_type = 'bar'
         else:
             bar_type = 'overlay'
-            if location[0] == 'grid_id':
-                location = ['state_mask', 'all',
+            if location[0] == 'grid':
+                location = ['all', 'y', 'x',
                     'Contiguous United States (point estimates not available)',
                     0]
-            timeseries, arrays, label = areaSeries(location, arrays, dates,
-                                                   mask, state_array,
-                                                   albers_source, crdict,
-                                                   reproject=True)
+            timeseries, label = data.getSeries(location, crdict)  # <---------- This won't work yet
 
             # ts_series, ts_series_ninc, dsci = retrieveAreaData(arrays, choice) # <------------ For caching later, when we have more space
-            ts_series, ts_series_ninc, dsci = droughtArea(arrays, choice)
+            ts_series, ts_series_ninc, dsci = droughtArea(arrays, choice)  # <- This won't work yet
 
             # Save to file for download option
             df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
@@ -1634,46 +1578,34 @@ for i in range(1, 3):
             df_str = df.to_csv(encoding='utf-8', index=False)
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
 
-        # Format dates
-        dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
+        # Set up y-axis depending on selection
+        if function != 'oarea':
+            if 'p' in function:
+                yaxis = dict(title='Percentiles', range=[0, 100])
+            elif 'o' in function:
+                yaxis = dict(range=[dmin, dmax], title='Index')
 
-        # The y-axis depends on the chosen function
-        if 'p' in function and function != 'oarea':
-            yaxis = dict(title='Percentiles',
-                         range=[0, 100])
-        elif 'o' in function and 'cv' not in function and function != 'oarea':
-            yaxis = dict(range=[dmin, dmax],
-                         title='Index')
-            xmask = xMask(mask, crdict)
-            sd = float(arrays.where(xmask == 1).std().compute().value.data)
-            if 'eddi' in choice:
-                sd = sd*-1
-            dmin = 3*sd
-            dmax = 3*sd*-1
-        elif 'min' in function or 'max' in function:
-            dmin = dmin
-            dmax = dmax
+                # Center the color scale
+                xmask = data.mask
+                sd = float(data.dataset_interval.where(xmask == 1).std().compute().value)
+                if 'eddi' in choice:
+                    sd = sd*-1
+                dmin = 3*sd
+                dmax = 3*sd*-1
+
+        # The drought area graphs have there own configuration
         elif function == 'oarea':
             yaxis = dict(title='Percent Area (%)',
-                          range=[0, 100],
-                          hovermode='y')
+                         range=[0, 100],
+                         hovermode='y')
 
-        if 'corr' in function:
-            if cs == 'Default':
-                colorscale = 'Viridis'
-                reverse=True
-
-        # Trying to free up space for more workers, does this do anything?
-        del array
-        del arrays
-
-        # Build the data dictionaries that plotly reads
+        # Build the plotly readable dictionaries (Two types)
         if function != 'oarea':
             data = [dict(type='bar',
                          x=dates,
                          y=timeseries,
                          marker=dict(color=timeseries,
-                                     colorscale=colorscale,
+                                     colorscale=data.color_scale,
                                      reversescale=reverse,
                                      autocolorscale=False,
                                      cmin=dmin,
@@ -1682,6 +1614,7 @@ for i in range(1, 3):
                                                color="#000000")))]
 
         else:
+            # The drought area data
             colors = ['rgb(255, 255, 0)','rgb(252, 211, 127)',
                       'rgb(255, 170, 0)', 'rgb(230, 0, 0)', 'rgb(115, 0, 0)']
             if year_range[0] != year_range[1]:
@@ -1699,6 +1632,8 @@ for i in range(1, 3):
                              hoverinfo='x',
                              fillcolor=colors[i])
                 data.append(trace)
+
+            # Toggle the DSCI
             if show_dsci % 2 != 0:
                 data.insert(5, dict(x=dates,
                                     y=dsci,
@@ -1720,7 +1655,7 @@ for i in range(1, 3):
         if function == 'oarea':
             if type(location[0]) is int:
                 layout_copy['title'] = (indexnames[choice] +
-                                        "<Br>" + 'Contiguous US ' +
+                                        '<Br>' + 'Contiguous US ' +
                                         '(point estimates not available)')
             layout_copy['xaxis'] = dict(type='date')
             layout_copy['yaxis2'] = dict(title='<br>DSCI',
@@ -1730,11 +1665,7 @@ for i in range(1, 3):
                                          side='right',
                                          position=0.15,
                                          font=dict(size=8))
-            layout_copy['margin'] = dict(l=55,
-                                         r=55,
-                                         b=25,
-                                         t=90,
-                                         pad=10)
+            layout_copy['margin'] = dict(l=55, r=55, b=25, t=90, pad=10)
         layout_copy['hovermode'] = 'x'
         layout_copy['barmode'] = bar_type
         layout_copy['legend'] = dict(orientation='h',
