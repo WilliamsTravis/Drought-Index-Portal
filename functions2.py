@@ -1679,7 +1679,7 @@ class Index_Maps():
                 timeseries = data.mean(dim=('lat', 'lon'))
                 timeseries = timeseries.value.values
 
-        print("Area fitlering complete.")
+        # print("Area fitlering complete.")
         return timeseries
 
     def getCorr(self, location, crdict):
@@ -1730,7 +1730,7 @@ class Index_Maps():
             arrays = arrays*-1
     
         # Drought Categories
-        print("calculating drought area...")
+        # print("calculating drought area...")
         drought_cats = {'sp': {0: [-0.5, -0.8],
                                1: [-0.8, -1.3],
                                2: [-1.3, -1.5],
@@ -1782,7 +1782,7 @@ class Index_Maps():
                            i in range(len(values))])
             return ps
     
-        print("starting offending loops...")
+        # print("starting offending loops...")
         pnincs = np.array([filter(arrays, cats[i]) for i in range(5)])
         DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
         pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]

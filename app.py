@@ -280,7 +280,7 @@ with xr.open_dataset(
 min_date = sample_nc.time.data[0]
 max_date = sample_nc.time.data[-1]
 max_year = pd.Timestamp(max_date).year
-min_year = pd.Timestamp(min_date).year
+min_year = pd.Timestamp(min_date).year + 1  # SPEI/SPI don't start on january
 max_month = pd.Timestamp(max_date).month
 
 # Get spatial dimensions from the sample data set above
@@ -907,7 +907,7 @@ def submitSignal(click, colorscale, reverse, year_range, month1, month2,
     '''
     Collect and hide the options signal in the hidden 'signal' div.
     '''
-    print(str(month_filter))
+    # print(str(month_filter))
     signal = [[year_range, month1, month2, month_filter], colorscale, reverse]
     return json.dumps(signal)
 
@@ -1540,7 +1540,7 @@ for i in range(1, 3):
                    State('function_choice', 'value')])
     def makeSeries(submit, signal, choice, choice_store,  location,
                    show_dsci, key, sync, function):
-        print(str(location))
+        # print(str(location))
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
 

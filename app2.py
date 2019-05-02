@@ -279,7 +279,7 @@ with xr.open_dataset(
     max_date = data.time.data[-1]
     resolution = data.crs.GeoTransform[1]
 max_year = pd.Timestamp(max_date).year
-min_year = pd.Timestamp(min_date).year
+min_year = pd.Timestamp(min_date).year + 1  # SPEI/SPI don't start on january
 max_month = pd.Timestamp(max_date).month
 
 # Get spatial dimensions from the sample data set above
@@ -1533,7 +1533,7 @@ for i in range(1, 3):
         # Reset Everything
         if 'reset_map' in trig:
             sel_idx = location[-1]
-            location = ['all', 'y', 'x', 'CONUS', sel_idx]
+            location = ['all', 'y', 'x', 'Contiguous United States', sel_idx]
             if 'On' not in sync:
                 idx = int(key) - 1
                 if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
