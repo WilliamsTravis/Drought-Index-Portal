@@ -908,7 +908,7 @@ def submitSignal(click, colorscale, reverse, year_range, month1, month2,
     '''
     Collect and hide the options signal in the hidden 'signal' div.
     '''
-    print(str(month_filter))
+    # print(str(month_filter))
     signal = [[year_range, [month1, month2], month_filter], colorscale,
               reverse]
     return json.dumps(signal)
@@ -1386,11 +1386,16 @@ for i in range(1, 3):
             reverse = not reverse
  
         # Filter for state filters
-        print("location: " + str(location))
+        # print("location: " + str(location))
         flag, y, x, label, idx = location
         if flag == 'state':
             data.setMask(location, crdict)
             array = array * data.mask
+        elif flag == 'shape':
+            y = np.array(json.loads(y))
+            x = np.array(json.loads(x))        
+            gridids = grid[y, x]
+            array[~np.isin(grid, gridids)] = np.nan
 
         # Get the right print statement for the date used
         date_print = datePrint(year_range[0], year_range[1], month1, month2,
@@ -1498,12 +1503,14 @@ for i in range(1, 3):
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children'),
                    Input('location_store', 'children'),
-                   Input('dsci_button_{}'.format(i), 'n_clicks')],
+                   Input('dsci_button_{}'.format(i), 'n_clicks'),
+                   Input('reset_map_1', 'n_clicks'),
+                   Input('reset_map_2', 'n_clicks')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
                    State('function_choice', 'value')])
-    def makeSeries(submit, signal, choice, choice_store,  location,
-                   show_dsci, key, sync, function):
+    def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
+                   reset1, reset2, key, sync, function):
         '''
         This makes the time series graph below the map.  
         
@@ -1518,6 +1525,15 @@ for i in range(1, 3):
         # Check which element the selection came from
         if trig == 'location_store.children':
             sel_idx = location[-1]
+            if 'On' not in sync:
+                idx = int(key) - 1
+                if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
+                    raise PreventUpdate
+
+        # Reset Everything
+        if 'reset_map' in trig:
+            sel_idx = location[-1]
+            location = ['all', 'y', 'x', 'CONUS', sel_idx]
             if 'On' not in sync:
                 idx = int(key) - 1
                 if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
