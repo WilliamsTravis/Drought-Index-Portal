@@ -66,86 +66,7 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
 
 
 # In[]: Functions
-def xMask(array, crdict):
-    '''
-    Take a simple numpy array with the coordinate dictionary and create an
-    xarray for masking the dask datasets without pulling into memory.
-    '''
-    geom = crdict.source.transform
-    nlat, nlon = array.shape   
-    lons = np.arange(nlon) * geom[1] + geom[0]
-    lats = np.arange(nlat) * geom[5] + geom[3]
-    mask = xr.DataArray(array,
-                        coords={'lat': lats,
-                                'lon': lons},
-                        dims={'lat': len(lats),
-                              'lon': len(lons)})
-    return mask
 
-def areaSeries(location, arrays, dates, mask, state_array, albers_source,
-               crdict, reproject=False):
-    '''
-    location = list output from app.callback function 'locationPicker'
-    arrays = a time series of arrays falling into each of 5 drought categories
-    inclusive = whether or to categorize drought by including all categories
-    '''
-    if len(location) > 4:
-        flag, y, x, label, idx = location
-        y = json.loads(y)
-        x = json.loads(x)
-        if type(y) is not list:
-            timeseries = arrays.value[:, y, x].values
-        else:
-            gridids = crdict.grid[y, x]
-            area_mask = crdict.grid.copy()
-            area_mask[~np.isin(crdict.grid, gridids)] = np.nan
-            area_mask = area_mask * 0 + 1
-            xmask = xMask(area_mask, crdict)
-            arrays = arrays.where(xmask == 1)
-            timeseries = arrays.mean(dim=('lat', 'lon'))
-            timeseries = timeseries.value.values
-
-    else:
-        flag, states, label, idx = location
-        timeseries = arrays.mean(dim=('lat', 'lon'))  # <-- Here, we only want to pull a single number for each time step into memory
-        timeseries = timeseries.value.values
-
-    # If we are sending the output to the drought area function
-    if reproject:
-        arrays = wgsToAlbers(arrays, crdict, albers_source)
-
-    # print("Area fitlering complete.")
-    return [timeseries, arrays, label]
-
-
-def calculateCV(indexlist):
-    '''
-     A single array showing the distribution of coefficients of variation
-         throughout the time period represented by the chosen rasters
-    '''
-    # is it a named list or not?
-    if type(indexlist[0]) is list:
-        # Get just the arrays from this
-        indexlist = [a[1] for a in indexlist]
-    else:
-        indexlist = indexlist
-
-    # Adjust for outliers
-    sd = np.nanstd(indexlist)
-    thresholds = [-3*sd, 3*sd]
-    for a in indexlist:
-        a[a <= thresholds[0]] = thresholds[0]
-        a[a >= thresholds[1]] = thresholds[1]
-
-    # Standardize Range
-    indexlist = standardize(indexlist)
-
-    # Simple Cellwise calculation of variance
-    sds = np.nanstd(indexlist, axis=0)
-    avs = np.nanmean(indexlist, axis=0)
-    covs = sds/avs
-
-    return covs
 
 
 @jit(nopython=True)
@@ -1646,14 +1567,15 @@ class Index_Maps():
                              [0.90, 'rgb(1,102,94)'],
                              [1.00, 'rgb(0, 73, 68)']]}
 
+        # Default color schemes
+        defaults = {'percentile': options['RdWhBu'],
+                    'original':  options['BrGn'],
+                    'area': options['RdWhBu'],
+                    'correlation_o': 'Viridis',
+                    'correlation_p': 'Viridis'}
+
         if value == 'Default':
-            if self.choice_type == 'percentile':
-                scale = options['RdWhBu']
-            else:
-                scale = options['BrGn']
-            # elif self.choice_type == 'correlation':
-            #     scale = 'Viridis'
-                # self.reverse = self.reverse * -1
+            scale = defaults[self.choice_type]
         else:
             scale = options[value]
 
@@ -1667,6 +1589,10 @@ class Index_Maps():
         '''
         # There are three types of datsets
         type_paths = {'original': 'data/droughtindices/netcdfs/',
+                      'area': 'data/droughtindices/netcdfs/',
+                      'correlation_o': 'data/droughtindices/netcdfs/',
+                      'correlation_p':
+                          'data/droughtindices/netcdfs/percentiles',
                       'percentile': 'data/droughtindices/netcdfs/percentiles',
                       'projected': 'data/droughtindices/netcdfs/albers'}
 
@@ -1681,15 +1607,6 @@ class Index_Maps():
 
         # Set this as an attribute for easy retrieval
         self.dataset = dataset
-
-    def getMean(self):
-        return self.dataset_interval.mean('time').value.data
-
-    def getMin(self):
-        return self.dataset_interval.min('time').value.data
-
-    def getMax(self):
-        return self.dataset_interval.max('time').value.data
 
     def setMask(self, location, crdict):
         '''
@@ -1727,6 +1644,15 @@ class Index_Maps():
                                    'lon': len(lons)})
         self.mask = xmask
 
+    def getMean(self):
+        return self.dataset_interval.mean('time').value.data
+
+    def getMin(self):
+        return self.dataset_interval.min('time').value.data
+
+    def getMax(self):
+        return self.dataset_interval.max('time').value.data
+
     def getSeries(self, location, crdict):
         '''
         This uses the mask to get a monthly time series of values at a
@@ -1753,15 +1679,116 @@ class Index_Maps():
                 timeseries = data.mean(dim=('lat', 'lon'))
                 timeseries = timeseries.value.values
 
-        # # If we are sending the output to the drought area function
-        # if reproject:
-        #     data = wgsToAlbers(data, crdict, albers_source)
-    
-        # print("Area fitlering complete.")
-        return timeseries, label
+        print("Area fitlering complete.")
+        return timeseries
 
-    def getCorr(self, location):
-        return []
+    def getCorr(self, location, crdict):
+        '''
+        Create a field of pearson's correlation coefficients with any one
+        selection.
+        '''
+        ts = self.getSeries(location, crdict)
+        arrays = self.dataset_interval.value.values
+
+        @jit(nopython=True)
+        def correlationField(ts, arrays):
+            '''
+            Create a 2d array of pearson correlation coefficient between the time
+            series at the location of the grid id and every other grid in a 3d array
+            '''
+            # Apply that to each cell
+            one_field = np.zeros((arrays.shape[1], arrays.shape[2]))
+            for i in range(arrays.shape[1]):
+                for j in range(arrays.shape[2]):
+                    lst = arrays[:, i, j]
+                    cor = np.corrcoef(ts, lst)[0,1]
+                    one_field[i, j] = cor
+            return one_field
+
+        one_field = correlationField(ts, arrays)
+
+        return one_field
+
+    def getArea(self, crdict, albers_source):
+        '''
+        This will take in a time series of arrays and a drought severity
+        category and mask out all cells with values above or below the category
+        thresholds. If inclusive is 'True' it will only mask out all cells that
+        fall above the chosen category.
+    
+        For now this requires original values, percentiles even out too quickly
+        '''
+        # Specify choice in case it needs to be inverse for eddi
+        choice = self.choice
+
+        # Filter data by the mask (should be set already)
+        arrays = self.dataset_interval.where(self.mask == 1)
+        arrays = wgsToAlbers(arrays, crdict, albers_source)  # <--------------- Memory spike
+
+        # Flip if this is EDDI
+        if 'eddi' in choice:
+            arrays = arrays*-1
+    
+        # Drought Categories
+        print("calculating drought area...")
+        drought_cats = {'sp': {0: [-0.5, -0.8],
+                               1: [-0.8, -1.3],
+                               2: [-1.3, -1.5],
+                               3: [-1.5, -2.0],
+                               4: [-2.0, -999]},
+                        'eddi': {0: [-0.5, -0.8],
+                                 1: [-0.8, -1.3],
+                                 2: [-1.3, -1.5],
+                                 3: [-1.5, -2.0],
+                                 4: [-2.0, -999]},
+                        'pdsi': {0: [-1.0, -2.0],
+                                 1: [-2.0, -3.0],
+                                 2: [-3.0, -4.0],
+                                 3: [-4.0, -5.0],
+                                 4: [-5.0, -999]},
+                        'leri': {0: [30, 20],
+                                 1: [20, 10],
+                                 2: [10, 5],
+                                 3: [5, 2],
+                                 4: [2, 0]}}
+    
+        # Choose a set of categories
+        cat_key = [key for key in drought_cats.keys() if key in choice][0]
+        cats = drought_cats[cat_key]
+    
+        def singleFilter(array, d, inclusive=False):
+            '''
+            There is some question about the Drought Severity Coverage Index. The
+            NDMC does not use inclusive drought categories though NIDIS appeared to
+            in the "Historical Character of US Northern Great Plains Drought"
+            study. In an effort to match NIDIS' sample chart, we are using the
+            inclusive method for now. It would be fine either way as long as the
+            index is compared to other values with the same calculation, but we
+            should really defer to NDMC. We could also add an option to display
+            inclusive vs non-inclusive drought severity coverages.
+            '''
+            if inclusive:
+                mask = array<d[0]
+            else:
+                mask = (array<d[0]) & (array>=d[1])
+            return array[mask]
+    
+        # For each array
+        def filter(arrays, d, inclusive=False):
+            values = np.array([singleFilter(a, d, inclusive=inclusive) for
+                                a in arrays])
+            totals = [len(a[~np.isnan(a)]) for a in arrays]  # <------------------- Because the available area for LERI changes, this adjusts the total area for each time step
+            ps = np.array([(len(values[i])/totals[i]) * 100 for
+                           i in range(len(values))])
+            return ps
+    
+        print("starting offending loops...")
+        pnincs = np.array([filter(arrays, cats[i]) for i in range(5)])
+        DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
+        pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]
+    
+        # Return the list of five layers
+        return pincs, pnincs, DSCI
 
     def getFunction(self, function):
         '''
@@ -1773,8 +1800,8 @@ class Index_Maps():
                      "pmean": self.getMean,
                      "pmin": self.getMin,
                      "pmax": self.getMax,
-                      # "oarea": self.getArea,
-                      # "ocorr": self.getCorr,
+                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now
+                     "ocorr": self.getMean
                      }
         function = functions[function]
 

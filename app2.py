@@ -22,13 +22,13 @@ Things to do:
 
     3) The correlation function is new and simple. It would be good to talk
        with the team about what would be most useful. I think it would be neat
-       to express a time series of the ranges of covariance when a point is
+       to express the time series as ranges of covariance from where a point is
        clicked. That would mean fitting a model of semivariance to each
        selection in projected space and would likely require more computing
        than any other part of the app, but it could be done. If there are non-
        parametric ways of doing this we could skip the model fitting step. Or,
        if one model does generally well with each index and location we could
-       use established shapes. Myself, I would just use the average distance to
+       use established shapes. We could just use the average distance to
        a specific threshold correlation coefficient (eg. 500 km to 0.5). We
        are, however, just now learning of non-linear dependence...this might be
        a future addition.
@@ -45,7 +45,7 @@ Things to do:
                 the very least, it would not require all of the
                 transformations.
              b) It is possible that spatial querying could be done faster
-                through PostGIS.
+                through PostGIS?
              c) It would be more organized and possibly simpler to share data
                 with a GIS.
 
@@ -94,9 +94,8 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions and classes
-from functions2 import Admin_Elements, areaSeries, correlationField, datePrint
-from functions2 import droughtArea, Index_Maps, Location_Builder
-from functions2 import shapeReproject, xMask
+from functions2 import Admin_Elements, correlationField, datePrint, droughtArea
+from functions2 import Index_Maps, Location_Builder, shapeReproject
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -107,16 +106,18 @@ else:
 # What to do with the mean of empty slice warning?
 warnings.filterwarnings("ignore")
 
-######################## Default Values #######################################
+# In[] Default Values
 # For testing
-source_signal = [[[2000, 2017], 1, 12,
-                  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 'Viridis', 'no']
+source_signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
 source_choice = 'pdsi'
 source_function = 'pmean'
+source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
+                   '[243, 242, 243, 244, 241, 242, 243, 244]',
+                   'Aroostook County, ME to Aroostook County, ME', 2]
 
 # Initializing Values
 default_function = 'pmean'
-default_sample = 'leri1'
+default_sample = 'leri1'  # Move these down to experiment with "high" res
 default_1 = 'leri1'
 default_2 = 'leri3'
 default_sample = 'spi1'
@@ -167,7 +168,7 @@ cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
 cache.init_app(server)
 cache2.init_app(server)
 
-####################### Options ###############################################
+# In[] Interface Options
 # Drought Index Options
 indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'PDSI-Self Calibrated', 'value': 'pdsisc'},
@@ -218,7 +219,6 @@ function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
 function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Maximum', 'value': 'omax'},
                          {'label': 'Minimum', 'value': 'omin'},
-                    # {'label': 'Coefficient of Variation', 'value': 'ocv'},
                          {'label': 'Drought Severity Area', 'value':'oarea'},
                          {'label': 'Correlation', 'value': 'ocorr'}]
 
@@ -228,12 +228,11 @@ function_names = {'pmean': 'Average Percentiles',
                   'omean': 'Average Index Values',
                   'omax': 'Maximum Index Values',
                   'omin': 'Minimum Index Values',
-                  # 'ocv': 'Coefficient of Variation',
                   'oarea': 'Average Index Values',
                   'pcorr': "Pearson's Correlation ",
                   'ocorr': "Pearson's Correlation "}
 
-# County Data Frame and options
+# County data frame and options
 counties_df = pd.read_csv('data/tables/unique_counties.csv')
 rows = [r for idx, r in counties_df.iterrows()]
 county_options = [{'label': r['place'], 'value': r['fips']} for r in rows]
@@ -243,7 +242,7 @@ label_pos = {county_options[i]['label']: i for i in range(len(county_options))}
 # State options
 states_df = pd.read_table('data/tables/state_fips.txt', sep='|')
 states_df = states_df.sort_values('STUSAB')
-nconus = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']  # <----------- I'm reading a book about how we ignore most of these (D:). In the future we'll have to include them.
+nconus = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']  # <----------- I'm reading a book about how we ignore most of these D: ... In the future we'll have to include them.
 states_df = states_df[~states_df.STUSAB.isin(nconus)]
 rows = [r for idx, r in states_df.iterrows()]
 state_options = [{'label': r['STUSAB'], 'value': r['STATE']} for r in rows]
@@ -272,7 +271,7 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
           [0.70, 'rgb(12,164,235)'], [0.80, 'rgb(0,125,255)'],
           [0.90, 'rgb(10,55,166)'], [1.00, 'rgb(5,16,110)']]
 
-# Get time dimension from the first data set, assuming netcdfs are uniform
+# Get time dimensions from the first data set, assuming netcdfs are uniform
 with xr.open_dataset(
         os.path.join(data_path,
              'data/droughtindices/netcdfs/' + default_sample + '.nc')) as data:
@@ -288,7 +287,7 @@ admin = Admin_Elements(resolution)
 [state_array, county_array, grid, mask,
  source, albers_source, crdict, admin_df] = admin.getElements()
 
-# Create the date options
+# Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
 yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
@@ -306,7 +305,7 @@ for y in yearmarks:
     if y % 5 != 0:
         yearmarks[y] = ""
 
-################## Map Section ################################################
+# In[] Map Elements
 # Mapbox Access
 mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
                        'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
@@ -334,7 +333,7 @@ layout = dict(
         center=dict(lon=-95.7, lat=37.1),
         zoom=2))
 
-################### Temporary CSS Items #######################################
+# In[] Temporary CSS Items
 tab_height = '25px'
 tab_style = {'height': tab_height, 'padding': '0'}
 tablet_style = {'line-height': tab_height, 'padding': '0'}
@@ -352,11 +351,9 @@ on_button_style = {'background-color': '#C7D4EA',
 off_button_style =  {'background-color': '#a8b3c4',
                      'border-radius': '4px',
                      'font-family': 'Times New Roman'}
-###############################################################################
-
 
 # In[]: Application Structure
-# Create a Div maker
+# Dynamic Elements
 def divMaker(id_num, index='noaa'):
     div = html.Div([
             html.Div([
@@ -503,15 +500,15 @@ def divMaker(id_num, index='noaa'):
     return div
 
 
+# Static Elements
 app.layout = html.Div([
       html.Div([
 
          # Sponsers
          html.A(
            html.Img(
-             src=("https://github.com/WilliamsTravis/" +
-                  "Pasture-Rangeland-Forage/blob/master/" +
-                  "data/earthlab.png?raw=true"),
+             src=("https://github.com/WilliamsTravis/Pasture-Rangeland-" +
+                  "Forage/blob/master/data/earthlab.png?raw=true"),
              className='one columns',
              style={'height': '40',
                     'width': '100',
@@ -521,9 +518,8 @@ app.layout = html.Div([
              target="_blank"),
          html.A(
            html.Img(
-             src=('https://github.com/WilliamsTravis/Pasture-' +
-                  'Rangeland-Forage/blob/master/data/' +
-                  'wwa_logo2015.png?raw=true'),
+             src=('https://github.com/WilliamsTravis/Pasture-Rangeland-' +
+                  'Forage/blob/master/data/wwa_logo2015.png?raw=true'),
              className='one columns',
              style={'height': '50',
                     'width': '150',
@@ -533,9 +529,8 @@ app.layout = html.Div([
              target="_blank"),
          html.A(
            html.Img(
-             src=("https://github.com/WilliamsTravis/Pasture-" +
-                  "Rangeland-Forage/blob/master/data/" +
-                  "nidis.png?raw=true"),
+             src=("https://github.com/WilliamsTravis/Pasture-Rangeland-" +
+                  "Forage/blob/master/data/nidis.png?raw=true"),
              className='one columns',
              style={'height': '50',
                     'width': '200',
@@ -545,9 +540,8 @@ app.layout = html.Div([
              target="_blank"),
          html.A(
            html.Img(
-             src=("https://github.com/WilliamsTravis/Pasture-" +
-                  "Rangeland-Forage/blob/master/data/" +
-                  "cires.png?raw=true"),
+             src=("https://github.com/WilliamsTravis/Pasture-Rangeland-" +
+                  "Forage/blob/master/data/cires.png?raw=true"),
              className='one columns',
              style={'height': '50',
                     'width': '100',
@@ -730,7 +724,7 @@ app.layout = html.Div([
        # Break line
        html.Hr(),
 
-       # Four by Four Map Layout
+       # Two by two map layout
        # Row 1
        html.Div([divMaker(1, default_1), divMaker(2, default_2)],
                 className='row'),
@@ -739,6 +733,7 @@ app.layout = html.Div([
        html.Div(id='signal', style={'display': 'none'}),
        html.Div(id='location_store', style={'display': 'none'}),
        html.Div(id='choice_store', style={'display': 'none'})],
+
     className='ten columns offset-by-one')  # The end!
 
 
@@ -856,11 +851,17 @@ def retrieveData(signal, function, choice):
     time_data = signal[0]
     colorscale = signal[1]
 
-    # Determine if it is percentiles or original values
-    if function[0] == 'o':
-        choice_type = 'original'
-    else:
-        choice_type = 'percentile'
+    # Determine the choice_type based on function
+    choice_types = {'omean': 'original',
+                    'omin': 'original',
+                    'omax': 'original',
+                    'pmean': 'percentile',
+                    'pmin': 'percentile',
+                    'pmax': 'percentile',
+                    'oarea': 'area',
+                    'ocorr': 'correlation_o',
+                    'pcorr': 'correlation_p'}
+    choice_type = choice_types[function]
 
     # Retrieve data package (how to only update time_data)
     data = Index_Maps(choice, choice_type, time_data, colorscale)
@@ -929,12 +930,14 @@ def submitSignal(click, colorscale, reverse, year_range, month1, month2,
 def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
                    shape2, update1, update2, state1, state2):
         '''
-        With the context strategy it is still useful to have an independent
-        selection filter callback. Because there are many types of buttons and
-        clicks that could trigger a graph update we would have to work through
-        each input to check if it is a location. It's still much nicer than
-        setting up a dozen hidden divs, timing callbacks, and writing long
-        lines of logic to determine which was most recently updated.
+        The new context method allows us to select which input was most
+        recently changed. However, it is still necessary to have an
+        independent callback that identifies the most recent selection. Because
+        there are many types of buttons and clicks that could trigger a graph
+        update we would have to work through each input to check if it is a
+        location. It's still much nicer than setting up a dozen hidden divs,
+        timing callbacks, and writing long lines of logic to determine which
+        was most recently updated.
         '''
         # package the selections for indexing
         locations = [click1, click2, select1, select2, county1, county2,
@@ -1074,7 +1077,7 @@ for i in range(1, 3):
             # Rasterize
             src = 'data/shapefiles/temp/temp.shp'
             dst = 'data/shapefiles/temp/temp1.tif'
-            admin.rasterize(src, dst, attribute=attr, all_touch=False)  # <---- Disk space errors on Ubunutu machine, all touch not working.
+            admin.rasterize(src, dst, attribute=attr, all_touch=False)  # <---- All touch not working.
 
             # Cut to extent
             tif = gdal.Translate('data/shapefiles/temp/temp.tif',
@@ -1173,6 +1176,7 @@ for i in range(1, 3):
                 raise PreventUpdate
         else:
             children = None
+
         return children
 
 
@@ -1347,7 +1351,7 @@ for i in range(1, 3):
         choice = choices[key]
         choice2 = choices[~key]
 
-        # Get/cache data <----------------------------------------------------- Is this caching properly?
+        # Get/cache data <----------------------------------------------------- Is this caching properly with the Index_Maps object?
         data = retrieveData(signal, function, choice)
 
         # Pull array into memory
@@ -1376,7 +1380,7 @@ for i in range(1, 3):
         if 'leri' in choice:
             amin = 0
 
-        # Eddi has an inverse scale
+        # EDDI has an inverse scale
         if 'eddi' in choice:
             print("Reversing EDDI")
             reverse = not reverse
@@ -1392,11 +1396,13 @@ for i in range(1, 3):
         date_print = datePrint(year_range[0], year_range[1], month1, month2,
                                month_filter, monthmarks)
 
-        # If it is a correlation recreate the array
+        # If it is a correlation recreate the map array
         if 'corr' in function and flag != 'all':
             y = np.array(json.loads(y))
             x = np.array(json.loads(x))        
             gridid = grid[y, x]
+            amin = 0
+            amax = 1
             if type(gridid) is np.ndarray:
                 grids = [np.nanmin(gridid), np.nanmax(gridid)]
                 title = (indexnames[choice] + '<br>' +
@@ -1410,8 +1416,7 @@ for i in range(1, 3):
                          str(int(gridid))  + '  ('  + date_print + ')')
 
             # This is the only map interaction that alters the map
-            timeseries, label = data.getSeries(location, crdict)
-            array = correlationField(timeseries, data.value.values)  # <------- Expected memory spike
+            array = data.getCorr(location, crdict)  # <------------------------ Expected memory spike
             title_size = 20
         else:
             title = (indexnames[choice] + '<br>' + function_names[function] +
@@ -1441,7 +1446,6 @@ for i in range(1, 3):
         pdf['printdata'] = (pdf['place'] + " (grid: " + 
                             pdf['grid'].apply(int).apply(str) + ")<br>     " + 
                             pdf['data'].round(3).apply(str))
-
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
 
@@ -1501,7 +1505,12 @@ for i in range(1, 3):
     def makeSeries(submit, signal, choice, choice_store,  location,
                    show_dsci, key, sync, function):
         '''
-        This makes the time series graph below the map.        
+        This makes the time series graph below the map.  
+        
+        Smaple arguments:
+            signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
+            choice = 'pdsi'
+            function = 'oarea'
         '''
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
@@ -1536,9 +1545,10 @@ for i in range(1, 3):
             dmax = 100
 
         # If the function is oarea, we plot five overlapping timeseries
+        label = location[3]
         if function != 'oarea':
             # Get the time series from the data object
-            timeseries, label = data.getSeries(location, crdict)
+            timeseries = data.getSeries(location, crdict)
 
             # Create data frame as string for download option
             columns = OrderedDict({'month': dates,
@@ -1556,10 +1566,10 @@ for i in range(1, 3):
                 location = ['all', 'y', 'x',
                     'Contiguous United States (point estimates not available)',
                     0]
-            timeseries, label = data.getSeries(location, crdict)  # <---------- This won't work yet
 
             # ts_series, ts_series_ninc, dsci = retrieveAreaData(arrays, choice) # <------------ For caching later, when we have more space
-            ts_series, ts_series_ninc, dsci = droughtArea(arrays, choice)  # <- This won't work yet
+            ts_series, ts_series_ninc, dsci = data.getArea(crdict,
+                                                           albers_source)  # <- Temporary fix
 
             # Save to file for download option
             df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
@@ -1572,7 +1582,7 @@ for i in range(1, 3):
                                    'd4': list(ts_series_ninc[4]),
                                    'dsci': list(dsci),
                                    'function': 'Percent Area',
-                                   'location':  location[-2],
+                                   'location':  label,
                                    'index': indexnames[choice]})
             df = pd.DataFrame(columns)
             df_str = df.to_csv(encoding='utf-8', index=False)
@@ -1587,11 +1597,15 @@ for i in range(1, 3):
 
                 # Center the color scale
                 xmask = data.mask
-                sd = float(data.dataset_interval.where(xmask == 1).std().compute().value)
+                sd = float(data.dataset_interval.where(xmask == 1).std().compute().value) # Sheesh
                 if 'eddi' in choice:
                     sd = sd*-1
                 dmin = 3*sd
                 dmax = 3*sd*-1
+
+        # A few pieces to incorporate in to Index_Maps later
+        if 'corr' in function:
+            reverse = not reverse
 
         # The drought area graphs have there own configuration
         elif function == 'oarea':
