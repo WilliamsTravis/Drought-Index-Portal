@@ -2,7 +2,7 @@
 """
     Updating WWDT Data on a monthly basis.
 
-    Run this using crontab once a month this to pull netcdf files from the
+    Run this using crontab once a month to pull netcdf files from the
     WestWide Drought Tracker site, transform them to fit in the app, and either
     append them to an existing file, or build the data set from scratch. This
     also rebuilds each percentile netcdf entirely because those are rank based.
@@ -14,7 +14,7 @@
           coordinates at the grid center, which is different than previous
           geotiffs I created, however, the maps are rendered properly (point in
           lower left corner), and I believe that's because of the binning step.
-        - There appears to tbe a directory bug when starting over, but only for
+        - There appears to be a directory bug when starting over, but only for
           wwdt on the virtual machines...this may have been fixed, need to
           check.
         - There are a few ways to make this a little more efficient but I left
@@ -71,12 +71,15 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions import toNetCDF2, toNetCDFPercentile
+from functions2 import toNetCDF, toNetCDFAlbers, toNetCDFPercentile
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
 # Get resolution from file call
-res = float(sys.argv[1])
+try:
+    res = float(sys.argv[1])
+except:
+    res = 0.25
 
 # In[] Set up paths and urls
 wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM' 
@@ -90,6 +93,7 @@ if not os.path.exists(local_path):
 if not os.path.exists(local_path2):
     os.makedirs(local_path2)
 
+# I came up with a slightly differentset of acroynms
 indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3', 'spei6',
            'pdsi', 'scpdsi', 'pzi']
 local_indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3',
@@ -135,6 +139,9 @@ for index in indices:
     nc_path = os.path.join(data_path,
                            'data/droughtindices/netcdfs/',
                            index_map[index] + '.nc')
+    nc_proj_path = os.path.join(data_path,
+                                'data/droughtindices/netcdfs/albers/',
+                                index_map[index] + '.nc')
     wwdt_index_url = wwdt_url + '/' + index
 
     if os.path.exists(nc_path):  # Create a netcdf and append to file
@@ -215,17 +222,27 @@ for index in indices:
                         os.remove(out_path)
 
                     ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4326',
-                                   xRes=res, yRes=res,  # <------------------ maybe specify this in argv...with a default value of .25
+                                   xRes=res, yRes=res,
                                    outputBounds=[-130, 20, -55, 50])
                     del ds
 
                     # Also create an alber's equal area projection
-                    # ...
+                    source_path = out_path
+                    out_path_p = os.path.join(local_path, 'proj_temp.tif')
+                    if os.path.exists(out_path):
+                        os.remove(out_path)
 
-                    # Open old data set
+                    ds = gdal.Warp(out_path_p, source_path,
+                                   dstSRS='EPSG:102008')
+                    del ds
+
+                    # Open old data sets
                     old = Dataset(nc_path, 'r+')
+                    old_p = Dataset(nc_proj_path, 'r+')
                     times = old.variables['time']
+                    times_p = old_p.variables['time']
                     values = old.variables['value']
+                    values_p = old_p.variables['value']
                     n = times.shape[0]
 
                     # Convert new date to days
@@ -235,16 +252,19 @@ for index in indices:
 
                     # Convert new data to array
                     base_data = gdal.Open(out_path)
+                    base_data_p = gdal.Open(out_path_p)
                     array = base_data.ReadAsArray()
+                    array_p = base_data_p.ReadAsArray()
                     del base_data
+                    del base_data_p
 
                     # Write changes to file and close
                     times[n] = days
+                    times_p[n] = days
                     values[n] = array
+                    values_p[n] = array_p
                     old.close()
-
-                    # Do the same to the alber's file
-                    # ...
+                    old_p.close()
 
                 # Now recreate the entire percentile data set
                 print('Reranking percentiles...')
@@ -286,7 +306,6 @@ for index in indices:
             # Get the original dates in the right format
             with xr.open_dataset(source_path) as data:
                 dates = data.day.data
-                data.close()
 
             # It is much easier to transform the files themselves
             out_path = os.path.join(local_path, 'tifs',
@@ -301,22 +320,33 @@ for index in indices:
             del ds
 
             # Do the same for alber's
-            # ...
+            source_path = out_path
+            out_path = os.path.join(local_path, 'tifs',
+                                    'proj_temp_{}.tif'.format(i))
+            ds = gdal.Warp(out_path, source_path, format='GTiff',
+                           dstSRS='EPSG:102008')
+            del ds
 
-        # These are lists of all the temporary files
+        # These are lists of all the temporary files, (1, 10, 11, 12, 2, 3,...)
         tfiles = glob(os.path.join(local_path, 'tifs', 'temp_*[0-9]*.tif'))
         tfiles.sort()
+        tfiles_proj = glob(os.path.join(local_path, 'tifs',
+                                        'proj_temp_*[0-9]*.tif'))
+        tfiles_proj.sort()
         ncfiles = glob(os.path.join(local_path, 'temp_*[0-9]*.nc'))
         ncfiles.sort()
 
-        # This is the target file - wwdt acronyms differ (and I'm not changing)
+        # This is the target file - wwdt acronyms differ
         nc_path = os.path.join(data_path, 'data/droughtindices/netcdfs/',
                                index_map[index] + '.nc')
+        nc_path_proj = os.path.join(data_path, 
+                                    'data/droughtindices/netcdfs/albers',
+                                    index_map[index] + '.nc')
 
         # This function smooshes everything into one netcdf file
-        toNetCDF2(tfiles, ncfiles, nc_path, index, epsg=4326, year1=1895,
-                  month1=1, year2=todays_date.year, month2=todays_date.month,
-                  wmode='w', percentiles=False)
+        toNetCDF(tfiles, ncfiles, nc_path, index, epsg=4326, year1=1895,
+                    month1=1, year2=todays_date.year, month2=todays_date.month,
+                    wmode='w', percentiles=False)
 
         # We are also including percentiles, so lets build another dataset
         pc_path = os.path.join(data_path,
@@ -325,7 +355,10 @@ for index in indices:
         print("Calculating Percentiles...")
         toNetCDFPercentile(nc_path, pc_path)
 
-        # Now create the alber's netcdf (let's skip percentiles)
+        # Now create the alber's netcdf
+        toNetCDFAlbers(tfiles_proj, ncfiles, nc_path, index, epsg=4326,
+                       year1=1895, month1=1, year2=todays_date.year,
+                       month2=todays_date.month, wmode='w', percentiles=False)
 
 print("Update Complete.")
 print("####################################################")

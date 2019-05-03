@@ -94,8 +94,8 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions and classes
-from functions2 import Admin_Elements, correlationField, datePrint, droughtArea
-from functions2 import Index_Maps, Location_Builder, shapeReproject
+from functions2 import Admin_Elements, datePrint, droughtArea, Index_Maps
+from functions2 import Location_Builder, shapeReproject
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -279,7 +279,7 @@ with xr.open_dataset(
     max_date = data.time.data[-1]
     resolution = data.crs.GeoTransform[1]
 max_year = pd.Timestamp(max_date).year
-min_year = pd.Timestamp(min_date).year + 1  # SPEI/SPI don't start on january
+min_year = pd.Timestamp(min_date).year
 max_month = pd.Timestamp(max_date).month
 
 # Get spatial dimensions from the sample data set above
@@ -289,7 +289,10 @@ admin = Admin_Elements(resolution)
 
 # Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
-yearmarks = dict(zip(years, years))
+{'label': '0°C', 'style': {'color': '#77b0b1'}}
+yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
+             y in years}        
+# yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
 monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',
@@ -301,7 +304,7 @@ monthoptions_full = [{'label': monthmarks_full[i], 'value': i} for
                       i in range(1, 13)]
 
 # Only display every 5 years for space
-for y in yearmarks:
+for y in years:
     if y % 5 != 0:
         yearmarks[y] = ""
 
@@ -612,7 +615,7 @@ app.layout = html.Div([
                                       updatemode='drag',
                                       marks=yearmarks)],
                       style={'margin-top': '0',
-                             'margin-bottom': '40'})]),
+                             'margin-bottom': '80'})]),
 
                   # Month Slider
                   html.Div(id='month_slider',

@@ -280,7 +280,7 @@ with xr.open_dataset(
 min_date = sample_nc.time.data[0]
 max_date = sample_nc.time.data[-1]
 max_year = pd.Timestamp(max_date).year
-min_year = pd.Timestamp(min_date).year + 1  # SPEI/SPI don't start on january
+min_year = pd.Timestamp(min_date).year
 max_month = pd.Timestamp(max_date).month
 
 # Get spatial dimensions from the sample data set above
