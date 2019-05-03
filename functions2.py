@@ -66,9 +66,6 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
 
 
 # In[]: Functions
-
-
-
 @jit(nopython=True)
 def correlationField(ts, arrays):
     '''
@@ -80,9 +77,8 @@ def correlationField(ts, arrays):
     for i in range(arrays.shape[1]):
         for j in range(arrays.shape[2]):
             lst = arrays[:, i, j]
-            cor = np.corrcoef(ts, lst)[0,1]
+            cor = np.corrcoef(ts, lst)[0, 1]
             one_field[i, j] = cor
-
     return one_field
 
 
@@ -108,81 +104,6 @@ def datePrint(y1, y2, m1, m2, month_filter, monthmarks):
             letters = "".join([monthmarks[m][0] for m in month_filter])
             date_print =  '{}'.format(y1) + ' ' + letters
     return date_print
-
-
-def droughtArea(arrays, choice, inclusive=False):
-    '''
-    This will take in a time series of arrays and a drought severity
-    category and mask out all cells with values above or below the category
-    thresholds. If inclusive is 'True' it will only mask out all cells that
-    fall above the chosen category.
-
-    For now this requires original values, percentiles even out too quickly
-    '''
-    # Flip if this is EDDI
-    if 'eddi' in choice:
-        arrays = arrays*-1
-
-    # Drought Categories
-    # print("calculating drought area...")
-    drought_cats = {'sp': {0: [-0.5, -0.8],
-                           1: [-0.8, -1.3],
-                           2: [-1.3, -1.5],
-                           3: [-1.5, -2.0],
-                           4: [-2.0, -999]},
-                    'eddi': {0: [-0.5, -0.8],
-                             1: [-0.8, -1.3],
-                             2: [-1.3, -1.5],
-                             3: [-1.5, -2.0],
-                             4: [-2.0, -999]},
-                    'pdsi': {0: [-1.0, -2.0],
-                             1: [-2.0, -3.0],
-                             2: [-3.0, -4.0],
-                             3: [-4.0, -5.0],
-                             4: [-5.0, -999]},
-                    'leri': {0: [30, 20],
-                             1: [20, 10],
-                             2: [10, 5],
-                             3: [5, 2],
-                             4: [2, 0]}}
-
-    # Choose a set of categories
-    cat_key = [key for key in drought_cats.keys() if key in choice][0]
-    cats = drought_cats[cat_key]
-
-    def singleFilter(array, d, inclusive=False):
-        '''
-        There is some question about the Drought Severity Coverage Index. The
-        NDMC does not use inclusive drought categories though NIDIS appeared to
-        in the "Historical Character of US Northern Great Plains Drought"
-        study. In an effort to match NIDIS' sample chart, we are using the
-        inclusive method for now. It would be fine either way as long as the
-        index is compared to other values with the same calculation, but we
-        should really defer to NDMC. We could also add an option to display
-        inclusive vs non-inclusive drought severity coverages.
-        '''
-        if inclusive:
-            mask = array<d[0]
-        else:
-            mask = (array<d[0]) & (array>=d[1])
-        return array[mask]
-
-    # For each array
-    def filter(arrays, d, inclusive=False):
-        values = np.array([singleFilter(a, d, inclusive=inclusive) for
-                            a in arrays])
-        totals = [len(a[~np.isnan(a)]) for a in arrays]  # <------------------- Because the available area for LERI changes, this adjusts the total area for each time step
-        ps = np.array([(len(values[i])/totals[i]) * 100 for
-                       i in range(len(values))])
-        return ps
-
-    # print("starting offending loops...")
-    pnincs = np.array([filter(arrays, cats[i]) for i in range(5)])
-    DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-    pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]
-
-    # Return the list of five layers
-    return pincs, pnincs, DSCI
 
 
 def im(array):
@@ -407,7 +328,7 @@ def standardize(indexlist):
     return(standardizedlist)
 
 
-def toNetCDF(file, ncfile, savepath, index, epsg=4326, wmode='w'):
+def toNetCDFSingle(file, ncfile, savepath, index, epsg=4326, wmode='w'):
     '''
     Take an individual tif and either write or append to netcdf.
     '''
@@ -497,9 +418,8 @@ def toNetCDF(file, ncfile, savepath, index, epsg=4326, wmode='w'):
     nco.close()
 
 
-def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
-              year2, month2, epsg=4326, percentiles=False,
-              wmode='w'):
+def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
+             epsg=4326, percentiles=False, wmode='w'):
     '''
     Take multiple multiband netcdfs with unordered dates and multiple tiffs
     with desired geometries and write to a single netcdf as a single time
@@ -509,7 +429,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     from the file names.
 
     Test parameters for toNetCDF2
-        tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/*tif')
+        tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/temp*')
         ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/*nc')
         savepath = 'testing.nc'
         index = 'spi1'
@@ -528,6 +448,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     # Use one tif (one array) for spatial attributes
     data = gdal.Open(tfiles[0])
     geom = data.GetGeoTransform()
+    res = abs(geom[1])
     proj = data.GetProjection()
     array = data.ReadAsArray()
     if len(array.shape) == 3:
@@ -575,9 +496,10 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     # Global Attrs
     nco.title = title_map[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
-    nco.description = ('Monthly gridded data at 0.25 decimal degree' +
-                       ' (15 arc-minute resolution, calibrated to 1895-2010 ' +
-                       ' for the continental United States.'),
+    nco.description = ('Monthly gridded data at '+ str(res) + 
+                       'decimal degree (15 arc-minute resolution, ' +
+                       'calibrated to 1895-2010 for the continental ' +
+                       'United States.'),
     nco.original_author = 'John Abatzoglou - University of Idaho'
     nco.date = pd.to_datetime(str(today)).strftime('%Y-%m-%d')
     nco.projection = 'WGS 1984 EPSG: 4326'
@@ -618,6 +540,168 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     except Exception as e:
         print(str(e))
         # print('Combining data using filename dates...')
+        datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
+        dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
+                  d in datestrings]
+        deltas = [d - dt.datetime(1900, 1, 1) for d in dates]
+        days = np.array([d.days for d in deltas])
+        arrays = []
+        for t in tfiles:
+            data = gdal.Open(t)
+            array = data.ReadAsArray()
+            arrays.append(array)
+        arrays = np.array(arrays)
+
+    # Filter out dates
+    base = dt.datetime(1900, 1, 1)
+    start = dt.datetime(year1, month1, 1)
+    day1 = start - base
+    day1 = day1.days
+    end = dt.datetime(year2, month2, 1)
+    day2 = end - base
+    day2 = day2.days
+    idx = len(days) - len(days[np.where(days >= day1)])
+    idx2 = len(days[np.where(days < day2)])
+    days = days[idx:idx2]
+    arrays = arrays[idx:idx2]
+
+    # This allows the option to store the data as percentiles
+    if percentiles:
+        arrays[arrays==-9999] = np.nan
+        arrays = percentileArrays(arrays)
+
+    # Write - set this to write one or multiple
+    latitudes[:] = lats
+    longitudes[:] = lons
+    times[:] = days.astype(int)
+    variable[:, :, :] = arrays
+
+    # Done
+    nco.close()
+
+
+def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
+                      year2, month2, epsg=4326, percentiles=False, wmode='w'):
+    '''
+    This does the same as above but is specific to the north american
+    albers equal area conic projection
+
+    Test parameters for toNetCDF2
+        tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/proj*')
+        ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/temp_*[0-9]*.nc')
+        savepath = 'f:/data/droughtindices/netcdfs/wwdt/testing.nc'
+        index = 'spi1'
+        year1=1895
+        month1=1
+        year2=2019
+        month2=12
+        epsg=102008
+        percentiles=False
+        wmode='w'
+    '''
+    # For attributes
+    todays_date = dt.datetime.today()
+    today = np.datetime64(todays_date)
+
+    # Use one tif (one array) for spatial attributes
+    data = gdal.Open(tfiles[0])
+    geom = data.GetGeoTransform()
+    res = abs(geom[1])
+    proj = data.GetProjection()
+    array = data.ReadAsArray()
+    if len(array.shape) == 3:
+        ntime, nlat, nlon = np.shape(array)
+    else:
+        nlat, nlon = np.shape(array)
+    lons = np.arange(nlon) * geom[1] + geom[0]
+    lats = np.arange(nlat) * geom[5] + geom[3]
+    del data
+
+    # use osr for more spatial attributes
+    refs = osr.SpatialReference()
+    refs.ImportFromEPSG(epsg)
+
+    # Create Dataset
+    nco = Dataset(savepath, mode=wmode, format='NETCDF4')
+
+    # Dimensions
+    nco.createDimension('lat', nlat)
+    nco.createDimension('lon', nlon)
+    nco.createDimension('time', None)
+
+    # Variables
+    latitudes = nco.createVariable('lat',  'f4', ('lat',))
+    longitudes = nco.createVariable('lon',  'f4', ('lon',))
+    times = nco.createVariable('time', 'f8', ('time',))
+    variable = nco.createVariable('value', 'f4', ('time', 'lat', 'lon'),
+                                  fill_value=-9999)
+    variable.standard_name = 'index'
+    variable.units = 'unitless'
+    variable.long_name = 'Index Value'
+
+    # Appending the CRS information
+    crs = nco.createVariable('crs', 'c')
+    variable.setncattr('grid_mapping', 'crs')
+    crs.spatial_ref = proj
+    crs.epsg_code = "EPSG:" + str(epsg)
+    crs.GeoTransform = geom
+    crs.grid_mapping_name = 'albers_conical_equal_area'
+    crs.standard_parallel = [20.0, 60.0]
+    crs.longitude_of_central_meridian = -32.0
+    crs.latitude_of_projection_origin = 40.0
+    crs.false_easting = 0.0
+    crs.false_northing = 0.0
+
+    # Attributes
+    # Global Attrs
+    nco.title = title_map[index]
+    nco.subtitle = "Monthly Index values since 1895-01-01"
+    nco.description = ('Monthly gridded data at '+ str(res) + 
+                       'decimal degree (15 arc-minute resolution, ' +
+                       'calibrated to 1895-2010 for the continental ' +
+                       'United States.'),
+    nco.original_author = 'John Abatzoglou - University of Idaho'
+    nco.date = pd.to_datetime(str(today)).strftime('%Y-%m-%d')
+    nco.projection = 'WGS 1984 EPSG: 4326'
+    nco.citation = ('Westwide Drought Tracker, ' +
+                    'http://www.wrcc.dri.edu/monitor/WWDT')
+    nco.Conventions = 'CF-1.6'  # Should I include this if I am not sure?
+
+    # Variable Attrs
+    times.units = 'days since 1900-01-01'
+    times.standard_name = 'time'
+    times.calendar = 'gregorian'
+    latitudes.units = 'degrees_south'
+    latitudes.standard_name = 'latitude'
+    longitudes.units = 'degrees_east'
+    longitudes.standard_name = 'longitude'
+
+    # Now getting the data, which is not in order because of how wwdt does it
+    # We need to associate each day with its array, let's sort files to start
+    ncfiles.sort()
+    tfiles.sort()   
+    
+    # Dates may be gotten from either the original nc files or tif filenames
+    try:
+        test = Dataset(ncfiles[0])
+        test.close()
+        date_tifs = {}
+        for i in range(len(ncfiles)):
+            nc = Dataset(ncfiles[i])
+            days = nc.variables['day'][:]
+            rasters = gdal.Open(tfiles[i])
+            arrays = rasters.ReadAsArray()
+            for y in range(len(arrays)):
+                date_tifs[days[y]] = arrays[y]
+    
+        # okay, that was just in case the dates wanted to bounce around
+        date_tifs = OrderedDict(sorted(date_tifs.items()))
+    
+        # Now that everything is in the right order, split them back up
+        days = np.array(list(date_tifs.keys()))
+        arrays = np.array(list(date_tifs.values()))
+
+    except Exception as e:
         datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
         dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
                   d in datestrings]
@@ -1689,22 +1773,6 @@ class Index_Maps():
         '''
         ts = self.getSeries(location, crdict)
         arrays = self.dataset_interval.value.values
-
-        @jit(nopython=True)
-        def correlationField(ts, arrays):
-            '''
-            Create a 2d array of pearson correlation coefficient between the time
-            series at the location of the grid id and every other grid in a 3d array
-            '''
-            # Apply that to each cell
-            one_field = np.zeros((arrays.shape[1], arrays.shape[2]))
-            for i in range(arrays.shape[1]):
-                for j in range(arrays.shape[2]):
-                    lst = arrays[:, i, j]
-                    cor = np.corrcoef(ts, lst)[0,1]
-                    one_field[i, j] = cor
-            return one_field
-
         one_field = correlationField(ts, arrays)
 
         return one_field

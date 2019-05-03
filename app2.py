@@ -336,6 +336,7 @@ layout = dict(
         center=dict(lon=-95.7, lat=37.1),
         zoom=2))
 
+
 # In[] Temporary CSS Items
 tab_height = '25px'
 tab_style = {'height': tab_height, 'padding': '0'}
@@ -1085,7 +1086,7 @@ for i in range(1, 3):
             # Cut to extent
             tif = gdal.Translate('data/shapefiles/temp/temp.tif',
                                  'data/shapefiles/temp/temp1.tif',
-                                 projWin=[-130, 50, -55, 20])
+                                  projWin=[-130, 50, -55, 20])
             del tif
 
             return basename
