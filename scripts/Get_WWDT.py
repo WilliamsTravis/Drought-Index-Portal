@@ -314,8 +314,7 @@ for index in indices:
             if os.path.exists(out_path):
                 os.remove(out_path)
 
-            ds = gdal.Warp(out_path, source_path, format='GTiff',
-                           dstSRS='EPSG:4326', xRes=res,
+            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:4326', xRes=res,
                            yRes=res, outputBounds=[-130, 20, -55, 50])
             del ds
 
@@ -323,8 +322,7 @@ for index in indices:
             source_path = out_path
             out_path = os.path.join(local_path, 'tifs',
                                     'proj_temp_{}.tif'.format(i))
-            ds = gdal.Warp(out_path, source_path, format='GTiff',
-                           dstSRS='EPSG:102008')
+            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:102008')
             del ds
 
         # These are lists of all the temporary files, (1, 10, 11, 12, 2, 3,...)
