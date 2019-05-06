@@ -1742,7 +1742,7 @@ class Index_Maps():
         time_data = self.getTime()
         choice_type = 'projected'
         proj_data = Index_Maps(choice, choice_type, time_data, 'RdWhBu',
-                               chunk=True)  # <------------------------------- It's a bit too slow chunked...but saves memory of course
+                               chunk=True)
 
         # Filter data by the mask (should be set already)
         masked_arrays = data.where(self.mask == 1)

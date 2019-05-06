@@ -872,20 +872,20 @@ def retrieveData(signal, function, choice):
     return data
 
 
-# @cache2.memoize()
-# def retrieveAreaData(arrays, choice):
-#     '''
-#     This is here just to cache the output of 'droughtArea', which returns both
-#     the 5 categorical drought coverages (% area) and the singlular DSCI. The
-#     DSCI cannot be calculated from the 5 coverages because these are inclusive
-#     for display purposes while the DSCI uses only the percentage of area in
-#     each category. 
+@cache2.memoize()  # <--------------------------------------------------------- This is not caching!
+def retrieveAreaData(data, keyid, crdict):
+    '''
+    This is here just to cache the output of 'droughtArea', which returns both
+    the 5 categorical drought coverages (% area) and the singlular DSCI. The
+    DSCI cannot be calculated from the 5 coverages because these are inclusive
+    for display purposes while the DSCI uses only the percentage of area in
+    each category. 
 
-#     When there is enough memory to use this, toggling the DSCI on and off will
-#     be immediate because it will not need to be recalculated each time.
-#     '''
-#     return droughtArea(arrays, choice)
-
+    When there is enough memory to use this, toggling the DSCI on and off will
+    be immediate because it will not need to be recalculated each time.
+    '''
+    ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+    return [ts_series, ts_series_ninc, dsci]
 
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
@@ -1588,9 +1588,10 @@ for i in range(1, 3):
                     'Contiguous United States (point estimates not available)',
                     0]
             label = location[3]
-
-            # ts_series, ts_series_ninc, dsci = retrieveAreaData(arrays, choice) # <------------ For caching later, when we have more space
-            ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+            keyid = str(signal) + '_' + choice
+            ts_series, ts_series_ninc, dsci = retrieveAreaData(data, keyid,
+                                                               crdict) # <------------ For caching later, when we have more space
+            # ts_series, ts_series_ninc, dsci = data.getArea(crdict)
 
             # Save to file for download option
             columns = OrderedDict({'month': dates,
