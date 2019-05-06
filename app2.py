@@ -50,9 +50,9 @@ Things to do:
                 with a GIS.
 
     5) Fully integrate DASK. It turns out that xarray already uses dask and
-       was keeping much of the data on disk. Explicitly setting chunk sizes
-       seemed to help only slightly, and not at all for the correlation and
-       drought severity calcualtions (in memory numba and reprojection calls).
+       was keeping much of the data on disk. This helps to avoid memory
+       errors, but does improve speed. With the area calculations it worsens
+       it significantly... Is this an inevitable tradeoff?
 
 Created on April 15th 2019
 
@@ -279,7 +279,7 @@ with xr.open_dataset(
     max_date = data.time.data[-1]
     resolution = data.crs.GeoTransform[1]
 max_year = pd.Timestamp(max_date).year
-min_year = pd.Timestamp(min_date).year
+min_year = pd.Timestamp(min_date).year + 5
 max_month = pd.Timestamp(max_date).month
 
 # Get spatial dimensions from the sample data set above
@@ -292,7 +292,6 @@ years = [int(y) for y in range(min_year, max_year + 1)]
 {'label': '0°C', 'style': {'color': '#77b0b1'}}
 yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
              y in years}        
-# yearmarks = dict(zip(years, years))
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
 monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',

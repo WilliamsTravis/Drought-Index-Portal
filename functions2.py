@@ -1741,15 +1741,15 @@ class Index_Maps():
         # Now read in the corrollary albers data set
         time_data = self.getTime()
         choice_type = 'projected'
-        proj_data = Index_Maps(choice, choice_type, time_data,
-                               color_class='RdWhBu', chunk=False)
+        proj_data = Index_Maps(choice, choice_type, time_data, 'RdWhBu',
+                               chunk=False)  # <------------------------------- It's a bit too slow chunked...but saves memory of course
 
         # Filter data by the mask (should be set already)
         masked_arrays = data.where(self.mask == 1)
         albers_mask = wgsToAlbers(masked_arrays, crdict, proj_data.dataset)
         arrays = proj_data.dataset_interval.where(albers_mask == 1).value
 
-        # Flip if this is EDDI  # <-------------------------------------------- left off here
+        # Flip if this is EDDI
         if 'eddi' in choice:
             arrays = arrays*-1
 
@@ -1792,7 +1792,8 @@ class Index_Maps():
             inclusive vs non-inclusive drought severity coverages.
             '''
             if inclusive:
-                totals = arrays.where(~np.isnan(arrays)).count(dim=('lat', 'lon'))
+                totals = arrays.where(~np.isnan(arrays)).count(dim=('lat', 
+                                                                    'lon'))
                 counts = arrays.where(arrays<d[0]).count(dim=('lat', 'lon'))
                 ratios = counts / totals
                 pcts = ratios.compute().data * 100                
