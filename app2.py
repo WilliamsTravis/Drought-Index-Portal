@@ -735,7 +735,12 @@ app.layout = html.Div([
        # Signals
        html.Div(id='signal', style={'display': 'none'}),
        html.Div(id='location_store', style={'display': 'none'}),
-       html.Div(id='choice_store', style={'display': 'none'})],
+       html.Div(id='choice_store', style={'display': 'none'}),
+       html.Div(id='area_store_1', children='[0, 0]', # <---------------------- I cannot figure out how to properly cache these area time series
+                style={'display': 'none'}),  
+       html.Div(id='area_store_2', children='[0, 0]',
+                style={'display': 'none'})
+       ],
 
     className='ten columns offset-by-one')  # The end!
 
@@ -839,7 +844,7 @@ def functionOptions(function_type):
 
 
 @cache.memoize()
-def retrieveData(signal, function, choice): 
+def retrieveData(signal, function, choice, location): 
     '''
     This takes the user defined signal and uses the Index_Map class to filter'
     by the selected dates and return the singular map, the 3d timeseries array,
@@ -850,6 +855,8 @@ def retrieveData(signal, function, choice):
         choice = 'pdsi'
         function = 'omean'
     '''
+    print("Recacluating data...")
+
     # Retrieve signal elements
     time_data = signal[0]
     colorscale = signal[1]
@@ -866,26 +873,29 @@ def retrieveData(signal, function, choice):
                     'pcorr': 'correlation_p'}
     choice_type = choice_types[function]
 
-    # Retrieve data package (how to only update time_data)
+    # Retrieve data package
     data = Index_Maps(choice, choice_type, time_data, colorscale)
+
+    # Set mask (also sets coordinate dictionary)
+    data.setMask(location, crdict)
 
     return data
 
 
-@cache2.memoize()  # <--------------------------------------------------------- This is not caching!
-def retrieveAreaData(data, keyid, crdict):
-    '''
-    This is here just to cache the output of 'droughtArea', which returns both
-    the 5 categorical drought coverages (% area) and the singlular DSCI. The
-    DSCI cannot be calculated from the 5 coverages because these are inclusive
-    for display purposes while the DSCI uses only the percentage of area in
-    each category. 
+# @cache2.memoize()  # <--------------------------------------------------------- This is not caching!
+# def retrieveAreaData(data):
+#     '''
+#     This is here just to cache the output of 'droughtArea', which returns both
+#     the 5 categorical drought coverages (% area) and the singlular DSCI. The
+#     DSCI cannot be calculated from the 5 coverages because these are inclusive
+#     for display purposes while the DSCI uses only the percentage of area in
+#     each category. 
 
-    When there is enough memory to use this, toggling the DSCI on and off will
-    be immediate because it will not need to be recalculated each time.
-    '''
-    ts_series, ts_series_ninc, dsci = data.getArea(crdict)
-    return [ts_series, ts_series_ninc, dsci]
+#     When there is enough memory to use this, toggling the DSCI on and off will
+#     be immediate because it will not need to be recalculated each time.
+#     '''
+#     ts_series, ts_series_ninc, dsci = data.getArea()
+#     return [ts_series, ts_series_ninc, dsci]
 
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
@@ -1321,7 +1331,7 @@ for i in range(1, 3):
 
         if trig == 'location_store.children':
             if 'corr' not in function:
-                if 'grid' in location[0] or 'county' in location[0]:
+                if 'grid' in location[0] or 'county' in location[0] or 'area' in function:
                     raise PreventUpdate
 
             # Check which element the selection came from
@@ -1354,8 +1364,8 @@ for i in range(1, 3):
         choice = choices[key]
         choice2 = choices[~key]
 
-        # Get/cache data <----------------------------------------------------- Is this caching properly with the Index_Maps object?
-        data = retrieveData(signal, function, choice)
+        # Get/cache data
+        data = retrieveData(signal, function, choice, location)
 
         # Pull array into memory
         array = data.getFunction(function).compute()
@@ -1393,7 +1403,6 @@ for i in range(1, 3):
         # print("location: " + str(location))
         flag, y, x, label, idx = location
         if flag == 'state':
-            data.setMask(location, crdict)
             array = array * data.mask
         elif flag == 'shape':
             y = np.array(json.loads(y))
@@ -1501,7 +1510,8 @@ for i in range(1, 3):
 
 
     @app.callback([Output('series_{}'.format(i), 'figure'),
-                   Output('download_link_{}'.format(i), 'href')],
+                   Output('download_link_{}'.format(i), 'href'),
+                   Output('area_store_{}'.format(i), 'children')],
                   [Input('submit', 'n_clicks'),
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
@@ -1512,9 +1522,10 @@ for i in range(1, 3):
                    Input('reset_map_2', 'n_clicks')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
-                   State('function_choice', 'value')])
+                   State('function_choice', 'value'),
+                   State('area_store_{}'.format(i), 'children')])
     def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
-                   reset1, reset2, key, sync, function):
+                   reset1, reset2, key, sync, function, area_store):
         '''
         This makes the time series graph below the map.  
         
@@ -1523,7 +1534,7 @@ for i in range(1, 3):
             choice = 'pdsi'
             function = 'oarea'
             location =  ['all', 'y', 'x', 'Contiguous United States', 0]
-        '''
+        ''' 
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
@@ -1553,17 +1564,20 @@ for i in range(1, 3):
          month_filter], colorscale, reverse] = signal
 
         # Get/cache data
-        data = retrieveData(signal, function, choice)
+        data = retrieveData(signal, function, choice, location)
         dates = data.dataset_interval.time.values
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
         dmin = data.data_min
         dmax = data.data_max
-        data.setMask(location, crdict)
 
         # Experimenting with LERI
         if 'leri' in choice:  # <---------------------------------------------- Temporary
             dmin = 0
             dmax = 100
+
+        # Now, before we calculate the time series, there is some area business
+        area_store_key = str(signal) + '_' + choice + '_' + str(location)
+        area_store = json.loads(area_store)
 
         # If the function is oarea, we plot five overlapping timeseries
         label = location[3]
@@ -1581,17 +1595,21 @@ for i in range(1, 3):
             df_str = df.to_csv(encoding='utf-8', index=False)
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
             bar_type = 'bar'
+            area_store = ['', '']
+
         else:
             bar_type = 'overlay'
-            if location[0] == 'grid':
-                location = ['all', 'y', 'x',
-                    'Contiguous United States (point estimates not available)',
-                    0]
             label = location[3]
-            keyid = str(signal) + '_' + choice
-            ts_series, ts_series_ninc, dsci = retrieveAreaData(data, keyid,
-                                                               crdict) # <------------ For caching later, when we have more space
-            # ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+
+            # I cannot get this thing to cache! We are storing it in a Div
+            if area_store_key == area_store[0]:
+                ts_series, ts_series_ninc, dsci = area_store[1]
+            else:
+                ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+
+            # This needs to be returned either way
+            series = [ts_series, ts_series_ninc, dsci]
+            area_store = [area_store_key, series]
 
             # Save to file for download option
             columns = OrderedDict({'month': dates,
@@ -1608,6 +1626,7 @@ for i in range(1, 3):
             df_str = df.to_csv(encoding='utf-8', index=False)
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
 
+
         # Set up y-axis depending on selection
         if function != 'oarea':
             if 'p' in function:
@@ -1617,7 +1636,8 @@ for i in range(1, 3):
 
                 # Center the color scale
                 xmask = data.mask
-                sd = float(data.dataset_interval.where(xmask == 1).std().compute().value) # Sheesh
+                sd = data.dataset_interval.where(xmask == 1).std()
+                sd = float(sd.compute().value) # Sheesh
                 if 'eddi' in choice:
                     sd = sd*-1
                 dmin = 3*sd
@@ -1711,7 +1731,7 @@ for i in range(1, 3):
 
         figure = dict(data=data, layout=layout_copy)
 
-        return figure, href
+        return figure, href, json.dumps(area_store)
 
 
 # In[] Run Application through the server

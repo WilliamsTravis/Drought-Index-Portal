@@ -12,6 +12,7 @@ import datetime as dt
 from dash.exceptions import PreventUpdate
 import dask.array as da
 from dateutil.relativedelta import relativedelta
+import functools
 import gc
 from glob import glob
 import json
@@ -1705,7 +1706,7 @@ class Index_Maps():
             if flag == 'grid':
                 timeseries = data.value[:, y, x].values
             else:
-                self.setMask(location, crdict)
+                # self.setMask(location, crdict)
                 data = data.where(self.mask == 1)
                 timeseries = data.mean(dim=('lat', 'lon'))
                 timeseries = timeseries.value.values
@@ -1724,6 +1725,7 @@ class Index_Maps():
 
         return one_field
 
+    @functools.lru_cache()
     def getArea(self, crdict):
         '''
         This will take in a time series of arrays and a drought severity
@@ -1731,7 +1733,12 @@ class Index_Maps():
         thresholds. If inclusive is 'True' it will only mask out all cells that
         fall above the chosen category.
 
-        For now this requires original values, percentiles even out too quickly
+        This should be cached with functools, and will be calculated only once
+        in the app if the Index_Maps object is properly cached with flask
+        caching.
+
+        For now this requires original values, percentiles even out too
+        quickly.
         '''
         # Specify choice in case it needs to be inverse for eddi
         choice = self.choice
@@ -1781,14 +1788,15 @@ class Index_Maps():
 
         def catFilter(arrays, d, inclusive=False):
             '''
-            There is some question about the Drought Severity Coverage Index. The
-            NDMC does not use inclusive drought categories though NIDIS appeared to
-            in the "Historical Character of US Northern Great Plains Drought"
-            study. In an effort to match NIDIS' sample chart, we are using the
-            inclusive method for now. It would be fine either way as long as the
-            index is compared to other values with the same calculation, but we
-            should really defer to NDMC. We could also add an option to display
-            inclusive vs non-inclusive drought severity coverages.
+            There is some question about the Drought Severity Coverage Index.
+            The NDMC does not use inclusive drought categories though NIDIS
+            appeared to in the "Historical Character of US Northern Great
+            Plains Drought" study. In an effort to match NIDIS' sample chart,
+            we are using the inclusive method for now. It would be fine either
+            way as long as the index is compared to other values with the same
+            calculation, but we should really defer to NDMC. We could also add
+            an option to display inclusive vs non-inclusive drought severity
+            coverages.
             '''
             if inclusive:
                 totals = arrays.where(~np.isnan(arrays)).count(dim=('lat', 
@@ -1807,10 +1815,12 @@ class Index_Maps():
                 return pcts
 
         # print("starting offending loops...")
-        pnincs = np.array([catFilter(arrays, cats[i]) for i in range(5)])  # <--- How to speed up, again?
-        DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-        pincs = np.array([catFilter(arrays, cats[i],True) for i in range(5)])
-
+        pincs = [list(catFilter(arrays, cats[i],True)) for i in range(5)]
+        pnincs = [catFilter(arrays, cats[i]) for i in tqdm(range(5), position=0)]  # <--- How to speed up, again?
+        DSCI = list(np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]),
+                              axis=0))
+        pnincs = [list(p) for p in pnincs]  # These need to work with json
+        
         # Return the list of five layers
         return pincs, pnincs, DSCI
 
