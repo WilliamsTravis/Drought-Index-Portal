@@ -644,7 +644,7 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
 
     # use osr for more spatial attributes
     refs = osr.SpatialReference()
-    refs.ImportFromEPSG(epsg)
+    refs.ImportFromProj4(epsg)
 
     # Create Dataset
     nco = Dataset(savepath, mode=wmode, format='NETCDF4')
