@@ -36,17 +36,20 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions import toNetCDF2, isInt, toNetCDFPercentile
+from functions2 import  isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
 
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
 # Get resolution from file call
-res = float(sys.argv[1])
+try:
+    res = float(sys.argv[1])
+except:
+    res = 0.25
 
 # In[] Data source and target directory
 ftp_path = 'ftp://ftp.cdc.noaa.gov/Projects/EDDI/CONUS_archive/data'
-temp_folder = os.path.join(data_path, 'data/droughtindices/temps')
+temp_folder = os.path.join(data_path, 'data/droughtindices/netcdfs/eddi')
 pc_folder = os.path.join(data_path, 'data/droughtindices/netcdfs/percentiles')
 if not os.path.exists(temp_folder):
     os.makedirs(temp_folder)
@@ -87,7 +90,7 @@ def getEDDI(scale, date, temp_folder, write=False):
     else:
         def writeline(line):
             local_file.write(line + "\n")
-        local_file = open(os.path.join(temp_folder, 'temp.asc'), 'w')
+        local_file = open(os.path.join(temp_folder, 'eddi.asc'), 'w')
         try:
             file_name = 'EDDI_ETrs_{:02d}mn_{}{:02d}{}.asc'.format(scale, year,
                                                                month, last_day)
@@ -97,7 +100,8 @@ def getEDDI(scale, date, temp_folder, write=False):
                                                            month, last_day - 1)
             ftp.retrlines('RETR ' + file_name, writeline)
         local_file.close()
-        return os.path.join(temp_folder, 'temp.asc')
+        return os.path.join(temp_folder, 'eddi.asc')
+
 
 # In[] Today's date, month, and year
 todays_date = dt.datetime.today()
@@ -115,27 +119,33 @@ print(str(today) + '\n')
 # Connect to FTP 
 ftp = ftplib.FTP('ftp.cdc.noaa.gov', 'anonymous', 'anonymous@cdc.noaa.gov')
 for index in indices:
-    ftp.cwd('/Projects/EDDI/CONUS_archive/data/')  # sample
+    ftp.cwd('/Projects/EDDI/CONUS_archive/data/')
     print('\n' + index)
-    original_path = os.path.join(data_path,
-                                 "data/droughtindices/netcdfs/",
+    original_path = os.path.join(data_path, "data/droughtindices/netcdfs/",
                                  index + '.nc')
+    albers_path = os.path.join(data_path, "data/droughtindices/netcdfs/albers",
+                               index + '.nc')
     percentile_path = os.path.join(data_path,
                                    "data/droughtindices/netcdfs/percentiles",
                                    index + '.nc')
-    scale = int(index[-1:])
+    scale = index[-2:]
+    scale = int("".join([s for s in scale if isInt(s)]))
 
+    # Delete existing contents of temporary folder
+    temps = glob(os.path.join(temp_folder, "*"))
+    for t in temps:
+        os.remove(t)
 
     ####### If we are only missing some dates #################################
     if os.path.exists(original_path):
         with xr.open_dataset(original_path) as data:
             dates = pd.DatetimeIndex(data.time.data)
             data.close()
-        
+
         # Extract dates
         d1 = dates[0]
         d2 = dates[-1]
-    
+
         # Get a list of the dates already in the netcdf file
         existing_dates = pd.date_range(d1, d2, freq="M")
 
@@ -177,26 +187,36 @@ for index in indices:
             for date in tqdm(needed_dates, position=0):
                 ftp.cwd(os.path.join('/Projects/EDDI/CONUS_archive/data/',
                                      str(date.year)))
-                file_path = getEDDI(scale, date, temp_folder,
-                               write=True)
 
-                # We will save each to a geotiff so we can use the netcdf builders
-                # These will be overwritten for space
+                # This returns the filename of the downloaded asc file
+                in_path = getEDDI(scale, date, temp_folder, write=True)
+
+                # Save each to a geotiff to use the netcdf builders
                 file_name = ('eddi_' + str(date.year) +
                              '{:02d}'.format(date.month) + '.tif')
-                tif_path = os.path.join(temp_folder, file_name)
+                out_path = os.path.join(temp_folder, file_name)
+                tif_path = out_path
 
                 # Resample each, working from disk
-                ds = gdal.Warp(tif_path, file_path,
-                               dstSRS='EPSG:4326',
-                               xRes=res, yRes=res,
-                               outputBounds=[-130, 20, -55, 50])
+                ds = gdal.Warp(out_path, in_path, dstSRS='EPSG:4326',
+                               xRes=res, yRes=res, outputBounds=[-130, 20,
+                                                                 -55, 50])
                 del ds
 
-                # Open old data set
+                # Reproject the output from above
+                in_path = out_path
+                out_path = os.path.join(temp_folder, 'proj_' + file_name)
+                tif_path_proj = out_path
+                ds = gdal.Warp(out_path, in_path, dstSRS='EPSG:102008')
+                del ds
+
+                # Open old data sets
                 old = Dataset(original_path, 'r+')
+                old_proj = Dataset(albers_path, 'r+')
                 times = old.variables['time']
+                times_proj = old_proj.variables['time']
                 values = old.variables['value']
+                values_proj = old_proj.variables['value']
                 n = times.shape[0]
 
                 # Convert new date to days
@@ -206,13 +226,19 @@ for index in indices:
 
                 # Convert new data to array
                 base_data = gdal.Open(tif_path)
+                base_data_proj = gdal.Open(tif_path_proj)
                 array = base_data.ReadAsArray()
+                array_proj = base_data_proj.ReadAsArray()
                 del base_data
+                del base_data_proj
 
                 # Write changes to file and close
                 times[n] = days
+                times_proj[n] = days
                 values[n] = array
+                values_proj[n] = array_proj
                 old.close()
+                old_proj.close()
 
             # Now recreate the entire percentile data set
             print('Reranking percentiles...')
@@ -253,41 +279,47 @@ for index in indices:
         for date in tqdm(available_dates, position=0):
             ftp.cwd(os.path.join('/Projects/EDDI/CONUS_archive/data/',
                                  str(date.year)))
-            file_path = getEDDI(scale, date, temp_folder, write=True)
+            in_path = getEDDI(scale, date, temp_folder, write=True)
 
             # We will save each to a geotiff so we can use the netcdf builders
-            # These will be overwritten for space
             file_name = ('temp_' + str(date.year) +
                          '{:02d}'.format(date.month) + '.tif')
-            tif_path = os.path.join(temp_folder, file_name)
+            out_path = os.path.join(temp_folder, file_name)
+            tif_path = out_path
 
             # Resample each, working from disk
-            ds = gdal.Warp(tif_path, file_path,
-                           dstSRS='EPSG:4326',
-                           xRes=res, yRes=res,
-                           outputBounds=[-130, 20, -55, 50])
+            ds = gdal.Warp(out_path, in_path, dstSRS='EPSG:4326',
+                           xRes=res, yRes=res,outputBounds=[-130, 20,
+                                                            -55,50])
             del ds
 
-        # There are over four hundred of those, this will take a minute. Run it
-        # After Get_WWDT.py just in case. If either of these break I should
-        # have a contingency exception. 
+            # Reproject output from above
+            in_path = out_path
+            out_path = os.path.join(temp_folder, 'proj_' + file_name)
+            tif_path_proj = out_path
+            ds = gdal.Warp(out_path, in_path, dstSRS='EPSG:102008')
+            del ds
 
-        # Now, run a toNetCDF using the available dates instead of an existing
-        # netcdf file. I should tweak toNetCDF2 to accept either I think.
-        # Pardon this expediency
-        tfiles = glob(os.path.join(temp_folder, '*tif'))
-        tfiles.sort()
+        # Now, run toNetCDF using the file name dates.
+        tfiles = glob(os.path.join(temp_folder, 'temp_*'))
+        tfiles_proj = glob(os.path.join(temp_folder, 'proj_*'))
         nc_path = os.path.join(data_path, "data/droughtindices/netcdfs/",
-                               index + '.nc')
-        toNetCDF2(tfiles=tfiles, ncfiles=None, savepath=nc_path, index=index,
-                  year1=1980, month1=1, year2=todays_date.year, month2=12,
-                  epsg=4326, percentiles=False, wmode='w')
+                               index + ".nc")
+        nc_path_proj = os.path.join(data_path,
+                                    "data/droughtindices/netcdfs/albers",
+                                    index + ".nc")
+        toNetCDF(tfiles=tfiles, ncfiles=None, savepath=nc_path, index=index,
+                 epsg=4326, year1=1980, month1=1, year2=todays_date.year - 1, # I subtracted one to go back and check the update mode
+                 month2=12, wmode='w', percentiles=False)
+        toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None, savepath=nc_path_proj,
+                       index=index, epsg=102008, year1=1980, month1=1,
+                       year2=todays_date.year - 1, month2=12, wmode='w',                 # I subtracted one to go back and check the update mode
+                       percentiles=False)
 
         # Now lets get the percentile values
         pc_path = os.path.join(data_path, "data/droughtindices/netcdfs/" +
-                                   "percentiles", index + '.nc')
+                               "percentiles", index + ".nc")
         toNetCDFPercentile(nc_path, pc_path)
-
 
 # Close connection with FTP server
 ftp.quit()

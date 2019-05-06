@@ -329,12 +329,9 @@ for index in indices:
 
         # These are lists of all the temporary files, (1, 10, 11, 12, 2, 3,...)
         tfiles = glob(os.path.join(local_path, 'tifs', 'temp_*[0-9]*.tif'))
-        tfiles.sort()
         tfiles_proj = glob(os.path.join(local_path, 'tifs',
                                         'proj_temp_*[0-9]*.tif'))
-        tfiles_proj.sort()
         ncfiles = glob(os.path.join(local_path, 'temp_*[0-9]*.nc'))
-        ncfiles.sort()
 
         # This is the target file - wwdt acronyms differ
         nc_path = os.path.join(data_path, 'data/droughtindices/netcdfs/',
@@ -345,8 +342,8 @@ for index in indices:
 
         # This function smooshes everything into one netcdf file
         toNetCDF(tfiles, ncfiles, nc_path, index, epsg=4326, year1=1895,
-                    month1=1, year2=todays_date.year, month2=todays_date.month,
-                    wmode='w', percentiles=False)
+                 month1=1, year2=todays_date.year, month2=todays_date.month,
+                 wmode='w', percentiles=False)
 
         # We are also including percentiles, so lets build another dataset
         pc_path = os.path.join(data_path,
@@ -356,7 +353,7 @@ for index in indices:
         toNetCDFPercentile(nc_path, pc_path)
 
         # Now create the alber's netcdf
-        toNetCDFAlbers(tfiles_proj, ncfiles, nc_path, index, epsg=4326,
+        toNetCDFAlbers(tfiles_proj, ncfiles, nc_path_proj, index, epsg=102008,
                        year1=1895, month1=1, year2=todays_date.year,
                        month2=todays_date.month, wmode='w', percentiles=False)
 

@@ -10,6 +10,7 @@ Created on Tue Jan 22 18:02:17 2019
 # In[]: Environment
 import datetime as dt
 from dash.exceptions import PreventUpdate
+import dask.array as da
 from dateutil.relativedelta import relativedelta
 import gc
 from glob import glob
@@ -122,16 +123,33 @@ def isInt(string):
         return False
 
 
-def movie(array, titles=None, axis=0):
+def movie(array, titles=None, axis=0, na=-9999):
     '''
     This takes a three dimensional numpy array and animates it. If the time
     axis is not 0, specify which it is. Just a heads up, some functions
     organize along different axes; consider np.dstack vs np.array. 
     '''
-    if titles is None:
-        titles = ["" for t in range(len(array))]
-    if type(titles) is str:
-        titles = [titles + ': ' + str(t) for t in range(len(array))]
+    if 'netCDF' in str(type(array)):
+        if titles is None:
+            titles = array.variables['time']
+        key = list(array.variables.keys())[3]  # I am guessing it's always 3
+        array = array.variables[key][:]
+        if na in array:
+            array[array==na] = np.nan
+    elif 'xarray' in str(type(array)):
+        if titles is None:
+            titles = array.time
+        array = array.value
+        if na in array:
+            array.data[array.data==na] = np.nan
+    else:
+        if titles is None:
+            titles = ["" for t in range(len(array))]
+        elif type(titles) is str:
+            titles = [titles + ': ' + str(t) for t in range(len(array))]
+        if na in array:
+            array[array==na] = np.nan
+
 
     fig, ax = plt.subplots()
 
@@ -428,6 +446,9 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
     As an expediency, if there isn't an nc file it defaults to reading dates
     from the file names.
 
+    I need to go back and parameterize the subtitle to reflect the actual dates
+    used in each dataset.
+
     Test parameters for toNetCDF2
         tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/temp*')
         ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/*nc')
@@ -519,6 +540,8 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
     # Now getting the data, which is not in order because of how wwdt does it
     # We need to associate each day with its array
     try:
+        tfiles.sort()
+        ncfiles.sort()
         test = Dataset(ncfiles[0])
         test.close()
         date_tifs = {}
@@ -539,6 +562,8 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
 
     except Exception as e:
         print(str(e))
+        tfiles.sort()
+
         # print('Combining data using filename dates...')
         datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
         dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
@@ -581,7 +606,7 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
 
 
 def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
-                      year2, month2, epsg=4326, percentiles=False, wmode='w'):
+                   year2, month2, epsg=4326, percentiles=False, wmode='w'):
     '''
     This does the same as above but is specific to the north american
     albers equal area conic projection
@@ -671,18 +696,18 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
     times.units = 'days since 1900-01-01'
     times.standard_name = 'time'
     times.calendar = 'gregorian'
-    latitudes.units = 'degrees_south'
-    latitudes.standard_name = 'latitude'
-    longitudes.units = 'degrees_east'
-    longitudes.standard_name = 'longitude'
+    latitudes.units = 'meters'
+    latitudes.standard_name = 'projection_y_coordinate'
+    longitudes.units = 'meters'
+    longitudes.standard_name = 'projection_x_coordinate'
 
     # Now getting the data, which is not in order because of how wwdt does it
     # We need to associate each day with its array, let's sort files to start
-    ncfiles.sort()
-    tfiles.sort()   
     
     # Dates may be gotten from either the original nc files or tif filenames
     try:
+        ncfiles.sort()
+        tfiles.sort()   
         test = Dataset(ncfiles[0])
         test.close()
         date_tifs = {}
@@ -702,6 +727,7 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
         arrays = np.array(list(date_tifs.values()))
 
     except Exception as e:
+        tfiles.sort()   
         datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
         dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
                   d in datestrings]
@@ -804,119 +830,7 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
     # Attributes
     # Global Attrs
     nco.title = title_map[index]
-    nco.subtitle = "Monthly Index values since 1948-01-01"
-    nco.description = ('Monthly gridded data at 0.25 decimal degree' +
-                       ' (15 arc-minute resolution, calibrated to 1895-2010 ' +
-                       ' for the continental United States.'),
-    nco.original_author = 'John Abatzoglou - University of Idaho'
-    nco.date = pd.to_datetime(str(today)).strftime('%Y-%m-%d')
-    nco.projection = 'WGS 1984 EPSG: 4326'
-    nco.citation = ('Westwide Drought Tracker, ' +
-                    'http://www.wrcc.dri.edu/monitor/WWDT')
-    nco.Conventions = 'CF-1.6'
-
-    # Variable Attrs
-    times.units = 'days since 1900-01-01'
-    times.standard_name = 'time'
-    times.calendar = 'gregorian'
-    latitudes.units = 'meters'
-    latitudes.standard_name = 'projection_y_coordinate'
-    longitudes.units = 'meters'
-    longitudes.standard_name = 'projection_x_coordinate'
-
-    # Now getting the data, which is not in order because of how wwdt does it
-    # We need to associate each day with its array
-    nc = Dataset(ncfile)
-
-    # Make sure there are the same number of time steps
-    if ntime != len(nc.variables['time']):
-        print("Time lengths don't match.")
-        sys.exit(1)
-
-    days = nc.variables['time'][:]
-
-    # This allows the option to store the data as percentiles
-    if percentiles:
-        arrays = percentileArrays(arrays)
-
-    # Write - set this to write one or multiple
-    latitudes[:] = lats
-    longitudes[:] = lons
-    times[:] = days.astype(int)
-    variable[:, :, :] = arrays
-
-    # Done
-    nco.close()
-
-
-def toNetCDFAlbers(src, dst, epsg=102008, percentiles=False, wmode='w'):
-    '''
-    For some reason it is incredibly difficult to project a netcdf file without
-    splitting the data into separate bands. I found this OSGEO ticket from a
-    while ago that called for a reconstruction of the dataset upon a gdalwarp
-    call, but no comments and then it was closed earlier this year :/.
-
-    Anyways, what we'll do instead is reproject to a multiband tiff, pull that
-    into memory, create the dataset, setup up the crs attributes needed for
-    Alber's specifically, and copy the other attributes from the old nc file,
-    then write to a new one
-    '''
-    # For attributes
-    todays_date = dt.datetime.today()
-    today = np.datetime64(todays_date)
-
-    # Warp to tiff in epsg:102008
-
-    
-    # Use one tif (one array) for spatial attributes
-    data = gdal.Open(tfile)
-    geom = data.GetGeoTransform()
-    proj = data.GetProjection()
-    arrays = data.ReadAsArray()
-    ntime, nlat, nlon = np.shape(arrays)
-    lons = np.arange(nlon) * geom[1] + geom[0]
-    lats = np.arange(nlat) * geom[5] + geom[3]
-    del data
-
-    # use osr for more spatial attributes
-    refs = osr.SpatialReference()
-    refs.ImportFromEPSG(epsg)
-
-    # Create Dataset
-    nco = Dataset(dst, mode=wmode, format='NETCDF4')
-
-    # Dimensions
-    nco.createDimension('y', nlat)
-    nco.createDimension('x', nlon)
-    nco.createDimension('time', None)
-
-    # Variables
-    latitudes = nco.createVariable('lat', 'f4', ('lat',))
-    longitudes = nco.createVariable('lon', 'f4', ('lon',))
-    times = nco.createVariable('time', 'f8', ('time',))
-    variable = nco.createVariable('value', 'f4', ('time', 'lat', 'lon'),
-                                  fill_value=-9999)
-    variable.standard_name = 'index'
-    variable.units = 'unitless'
-    variable.long_name = 'Index Value'
-
-    # Appending the CRS information
-    crs = nco.createVariable('crs', 'c')
-    variable.setncattr('grid_mapping', 'crs')
-    crs.spatial_ref = proj
-    crs.epsg_code = "EPSG:" + str(epsg)
-    crs.GeoTransform = geom
-    crs.grid_mapping_name = 'albers_conical_equal_area'
-    crs.standard_parallel = [20.0, 60.0]
-    crs.longitude_of_central_meridian = -32.0
-    crs.latitude_of_projection_origin = 40.0
-    crs.false_easting = 0.0
-    crs.false_northing = 0.0
-
-    # Attributes
-    # Global Attrs
-    nco.title = title_map[index]
-    nco.subtitle = "Monthly Index values since 1948-01-01"
+    nco.subtitle = "Monthly Index values since 1895-01-01"
     nco.description = ('Monthly gridded data at 0.25 decimal degree' +
                        ' (15 arc-minute resolution, calibrated to 1895-2010 ' +
                        ' for the continental United States.'),
@@ -1070,12 +984,13 @@ def toRasters(arraylist, path, geometry, srs):
         image.GetRasterBand(1).WriteArray(ray[1])
           
 
-def wgsToAlbers(arrays, crdict, albers_source):
+def wgsToAlbers(arrays, crdict, proj_sample):
     '''
-    Takes a 3d array, or list of 2d arrays, in WGS 84 (epsg: 4326) to Alber's
-    North American Equal Area Conic (epsg: 102008).
+    Takes an xarray dataset in WGS 84 (epsg: 4326) with a specified mask and
+    returns that mask projected to Alber's North American Equal Area Conic
+    (epsg: 102008).
     '''
-    dates = range(len(arrays.time))
+    # dates = range(len(arrays.time))
     wgs_proj = Proj(init='epsg:4326')
     geom = crdict.source.transform
     wgrid = salem.Grid(nxny=(crdict.x_length, crdict.y_length),
@@ -1084,9 +999,9 @@ def wgsToAlbers(arrays, crdict, albers_source):
     lats = np.unique(wgrid.xy_coordinates[1])
     lats = lats[::-1]
     lons = np.unique(wgrid.xy_coordinates[0])
-    data_array = xr.DataArray(data=arrays.value,  # <-------------------------- I'm not sure what this does yet
-                              coords=[dates, lats, lons],
-                              dims=['time', 'lat', 'lon'])
+    data_array = xr.DataArray(data=arrays.value[0],  # <-------------------------- I'm not sure what this does yet
+                              coords=[lats, lons],
+                              dims=['lat', 'lon'])
     wgs_data = xr.Dataset(data_vars={'value': data_array})
 
     # Albers Equal Area Conic North America (epsg not working)
@@ -1095,11 +1010,11 @@ def wgsToAlbers(arrays, crdict, albers_source):
                         +datum=NAD83 +units=m +no_defs')
 
     # Create an albers grid
-    geom = albers_source.GetGeoTransform()
-    array = albers_source.ReadAsArray()
+    geom = proj_sample.crs.GeoTransform
+    array = proj_sample.value[0].values
     res = geom[1]
-    x_length = albers_source.RasterXSize 
-    y_length = albers_source.RasterYSize 
+    x_length = array.shape[1]
+    y_length = array.shape[0]
     agrid = salem.Grid(nxny=(x_length, y_length), dxdy=(res, -res),
                        x0y0=(geom[0], geom[3]), proj=albers_proj)
     lats = np.unique(agrid.xy_coordinates[1])
@@ -1108,12 +1023,26 @@ def wgsToAlbers(arrays, crdict, albers_source):
     data_array = xr.DataArray(data=array,
                               coords=[lats, lons],
                               dims=['lat', 'lon'])
+    data_array = data_array
     albers_data = xr.Dataset(data_vars={'value': data_array})
     albers_data.salem.grid._proj = albers_proj
     projection = albers_data.salem.transform(wgs_data, 'linear')
-    arrays = projection.value.data  # <---------------------------------------- what can be done here?
+    proj_mask = projection.value.data
+    proj_mask = proj_mask * 0 + 1
 
-    return(arrays)
+    # Set up grid info from coordinate dictionary
+    nlat, nlon = proj_mask.shape   
+    xs = np.arange(nlon) * geom[1] + geom[0]
+    ys = np.arange(nlat) * geom[5] + geom[3]
+
+
+    # Create mask xarray
+    proj_mask = xr.DataArray(proj_mask,
+                              coords={'lat': ys.astype(np.float32),
+                                      'lon': xs.astype(np.float32)},
+                              dims={'lat': len(ys),
+                                    'lon': len(xs)})
+    return(proj_mask)
 
 
 # In[]:Classes
@@ -1509,12 +1438,12 @@ class Index_Maps():
     def __init__(self, choice='pdsi', choice_type='original',
                  time_data=[[2000, 2018], [1, 12], list(range(1, 13))],
                  color_class='Default'):
-        self.choice = choice
+        self.choice = choice  # This does not yet update information
         self.choice_type = choice_type
         self.color_class = color_class
         self.setData()
         self.index_ranges = pd.read_csv('data/tables/index_ranges.csv')
-        self.time_data = time_data
+        self.time_data = time_data # This updates info but cannot be accessed  # <-- Help
 
     @property
     def time_data(self):
@@ -1559,28 +1488,30 @@ class Index_Maps():
 
             # The whole data set just says "NA" using the value -9999
             today = dt.datetime.now()
-            start = dt.datetime(1895, 1, 1)
-            base = dt.datetime(1900, 1, 1)
+            # base = dt.datetime(1900, 1, 1)
             na = readRaster(na_path, 1, -9999)[0]
             na = na * 0 - 9999
-            date_range = ((today.year - 1) - start.year) * 12 + today.month
-            data = np.repeat(na[np.newaxis, :, :], date_range, axis=0)
-            days = [base + relativedelta(months=m) for m in range(date_range)]
+            # date_range = ((today.year - 1) - start.year) * 12 + today.month
+            arrays = np.repeat(na[np.newaxis, :, :], 2, axis=0)
+            arrays = da.from_array(arrays, chunks=100)
+            # days = (today - base).days
+            days = [today - dt.timedelta(30), today]
+
             lats = data.coords['lat'].data
             lons = data.coords['lon'].data
-            array = xr.DataArray(data,
+            array = xr.DataArray(arrays,
                                  coords={'time': days,
                                          'lat': lats,
                                          'lon': lons},
-                                 dims={'time': len(days),
+                                 dims={'time': 2,
                                        'lat': len(lats),
                                        'lon': len(lons)})
             data = xr.Dataset({'value': array})
-    
+
         self.dataset_interval = data
 
         # I am also setting index ranges from the full data sets
-        if self.choice_type =='percentile':
+        if self.choice_type =='percentile' or 'leri' in self.choice:
             self.data_min = 0
             self.data_max = 100
         else:
@@ -1697,7 +1628,7 @@ class Index_Maps():
         Take a location object and the coordinate dictionary to create an
         xarray for masking the dask datasets without pulling into memory.
         
-        location = location from Location_Builder
+        location = location from Location_Builder or 1d array
         crdict = coordinate dictionary
         '''
         # Get x, y coordinates from location
@@ -1720,6 +1651,7 @@ class Index_Maps():
         lons = np.arange(nlon) * geom[1] + geom[0]
         lats = np.arange(nlat) * geom[5] + geom[3]
 
+
         # Create mask xarray
         xmask = xr.DataArray(mask,
                              coords={'lat': lats,
@@ -1727,6 +1659,18 @@ class Index_Maps():
                              dims={'lat': len(lats),
                                    'lon': len(lons)})
         self.mask = xmask
+
+    def getTime(self):
+        # Now read in the corrollary albers data set
+        dates = pd.DatetimeIndex(self.dataset_interval.time[:].values)
+        year1 = min(dates.year)
+        year2 = max(dates.year)
+        month1 = min(dates.month)
+        month2 = max(dates.month)
+        month_filter = list(pd.unique(dates.month))
+        time_data = [[year1, year2], [month1, month2], month_filter]
+
+        return time_data        
 
     def getMean(self):
         return self.dataset_interval.mean('time').value.data
@@ -1777,7 +1721,7 @@ class Index_Maps():
 
         return one_field
 
-    def getArea(self, crdict, albers_source):
+    def getArea(self, crdict):
         '''
         This will take in a time series of arrays and a drought severity
         category and mask out all cells with values above or below the category
@@ -1788,12 +1732,19 @@ class Index_Maps():
         '''
         # Specify choice in case it needs to be inverse for eddi
         choice = self.choice
+        data = self.dataset_interval
+
+        # Now read in the corrollary albers data set
+        time_data = self.getTime()
+        choice_type = 'projected'
+        proj_data = Index_Maps(choice, choice_type, time_data, 'RdWhBu')
 
         # Filter data by the mask (should be set already)
-        arrays = self.dataset_interval.where(self.mask == 1)
-        arrays = wgsToAlbers(arrays, crdict, albers_source)  # <--------------- Memory spike
+        masked_arrays = data.where(self.mask == 1)
+        albers_mask = wgsToAlbers(masked_arrays, crdict, proj_data.dataset)
+        arrays = proj_data.dataset_interval.where(albers_mask == 1).value
 
-        # Flip if this is EDDI
+        # Flip if this is EDDI  # <-------------------------------------------- left off here
         if 'eddi' in choice:
             arrays = arrays*-1
     
@@ -1824,7 +1775,7 @@ class Index_Maps():
         cat_key = [key for key in drought_cats.keys() if key in choice][0]
         cats = drought_cats[cat_key]
     
-        def singleFilter(array, d, inclusive=False):
+        def singleFilter(arrays, d, inclusive=False):
             '''
             There is some question about the Drought Severity Coverage Index. The
             NDMC does not use inclusive drought categories though NIDIS appeared to
@@ -1836,25 +1787,33 @@ class Index_Maps():
             inclusive vs non-inclusive drought severity coverages.
             '''
             if inclusive:
-                mask = array<d[0]
+                totals = arrays.where(~np.isnan(arrays)).count(dim=('lat', 'lon'))
+                counts = arrays.where(arrays<d[0]).count(dim=('lat', 'lon'))
+                ratios = counts / totals
+                pcts = ratios.compute().data * 100
+                return pcts
             else:
-                mask = (array<d[0]) & (array>=d[1])
-            return array[mask]
-    
+                totals = arrays.where(~np.isnan(arrays)).count(
+                                                            dim=('lat', 'lon'))
+                counts = arrays.where((arrays<d[0]) &
+                                      (arrays>=d[1])).count(dim=('lat', 'lon'))
+                ratios = counts / totals
+                pcts = ratios.compute().data * 100
+                return pcts
+
         # For each array
         def filter(arrays, d, inclusive=False):
-            values = np.array([singleFilter(a, d, inclusive=inclusive) for
-                                a in arrays])
-            totals = [len(a[~np.isnan(a)]) for a in arrays]  # <------------------- Because the available area for LERI changes, this adjusts the total area for each time step
-            ps = np.array([(len(values[i])/totals[i]) * 100 for
-                           i in range(len(values))])
+            ps = singleFilter(arrays, d, inclusive)
             return ps
     
         # print("starting offending loops...")
-        pnincs = np.array([filter(arrays, cats[i]) for i in range(5)])
+        pnincs = np.array([filter(arrays, cats[i],
+                                  inclusive=False)for i in range(5)])
+
         DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-        pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]
-    
+        pincs = np.array([filter(arrays, cats[i],
+                                 inclusive=True)for i in range(5)]) 
+
         # Return the list of five layers
         return pincs, pnincs, DSCI
 

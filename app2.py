@@ -94,8 +94,8 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions and classes
-from functions2 import Admin_Elements, datePrint, droughtArea, Index_Maps
-from functions2 import Location_Builder, shapeReproject
+from functions2 import Admin_Elements, datePrint, Index_Maps, Location_Builder
+from functions2 import shapeReproject
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -285,7 +285,7 @@ max_month = pd.Timestamp(max_date).month
 # Get spatial dimensions from the sample data set above
 admin = Admin_Elements(resolution)
 [state_array, county_array, grid, mask,
- source, albers_source, crdict, admin_df] = admin.getElements()
+ source, albers_source, crdict, admin_df] = admin.getElements()  # <----------- remove albers source here
 
 # Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
@@ -628,7 +628,7 @@ app.layout = html.Div([
                                             value=1)],
                                className='two columns',
                                title=('Choose the first month of the first ' +
-                                      'year of the study period')),
+                                      'year of the study period.')),
                              html.Div([
                                html.H5('Ending Month'),
                                dcc.Dropdown(id='month_2',
@@ -636,11 +636,11 @@ app.layout = html.Div([
                                             value=12)],
                                className='two columns',
                                title=('Choose the last month of the last ' +
-                                      'year of the study period')),
+                                      'year of the study period.')),
                             html.Div(
                               id='month_slider_holder',
                               children=[
-                                html.H5('Month Filter'),
+                                html.H5('Included Months'),
                                   dcc.Checklist(
                                     className='check_blue',
                                     id='month',
@@ -650,7 +650,7 @@ app.layout = html.Div([
                                                 'inline-block'})],
                                className='eight columns',
                                title=('Choose which months of the year to ' +
-                                      'be included'))])],
+                                      'be included.'))])],
                     className="row",
                    style={'margin-bottom': '75'}),
 
@@ -873,19 +873,19 @@ def retrieveData(signal, function, choice):
     return data
 
 
-@cache2.memoize()
-def retrieveAreaData(arrays, choice):
-    '''
-    This is here just to cache the output of 'droughtArea', which returns both
-    the 5 categorical drought coverages (% area) and the singlular DSCI. The
-    DSCI cannot be calculated from the 5 coverages because these are inclusive
-    for display purposes while the DSCI uses only the percentage of area in
-    each category. 
+# @cache2.memoize()
+# def retrieveAreaData(arrays, choice):
+#     '''
+#     This is here just to cache the output of 'droughtArea', which returns both
+#     the 5 categorical drought coverages (% area) and the singlular DSCI. The
+#     DSCI cannot be calculated from the 5 coverages because these are inclusive
+#     for display purposes while the DSCI uses only the percentage of area in
+#     each category. 
 
-    When there is enough memory to use this, toggling the DSCI on and off will
-    be immediate because it will not need to be recalculated each time.
-    '''
-    return droughtArea(arrays, choice)
+#     When there is enough memory to use this, toggling the DSCI on and off will
+#     be immediate because it will not need to be recalculated each time.
+#     '''
+#     return droughtArea(arrays, choice)
 
 
 # Output list of all index choices for syncing
@@ -1380,6 +1380,7 @@ for i in range(1, 3):
             amax = limit
             amin = limit * -1
 
+
         # Experimenting with leri  # <----------------------------------------- Temporary
         if 'leri' in choice:
             amin = 0
@@ -1566,6 +1567,7 @@ for i in range(1, 3):
 
         # If the function is oarea, we plot five overlapping timeseries
         label = location[3]
+        print(str(location))
         if function != 'oarea':
             # Get the time series from the data object
             timeseries = data.getSeries(location, crdict)
@@ -1588,8 +1590,7 @@ for i in range(1, 3):
                     0]
 
             # ts_series, ts_series_ninc, dsci = retrieveAreaData(arrays, choice) # <------------ For caching later, when we have more space
-            ts_series, ts_series_ninc, dsci = data.getArea(crdict,
-                                                           albers_source)  # <- Temporary fix
+            ts_series, ts_series_ninc, dsci = data.getArea(crdict)  # <- Temporary fix
 
             # Save to file for download option
             df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
