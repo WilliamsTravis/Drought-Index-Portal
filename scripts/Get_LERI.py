@@ -291,14 +291,14 @@ for index in indices:
 
         # Finally save to file
         toNetCDF(tfiles=tfiles, ncfiles=None, savepath=ncdir, index=index,
-                 year1=1980, month1=1, year2=todays_date.year - 1,  # <-------- -1 to test update mode
+                 year1=1980, month1=1, year2=todays_date.year,
                  month2=todays_date.month, epsg=4326, percentiles=False,
                  wmode='w')
 
         # Save another projected version
         toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None, savepath=ncdir_proj,
-                       index=index, year1=1980, month1=1, year2=todays_date.year - 1,  # <-------- -1 to test update mode
-                       month2=todays_date.month, epsg=102008,
+                       index=index, year1=1980, month1=1, year2=todays_date.year,
+                       month2=todays_date.month, epsg=proj,
                        percentiles=False, wmode='w')
 
         # Now lets get the percentile values
