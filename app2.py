@@ -5,7 +5,7 @@ An Application to visualize time series of drought indices.
 Things to do:
 
     1) Much of the functionality of this was added in a rather ad hoc manner
-       for time's sake. It's time to go through and modularize everything. 
+       for time's sake. It's time to go through and modularize everything.
             a) Read this: "https://dev.to/ice_lenor/modularization-and-
                            dependency-management-three-steps-to-better-code":
             b) Also this: "https://docs.python-guide.org/writing/structure/"
@@ -32,7 +32,7 @@ Things to do:
        a specific threshold correlation coefficient (eg. 500 km to 0.5). We
        are, however, just now learning of non-linear dependence...this might be
        a future addition.
-    
+
     4) Long-term goal. Retrieve data from a data base. Learning to do this with
        PostgreSQL was actually the main reason why I created the
        "Ubuntu-Practice-Machine" to begin with. I'd had trouble storing NetCDF
@@ -291,7 +291,7 @@ admin = Admin_Elements(resolution)
 years = [int(y) for y in range(min_year, max_year + 1)]
 {'label': '0°C', 'style': {'color': '#77b0b1'}}
 yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
-             y in years}        
+             y in years}
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
 monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',
@@ -737,7 +737,7 @@ app.layout = html.Div([
        html.Div(id='location_store', style={'display': 'none'}),
        html.Div(id='choice_store', style={'display': 'none'}),
        html.Div(id='area_store_1', children='[0, 0]', # <---------------------- I cannot figure out how to properly cache these area time series
-                style={'display': 'none'}),  
+                style={'display': 'none'}),
        html.Div(id='area_store_2', children='[0, 0]',
                 style={'display': 'none'})
        ],
@@ -844,12 +844,12 @@ def functionOptions(function_type):
 
 
 @cache.memoize()
-def retrieveData(signal, function, choice, location): 
+def retrieveData(signal, function, choice, location):
     '''
     This takes the user defined signal and uses the Index_Map class to filter'
     by the selected dates and return the singular map, the 3d timeseries array,
     and the colorscale.
-    
+
     sample arguments:
         signal = [[[2000, 2017], [1, 12], [ 4, 5, 6, 7]], 'Viridis', 'no']
         choice = 'pdsi'
@@ -889,7 +889,7 @@ def retrieveData(signal, function, choice, location):
 #     the 5 categorical drought coverages (% area) and the singlular DSCI. The
 #     DSCI cannot be calculated from the 5 coverages because these are inclusive
 #     for display purposes while the DSCI uses only the percentage of area in
-#     each category. 
+#     each category.
 
 #     When there is enough memory to use this, toggling the DSCI on and off will
 #     be immediate because it will not need to be recalculated each time.
@@ -902,7 +902,7 @@ def retrieveData(signal, function, choice, location):
               [Input('choice_1', 'value'),
                Input('choice_2', 'value')])
 def choiceStore(choice1, choice2):
-    ''' 
+    '''
     Collect and hide both data choices in the hidden 'choice_store' div
     '''
     return (json.dumps([choice1, choice2]))
@@ -962,7 +962,7 @@ def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
 
         # The update graph button activates state selections
         if 'update_graph' in trigger:
-            # When you switch from county to state, there is no initial value 
+            # When you switch from county to state, there is no initial value
             if triggered_value is None:
                 triggered_value = 'all'
                 sel_idx = 0
@@ -1018,7 +1018,7 @@ for i in range(1, 3):
         else:
             county_style = {'display': 'none'}
             state_style = {'display': 'none'}
-            shape_style = {}   
+            shape_style = {}
         return county_style, state_style, shape_style
 
 
@@ -1125,7 +1125,7 @@ for i in range(1, 3):
                                                 'D3 - D4 (Extreme)': ds[3],
                                                 'D4 (Exceptional)': ds[4]},
                                                index=[0])
-    
+
                 else:
                     ds = ['{0:.2f}'.format(hover['points'][i]['y']) for
                           i in range(6)]
@@ -1223,14 +1223,14 @@ for i in range(1, 3):
 
     @app.callback(Output('state_{}'.format(i), 'placeholder'),
                   [Input('update_graphs_1', 'n_clicks'),
-                   Input('update_graphs_2', 'n_clicks'), 
+                   Input('update_graphs_2', 'n_clicks'),
                    Input('location_store', 'children')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
     def dropState(update1, update2, location, key, sync):
         '''
         This is supposed to update the opposite placeholder of the updated map
-        to reflect the state selection if there was a state selection. 
+        to reflect the state selection if there was a state selection.
         '''
         # Check which element the selection came from
         sel_idx = location[-1]
@@ -1277,7 +1277,7 @@ for i in range(1, 3):
             idx = int(key) - 1
             if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
                 raise PreventUpdate
-        try: 
+        try:
             # Only update if it is a singular point
             location[0].index('id')
 
@@ -1296,9 +1296,9 @@ for i in range(1, 3):
                 old_idx = fips_pos[current_fips]
             except:
                 old_idx = label_pos[current_county]
-    
+
             current_options[old_idx]['label'] = current_county
-            
+
             return current_options, current_county, current_fips
 
         except:
@@ -1321,7 +1321,7 @@ for i in range(1, 3):
         '''
         This actually renders the map. I want to modularize, but am struggling
         on this.
-        
+
         Sample arguments
         location =  ['all', 'y', 'x', 'Contiguous United States', 0]
 
@@ -1331,7 +1331,7 @@ for i in range(1, 3):
 
         if trig == 'location_store.children':
             if 'corr' not in function:
-                if 'grid' in location[0] or 'county' in location[0] or 'area' in function:
+                if 'grid' in location[0] or 'county' in location[0]:
                     raise PreventUpdate
 
             # Check which element the selection came from
@@ -1380,8 +1380,8 @@ for i in range(1, 3):
             data2 = retrieveData(signal, function, choice2)
             array2 = data2.getFunction(function).compute()
             amax2 = np.nanmax(array2)
-            amin2 = np.nanmin(array2)        
-            amax = np.nanmax([amax, amax2])        
+            amin2 = np.nanmin(array2)
+            amax = np.nanmax([amax, amax2])
             amin = np.nanmin([amin, amin2])
             del array2
         else:
@@ -1406,7 +1406,7 @@ for i in range(1, 3):
             array = array * data.mask
         elif flag == 'shape':
             y = np.array(json.loads(y))
-            x = np.array(json.loads(x))        
+            x = np.array(json.loads(x))
             gridids = grid[y, x]
             array[~np.isin(grid, gridids)] = np.nan
 
@@ -1417,7 +1417,7 @@ for i in range(1, 3):
         # If it is a correlation recreate the map array
         if 'corr' in function and flag != 'all':
             y = np.array(json.loads(y))
-            x = np.array(json.loads(x))        
+            x = np.array(json.loads(x))
             gridid = grid[y, x]
             amin = 0
             amax = 1
@@ -1461,8 +1461,8 @@ for i in range(1, 3):
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, admin_df, how='inner')
         pdf['data'] = pdf['data'].astype(float)
-        pdf['printdata'] = (pdf['place'] + " (grid: " + 
-                            pdf['grid'].apply(int).apply(str) + ")<br>     " + 
+        pdf['printdata'] = (pdf['place'] + " (grid: " +
+                            pdf['grid'].apply(int).apply(str) + ")<br>     " +
                             pdf['data'].round(3).apply(str))
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
@@ -1527,14 +1527,14 @@ for i in range(1, 3):
     def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
                    reset1, reset2, key, sync, function, area_store):
         '''
-        This makes the time series graph below the map.  
-        
-        Smaple arguments:
+        This makes the time series graph below the map.
+
+        Sample arguments:
             signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
             choice = 'pdsi'
             function = 'oarea'
             location =  ['all', 'y', 'x', 'Contiguous United States', 0]
-        ''' 
+        '''
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
@@ -1560,7 +1560,7 @@ for i in range(1, 3):
         signal = json.loads(signal)
 
         # Collect signals
-        [[year_range, [month1, month2], 
+        [[year_range, [month1, month2],
          month_filter], colorscale, reverse] = signal
 
         # Get/cache data
@@ -1587,7 +1587,7 @@ for i in range(1, 3):
 
             # Create data frame as string for download option
             columns = OrderedDict({'month': dates,
-                                   'value': list(timeseries), 
+                                   'value': list(timeseries),
                                    'function': function_names[function],  # <-- This doesn't always make sense
                                    'location': location[-2],
                                    'index': indexnames[choice]})
@@ -1680,7 +1680,7 @@ for i in range(1, 3):
                 trace = dict(type='scatter',
                              fill='tozeroy',
                              mode='none',
-                             showlegend=False, 
+                             showlegend=False,
                              x=dates,
                              y=ts_series[i],
                              hoverinfo='x',
