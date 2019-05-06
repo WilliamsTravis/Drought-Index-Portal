@@ -41,6 +41,10 @@ from functions2 import  isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
+# There are often missing epsg codes in the gcs.csv file, but proj4 works
+proj = ('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 ' +
+        '+ellps=GRS80 +datum=NAD83 +units=m no_defs')
+
 # Get resolution from file call
 try:
     res = float(sys.argv[1])
@@ -207,7 +211,7 @@ for index in indices:
                 in_path = out_path
                 out_path = os.path.join(temp_folder, 'proj_' + file_name)
                 tif_path_proj = out_path
-                ds = gdal.Warp(out_path, in_path, dstSRS='EPSG:102008')
+                ds = gdal.Warp(out_path, in_path, dstSRS=proj)
                 del ds
 
                 # Open old data sets
@@ -297,7 +301,7 @@ for index in indices:
             in_path = out_path
             out_path = os.path.join(temp_folder, 'proj_' + file_name)
             tif_path_proj = out_path
-            ds = gdal.Warp(out_path, in_path, dstSRS='EPSG:102008')
+            ds = gdal.Warp(out_path, in_path, dstSRS=proj)
             del ds
 
         # Now, run toNetCDF using the file name dates.

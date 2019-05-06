@@ -121,6 +121,10 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'eddi3': 'Evaporative Demand Drought Index - 3 month',
              'eddi6': 'Evaporative Demand Drought Index - 6 month'}
 
+# There are often missing epsg codes in the gcs.csv file, but proj4 works
+proj = ('+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 ' +
+        '+ellps=GRS80 +datum=NAD83 +units=m no_defs')
+
 # Starting today
 todays_date = dt.datetime.today()
 today = np.datetime64(todays_date)
@@ -233,7 +237,7 @@ for index in indices:
                         os.remove(out_path)
 
                     ds = gdal.Warp(out_path_p, source_path,
-                                   dstSRS='EPSG:102008')
+                                   dstSRS=proj)
                     del ds
 
                     # Open old data sets
@@ -322,7 +326,7 @@ for index in indices:
             source_path = out_path
             out_path = os.path.join(local_path, 'tifs',
                                     'proj_temp_{}.tif'.format(i))
-            ds = gdal.Warp(out_path, source_path, dstSRS='EPSG:102008')
+            ds = gdal.Warp(out_path, source_path, dstSRS=proj)
             del ds
 
         # These are lists of all the temporary files, (1, 10, 11, 12, 2, 3,...)
