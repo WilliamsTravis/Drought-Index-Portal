@@ -599,7 +599,7 @@ app.layout = html.Div([
                   'margin': '0 auto',
                   'width': '100%'}),
 
-       # Date Options
+       # Options
        html.Div(id='options',
                 children=[
 
@@ -649,65 +649,67 @@ app.layout = html.Div([
                                                 'inline-block'})],
                                className='eight columns',
                                title=('Choose which months of the year to ' +
-                                      'be included.'))])],
-                    className="row",
-                   style={'margin-bottom': '75'}),
+                                      'be included.'))
+                        ],
+                        className='row'),
 
-       # Rendering Options
-       html.Div(id='options_div',
-                children=[
-                  # Maptype
-                  html.Div([
-                    html.H3("Map Type"),
-                    dcc.Dropdown(id="map_type",
-                                 value="basic",
-                                 options=maptypes)],
-                    className='two columns'),
+    
+                 # Rendering Options
+                 html.Div(id='options_div',
+                          children=[
+                            # Maptype
+                            html.Div([
+                              html.H3("Map Type"),
+                              dcc.Dropdown(id="map_type",
+                                           value="basic",
+                                           options=maptypes)],
+                              className='two columns'),
 
-                  # Functions
-                  html.Div([
-                    html.H3("Function"),
-                    dcc.Tabs(
-                      id='function_type',
-                      value='index',
-                      style=tab_style,
-                      children=[
-                        dcc.Tab(label='Index Values',
+                            # Functions
+                            html.Div([
+                              html.H3("Function"),
+                              dcc.Tabs(
+                                id='function_type',
                                 value='index',
-                                style=tablet_style,
-                                selected_style=tablet_style),
-                        dcc.Tab(label='Percentiles',
-                                value='perc',
-                                style=tablet_style,
-                                selected_style=tablet_style)]),
-                    dcc.Dropdown(id='function_choice',
-                                 options=function_options_perc,
-                                 value='pmean')],
-                    className='three columns'),
+                                style=tab_style,
+                                children=[
+                                  dcc.Tab(label='Index Values',
+                                          value='index',
+                                          style=tablet_style,
+                                          selected_style=tablet_style),
+                                  dcc.Tab(label='Percentiles',
+                                          value='perc',
+                                          style=tablet_style,
+                                          selected_style=tablet_style)]),
+                              dcc.Dropdown(id='function_choice',
+                                           options=function_options_perc,
+                                           value='pmean')],
+                              className='three columns'),
 
-                  # Customize Color Scales
-                  html.Div([
-                    html.H3('Color Gradient'),
-                    dcc.Tabs(
-                      id='reverse',
-                      value=False,
-                      style=tab_style,
-                      children=[
-                        dcc.Tab(value=False,
-                                label="Not Reversed",
+                            # Customize Color Scales
+                            html.Div([
+                              html.H3('Color Gradient'),
+                              dcc.Tabs(
+                                id='reverse',
+                                value='no',
                                 style=tab_style,
-                                selected_style=tablet_style),
-                        dcc.Tab(value=True,
-                                label='Reversed',
-                                style=tab_style,
-                                selected_style=tablet_style)]),
-                    dcc.Dropdown(id='colors',
-                                 options=color_options,
-                                 value='Default')],
-                    className='three columns')],
-                className='row',
-                style={'margin-bottom': '50',
-                       'margin-top': '50'}),
+                                children=[
+                                  dcc.Tab(value='no',
+                                          label="Not Reversed",
+                                          style=tab_style,
+                                          selected_style=tablet_style),
+                                  dcc.Tab(value='yes',
+                                          label='Reversed',
+                                          style=tab_style,
+                                          selected_style=tablet_style)]),
+                              dcc.Dropdown(id='colors',
+                                           options=color_options,
+                                           value='Default')],
+                              className='three columns')],
+                            style={'margin-bottom': '50',
+                                   'margin-top': '50',
+                                   'text-align': 'left'})], 
+                          className='row'),
 
        # Break
        html.Br(style={'line-height': '500%'}),
@@ -855,8 +857,6 @@ def retrieveData(signal, function, choice, location):
         choice = 'pdsi'
         function = 'omean'
     '''
-    print("Recacluating data...")
-
     # Retrieve signal elements
     time_data = signal[0]
     colorscale = signal[1]
@@ -921,7 +921,7 @@ def submitSignal(click, colorscale, reverse, year_range, month1, month2,
     '''
     Collect and hide the options signal in the hidden 'signal' div.
     '''
-    # print(str(month_filter))
+    print('submitSignal reverse: ' + str(reverse))
     signal = [[year_range, [month1, month2], month_filter], colorscale,
               reverse]
     return json.dumps(signal)
@@ -1358,6 +1358,10 @@ for i in range(1, 3):
         [[year_range, [month1, month2], month_filter],
          colorscale, reverse] = signal
 
+        # DASH doesn't seem to like passing True/False as values
+        verity = {'no': False,'yes':True}
+        reverse = verity[reverse]
+
         # Figure which choice is this panel's and which is the other
         key = int(key) - 1
         choices = [choice1, choice2]
@@ -1377,13 +1381,16 @@ for i in range(1, 3):
         # Now, we want to use the same value range for colors for both maps
         if function == 'pmean':
             # Get the data for the other panel for its value range
-            data2 = retrieveData(signal, function, choice2)
+            data2 = retrieveData(signal, function, choice2, location)
             array2 = data2.getFunction(function).compute()
             amax2 = np.nanmax(array2)
             amin2 = np.nanmin(array2)
             amax = np.nanmax([amax, amax2])
             amin = np.nanmin([amin, amin2])
             del array2
+        elif 'min' in function or 'max' in function:
+            amax = amax
+            amin = amin
         else:
             limit = np.nanmax([abs(amin), abs(amax)])
             amax = limit
@@ -1559,9 +1566,14 @@ for i in range(1, 3):
         choice_store = json.loads(choice_store)
         signal = json.loads(signal)
 
+
         # Collect signals
         [[year_range, [month1, month2],
          month_filter], colorscale, reverse] = signal
+
+        # DASH doesn't seem to like passing True/False as values
+        verity = {'no': False,'yes': True}
+        reverse = verity[reverse]
 
         # Get/cache data
         data = retrieveData(signal, function, choice, location)
@@ -1569,11 +1581,6 @@ for i in range(1, 3):
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
         dmin = data.data_min
         dmax = data.data_max
-
-        # Experimenting with LERI
-        if 'leri' in choice:  # <---------------------------------------------- Temporary
-            dmin = 0
-            dmax = 100
 
         # Now, before we calculate the time series, there is some area business
         area_store_key = str(signal) + '_' + choice + '_' + str(location)
@@ -1626,7 +1633,6 @@ for i in range(1, 3):
             df_str = df.to_csv(encoding='utf-8', index=False)
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
 
-
         # Set up y-axis depending on selection
         if function != 'oarea':
             if 'p' in function:
@@ -1646,12 +1652,22 @@ for i in range(1, 3):
         # A few pieces to incorporate in to Index_Maps later
         if 'corr' in function:
             reverse = not reverse
+            if 'p' in function:
+                dmin = 0
+                dmax = 100
+
+        # Experimenting with LERI
+        if 'leri' in choice:  # <---------------------------------------------- Temporary
+            dmin = 0
+            dmax = 100
 
         # The drought area graphs have there own configuration
         elif function == 'oarea':
             yaxis = dict(title='Percent Area (%)',
                          range=[0, 100],
                          hovermode='y')
+
+        print('Timeseries Reverse: ' + str(reverse))
 
         # Build the plotly readable dictionaries (Two types)
         if function != 'oarea':

@@ -1835,8 +1835,8 @@ class Index_Maps():
                      "pmin": self.getMin,
                      "pmax": self.getMax,
                      "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now
-                     "ocorr": self.getMean
-                     }
+                     "ocorr": self.getMean,
+                     "pcorr": self.getMean}
         function = functions[function]
 
         return function()
