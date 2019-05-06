@@ -518,7 +518,7 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
     nco.title = title_map[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
     nco.description = ('Monthly gridded data at '+ str(res) + 
-                       'decimal degree (15 arc-minute resolution, ' +
+                       ' decimal degree (15 arc-minute resolution, ' +
                        'calibrated to 1895-2010 for the continental ' +
                        'United States.'),
     nco.original_author = 'John Abatzoglou - University of Idaho'
@@ -682,7 +682,7 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
     nco.title = title_map[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
     nco.description = ('Monthly gridded data at '+ str(res) + 
-                       'decimal degree (15 arc-minute resolution, ' +
+                       ' decimal degree (15 arc-minute resolution, ' +
                        'calibrated to 1895-2010 for the continental ' +
                        'United States.'),
     nco.original_author = 'John Abatzoglou - University of Idaho'
@@ -1437,7 +1437,8 @@ class Index_Maps():
     # Create Initial Values
     def __init__(self, choice='pdsi', choice_type='original',
                  time_data=[[2000, 2018], [1, 12], list(range(1, 13))],
-                 color_class='Default'):
+                 color_class='Default', chunk=True):
+        self.chunk = chunk
         self.choice = choice  # This does not yet update information
         self.choice_type = choice_type
         self.color_class = color_class
@@ -1614,7 +1615,10 @@ class Index_Maps():
         # Build path and retrieve the data set
         netcdf_path =  type_paths[self.choice_type]
         file_path = os.path.join(data_path, netcdf_path, self.choice + '.nc')
-        dataset = xr.open_dataset(file_path, chunks=100)  # <------------------ Best chunk size/shape?
+        if self.chunk:
+            dataset = xr.open_dataset(file_path, chunks=100)  # <------------------ Best chunk size/shape?
+        else:
+            dataset = xr.open_dataset(file_path)
 
         # Leri is the only dataset that has missing information
         if 'leri' in self.choice:
@@ -1665,8 +1669,8 @@ class Index_Maps():
         dates = pd.DatetimeIndex(self.dataset_interval.time[:].values)
         year1 = min(dates.year)
         year2 = max(dates.year)
-        month1 = min(dates.month)
-        month2 = max(dates.month)
+        month1 = dates.month[0]
+        month2 = dates.month[-1]
         month_filter = list(pd.unique(dates.month))
         time_data = [[year1, year2], [month1, month2], month_filter]
 
@@ -1737,7 +1741,8 @@ class Index_Maps():
         # Now read in the corrollary albers data set
         time_data = self.getTime()
         choice_type = 'projected'
-        proj_data = Index_Maps(choice, choice_type, time_data, 'RdWhBu')
+        proj_data = Index_Maps(choice, choice_type, time_data,
+                               color_class='RdWhBu', chunk=False)
 
         # Filter data by the mask (should be set already)
         masked_arrays = data.where(self.mask == 1)
@@ -1747,7 +1752,7 @@ class Index_Maps():
         # Flip if this is EDDI  # <-------------------------------------------- left off here
         if 'eddi' in choice:
             arrays = arrays*-1
-    
+
         # Drought Categories
         # print("calculating drought area...")
         drought_cats = {'sp': {0: [-0.5, -0.8],
@@ -1770,12 +1775,12 @@ class Index_Maps():
                                  2: [10, 5],
                                  3: [5, 2],
                                  4: [2, 0]}}
-    
+
         # Choose a set of categories
         cat_key = [key for key in drought_cats.keys() if key in choice][0]
         cats = drought_cats[cat_key]
-    
-        def singleFilter(arrays, d, inclusive=False):
+
+        def catFilter(arrays, d, inclusive=False):
             '''
             There is some question about the Drought Severity Coverage Index. The
             NDMC does not use inclusive drought categories though NIDIS appeared to
@@ -1790,7 +1795,7 @@ class Index_Maps():
                 totals = arrays.where(~np.isnan(arrays)).count(dim=('lat', 'lon'))
                 counts = arrays.where(arrays<d[0]).count(dim=('lat', 'lon'))
                 ratios = counts / totals
-                pcts = ratios.compute().data * 100
+                pcts = ratios.compute().data * 100                
                 return pcts
             else:
                 totals = arrays.where(~np.isnan(arrays)).count(
@@ -1798,21 +1803,13 @@ class Index_Maps():
                 counts = arrays.where((arrays<d[0]) &
                                       (arrays>=d[1])).count(dim=('lat', 'lon'))
                 ratios = counts / totals
-                pcts = ratios.compute().data * 100
+                pcts = ratios.compute().data * 100                
                 return pcts
 
-        # For each array
-        def filter(arrays, d, inclusive=False):
-            ps = singleFilter(arrays, d, inclusive)
-            return ps
-    
         # print("starting offending loops...")
-        pnincs = np.array([filter(arrays, cats[i],
-                                  inclusive=False)for i in range(5)])
-
+        pnincs = np.array([catFilter(arrays, cats[i]) for i in range(5)])  # <--- How to speed up, again?
         DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-        pincs = np.array([filter(arrays, cats[i],
-                                 inclusive=True)for i in range(5)]) 
+        pincs = np.array([catFilter(arrays, cats[i],True) for i in range(5)]) 
 
         # Return the list of five layers
         return pincs, pnincs, DSCI

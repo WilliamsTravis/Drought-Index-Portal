@@ -1523,6 +1523,7 @@ for i in range(1, 3):
             signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
             choice = 'pdsi'
             function = 'oarea'
+            location =  ['all', 'y', 'x', 'Contiguous United States', 0]
         '''
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
@@ -1567,7 +1568,6 @@ for i in range(1, 3):
 
         # If the function is oarea, we plot five overlapping timeseries
         label = location[3]
-        print(str(location))
         if function != 'oarea':
             # Get the time series from the data object
             timeseries = data.getSeries(location, crdict)
@@ -1588,20 +1588,23 @@ for i in range(1, 3):
                 location = ['all', 'y', 'x',
                     'Contiguous United States (point estimates not available)',
                     0]
+            label = location[3]
 
             # ts_series, ts_series_ninc, dsci = retrieveAreaData(arrays, choice) # <------------ For caching later, when we have more space
-            ts_series, ts_series_ninc, dsci = data.getArea(crdict)  # <- Temporary fix
+            ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+
+            print(str(dsci.shape))
+            print(str(ts_series_ninc.shape))
+            print(str(len(dates)))
 
             # Save to file for download option
-            df_dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for
-                        d in dates]
-            columns = OrderedDict({'month': df_dates,
-                                   'd0': list(ts_series_ninc[0]),
-                                   'd1': list(ts_series_ninc[1]),
-                                   'd2': list(ts_series_ninc[2]),
-                                   'd3': list(ts_series_ninc[3]),
-                                   'd4': list(ts_series_ninc[4]),
-                                   'dsci': list(dsci),
+            columns = OrderedDict({'month': dates,
+                                   'd0': ts_series_ninc[0],
+                                   'd1': ts_series_ninc[1],
+                                   'd2': ts_series_ninc[2],
+                                   'd3': ts_series_ninc[3],
+                                   'd4': ts_series_ninc[4],
+                                   'dsci': dsci,
                                    'function': 'Percent Area',
                                    'location':  label,
                                    'index': indexnames[choice]})

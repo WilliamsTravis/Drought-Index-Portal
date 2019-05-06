@@ -355,7 +355,7 @@ for index in indices:
         toNetCDFPercentile(nc_path, pc_path)
 
         # Now create the alber's netcdf
-        toNetCDFAlbers(tfiles_proj, ncfiles, nc_path_proj, index, epsg=102008,
+        toNetCDFAlbers(tfiles_proj, ncfiles, nc_path_proj, index, epsg=proj,
                        year1=1895, month1=1, year2=todays_date.year,
                        month2=todays_date.month, wmode='w', percentiles=False)
 
