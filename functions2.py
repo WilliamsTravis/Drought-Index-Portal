@@ -93,7 +93,7 @@ def datePrint(y1, y2, m1, m2, month_filter, monthmarks):
                               monthmarks[m2] + ' ' + str(y2))
         else:
             letters = "".join([monthmarks[m][0] for m in month_filter])
-            date_print =  '{} - {}'.format(y1, y2) + ' ' + letters            
+            date_print =  '{} - {}'.format(y1, y2) + ' ' + letters
     elif y1 == y2:
         if len(month_filter) == 12:
             if m1 == 1 and m2 == 12:
@@ -127,7 +127,7 @@ def movie(array, titles=None, axis=0, na=-9999):
     '''
     This takes a three dimensional numpy array and animates it. If the time
     axis is not 0, specify which it is. Just a heads up, some functions
-    organize along different axes; consider np.dstack vs np.array. 
+    organize along different axes; consider np.dstack vs np.array.
     '''
     if 'netCDF' in str(type(array)):
         if titles is None:
@@ -237,12 +237,12 @@ def shapeReproject(src, dst, src_epsg, dst_epsg):
     '''
     There doesn't appear to be an ogr2ogr analog in Python's OGR module.
     This simply reprojects a shapefile from the file.
-    
+
     src = source file path
     dst = destination file path
     src_epsg = the epsg coordinate reference code for the source file
     dst_epsg = the epsg coordinate reference code for the destination file
-    
+
     src = 'data/shapefiles/temp/temp.shp'
     dst = 'data/shapefiles/temp/temp.shp'
     src_epsg = 102008
@@ -306,7 +306,7 @@ def shapeReproject(src, dst, src_epsg, dst_epsg):
 
     # Set coordinate extents?
     dst_layer.GetExtent()
-    
+
     # Save and close
     src_dataset = None
     dst_dataset = None
@@ -517,7 +517,7 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
     # Global Attrs
     nco.title = title_map[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
-    nco.description = ('Monthly gridded data at '+ str(res) + 
+    nco.description = ('Monthly gridded data at '+ str(res) +
                        ' decimal degree (15 arc-minute resolution, ' +
                        'calibrated to 1895-2010 for the continental ' +
                        'United States.'),
@@ -552,10 +552,10 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
             arrays = rasters.ReadAsArray()
             for y in range(len(arrays)):
                 date_tifs[days[y]] = arrays[y]
-    
+
         # okay, that was just in case the dates wanted to bounce around
         date_tifs = OrderedDict(sorted(date_tifs.items()))
-    
+
         # Now that everything is in the right order, split them back up
         days = np.array(list(date_tifs.keys()))
         arrays = np.array(list(date_tifs.values()))
@@ -681,7 +681,7 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
     # Global Attrs
     nco.title = title_map[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
-    nco.description = ('Monthly gridded data at '+ str(res) + 
+    nco.description = ('Monthly gridded data at '+ str(res) +
                        ' decimal degree (15 arc-minute resolution, ' +
                        'calibrated to 1895-2010 for the continental ' +
                        'United States.'),
@@ -701,13 +701,12 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
     longitudes.units = 'meters'
     longitudes.standard_name = 'projection_x_coordinate'
 
-    # Now getting the data, which is not in order because of how wwdt does it
+    # Now getting the data, which is not in order because of how wwdt does it.
     # We need to associate each day with its array, let's sort files to start
-    
     # Dates may be gotten from either the original nc files or tif filenames
     try:
         ncfiles.sort()
-        tfiles.sort()   
+        tfiles.sort()
         test = Dataset(ncfiles[0])
         test.close()
         date_tifs = {}
@@ -718,16 +717,16 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
             arrays = rasters.ReadAsArray()
             for y in range(len(arrays)):
                 date_tifs[days[y]] = arrays[y]
-    
+
         # okay, that was just in case the dates wanted to bounce around
         date_tifs = OrderedDict(sorted(date_tifs.items()))
-    
+
         # Now that everything is in the right order, split them back up
         days = np.array(list(date_tifs.keys()))
         arrays = np.array(list(date_tifs.values()))
 
     except Exception as e:
-        tfiles.sort()   
+        tfiles.sort()
         datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
         dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
                   d in datestrings]
@@ -883,7 +882,7 @@ def toNetCDFPercentile(src_path, dst_path):
     Sample arguments:
     src_path = 'f:/data/droughtindices/netcdfs/spi2.nc'
     dst_path = 'f:/data/droughtindices/netcdfs/percentiles/spi2.nc'
-    
+
     src = Dataset(src_path)
     dst = Dataset(dst_path, 'w')
     '''
@@ -914,11 +913,11 @@ def toNetCDFPercentile(src_path, dst_path):
                                       fill_value=-9999)
         crs = dst.createVariable('crs', 'c')
         variable.setncattr('grid_mapping', 'crs')
-        
+
         # Set coordinate system attributes
         src_crs = src.variables['crs']
         for name in src_crs.ncattrs():
-            crs.setncattr(name, src_crs.getncattr(name))   
+            crs.setncattr(name, src_crs.getncattr(name))
 
         # Variable Attrs
         times.units = 'days since 1900-01-01'
@@ -948,7 +947,7 @@ def toRaster(array, path, geometry, srs, navalue=-9999):
     path = target path
     srs = spatial reference system
     """
-    xpixels = array.shape[1]    
+    xpixels = array.shape[1]
     ypixels = array.shape[0]
     path = path.encode('utf-8')
     image = gdal.GetDriverByName("GTiff").Create(path, xpixels, ypixels,
@@ -957,7 +956,7 @@ def toRaster(array, path, geometry, srs, navalue=-9999):
     image.SetProjection(srs)
     image.GetRasterBand(1).WriteArray(array)
     image.GetRasterBand(1).SetNoDataValue(navalue)
-      
+
 
 def toRasters(arraylist, path, geometry, srs):
     """
@@ -982,7 +981,7 @@ def toRasters(arraylist, path, geometry, srs):
         image.SetGeoTransform(geometry)
         image.SetProjection(srs)
         image.GetRasterBand(1).WriteArray(ray[1])
-          
+
 
 def wgsToAlbers(arrays, crdict, proj_sample):
     '''
@@ -999,7 +998,7 @@ def wgsToAlbers(arrays, crdict, proj_sample):
     lats = np.unique(wgrid.xy_coordinates[1])
     lats = lats[::-1]
     lons = np.unique(wgrid.xy_coordinates[0])
-    data_array = xr.DataArray(data=arrays.value[0],  # <-------------------------- I'm not sure what this does yet
+    data_array = xr.DataArray(data=arrays.value[0],
                               coords=[lats, lons],
                               dims=['lat', 'lon'])
     wgs_data = xr.Dataset(data_vars={'value': data_array})
@@ -1031,7 +1030,7 @@ def wgsToAlbers(arrays, crdict, proj_sample):
     proj_mask = proj_mask * 0 + 1
 
     # Set up grid info from coordinate dictionary
-    nlat, nlon = proj_mask.shape   
+    nlat, nlon = proj_mask.shape
     xs = np.arange(nlon) * geom[1] + geom[0]
     ys = np.arange(nlat) * geom[5] + geom[3]
 
@@ -1056,10 +1055,10 @@ class Admin_Elements:
         res_ext = '_' + res_str.replace('.', '_')
         county_path = 'data/rasters/us_counties' + res_ext + '.tif'
         state_path = 'data/rasters/us_states' + res_ext + '.tif'
-        
+
         # Use the shapefile for just the county, it has state and county fips
-        src_path = 'data/shapefiles/contiguous_counties.shp' 
-    
+        src_path = 'data/shapefiles/contiguous_counties.shp'
+
         # And rasterize
         self.rasterize(src_path, county_path, attribute='COUNTYFP',
                        extent=[-130, 50, -55, 20])
@@ -1075,14 +1074,14 @@ class Admin_Elements:
         county_path = 'data/rasters/us_counties' + res_ext + '.tif'
         state_path = 'data/rasters/us_states' + res_ext + '.tif'
         admin_path = 'data/tables/admin_df' + res_ext + '.csv'
-    
+
         # There are several administrative elements used in the app
         fips = pd.read_csv('data/tables/US_FIPS_Codes.csv', skiprows=1,
                            index_col=0)
         res_ext = '_' + str(resolution).replace('.', '_')
         states = pd.read_table('data/tables/state_fips.txt', sep='|')
         states = states[['STATE_NAME', 'STUSAB', 'STATE']]
-    
+
         # Read, mask and flatten the arrays
         def flttn(array_path):
             '''
@@ -1093,12 +1092,12 @@ class Admin_Elements:
             na = grid[0, 0]
             grid[grid == na] = np.nan
             return grid.flatten()
-    
+
         grid = flttn(grid_path)
         gradient = flttn(gradient_path)
         carray = flttn(county_path)
         sarray = flttn(state_path)
-    
+
         # Associate county and state fips with grid ids
         cdf = pd.DataFrame(OrderedDict({'grid': grid, 'county_fips': carray,
                                         'state_fips': sarray,
@@ -1112,7 +1111,7 @@ class Admin_Elements:
         fips['fips'] = (fips['FIPS State'].map(frmt) +
                         fips['FIPS County'].map(frmt))
         cdf['fips'] = (cdf['state_fips'].map(frmt) +
-                       cdf['county_fips'].map(frmt))    
+                       cdf['county_fips'].map(frmt))
         df = cdf.merge(fips, left_on='fips', right_on='fips', how='inner')
         df = df.merge(states, left_on='state_fips', right_on='STATE',
                       how='inner')
@@ -1174,7 +1173,7 @@ class Admin_Elements:
         ds = gdal.Warp(out_path, src_path, dstSRS='EPSG:4326',
                        xRes=res, yRes=res, outputBounds=[-130, 20, -55, 50])
         del ds
-    
+
     def buildSource(self):
         '''
         take a single band raster and convert it to a data array for use as a
@@ -1197,10 +1196,10 @@ class Admin_Elements:
         lons = np.arange(nlon) * geom[1] + geom[0]
         lats = np.arange(nlat) * geom[5] + geom[3]
         del data
-    
+
         attributes = OrderedDict({'transform': geom,
                                   'res': (geom[1], geom[1])})
-    
+
         data = xr.DataArray(data=array,
                             name=('A ' + str(resolution) + ' resolution grid' +
                                   ' used as a source array'),
@@ -1225,8 +1224,8 @@ class Admin_Elements:
         # Get paths
         [grid_path, gradient_path, county_path, state_path,
          source_path, albers_path, admin_path] = self.pathRequest()
-    
-        # Read in/create objects  # <------------------------------------------ We could create xarray masks here (xMask)
+
+        # Read in/create objects
         states = gdal.Open(state_path).ReadAsArray()
         states[states==-9999] = np.nan
         cnty = gdal.Open(county_path).ReadAsArray()
@@ -1286,7 +1285,7 @@ class Admin_Elements:
         # Return everything at once
         path_package = [grid_path, gradient_path, county_path, state_path,
                         source_path, albers_path, admin_path]
-    
+
         return path_package
 
     def rasterize(self, src, dst, attribute, all_touch=False,
@@ -1294,7 +1293,7 @@ class Admin_Elements:
         '''
         It seems to be unreasonably involved to do this in Python compared to
         the command line.
-        ''' 
+        '''
         resolution = self.resolution
 
         # Open shapefile, retrieve the layer
@@ -1309,16 +1308,16 @@ class Admin_Elements:
         trgt = gdal.GetDriverByName('GTiff').Create(dst, cols, rows, 1,
                                    gdal.GDT_Float32)
         trgt.SetGeoTransform((xmin, resolution, 0, ymax, 0, -resolution))
-    
+
         # Add crs
         refs = osr.SpatialReference()
         refs.ImportFromEPSG(epsg)
         trgt.SetProjection(refs.ExportToWkt())
-    
+
         # Set no value
         band = trgt.GetRasterBand(1)
         band.SetNoDataValue(na)
-    
+
         # Set options
         if all_touch is True:
             ops = ['-at', 'ATTRIBUTE=' + attribute]
@@ -1332,7 +1331,7 @@ class Admin_Elements:
         del trgt
         del src_data
 
-    
+
 class Cacher:
     '''
     A simple stand in cache for storing objects in memory.
@@ -1362,7 +1361,7 @@ class Coordinate_Dictionaries:
     This translates cartesian coordinates to geographic coordinates and back.
     It also provides information about the coordinate system used in the
     source data set, and methods to translate grid ids to plotly point objects
-    and back. 
+    and back.
     '''
     def __init__(self, source_path, grid):
         # Source Data Array
@@ -1414,7 +1413,7 @@ class Index_Maps():
     This class creates a singular map as a function of some timeseries of
     rasters for use in the Ubuntu-Practice-Machine index comparison app.
     It also returns information needed for rendering.
-    
+
     I think I could also incorporate the location data into this, include the
     correlation and area series functions, and simplify the logic built into
     the call backs.
@@ -1631,7 +1630,7 @@ class Index_Maps():
         '''
         Take a location object and the coordinate dictionary to create an
         xarray for masking the dask datasets without pulling into memory.
-        
+
         location = location from Location_Builder or 1d array
         crdict = coordinate dictionary
         '''
@@ -1651,7 +1650,7 @@ class Index_Maps():
 
         # Set up grid info from coordinate dictionary
         geom = crdict.source.transform
-        nlat, nlon = mask.shape   
+        nlat, nlon = mask.shape
         lons = np.arange(nlon) * geom[1] + geom[0]
         lats = np.arange(nlat) * geom[5] + geom[3]
 
@@ -1674,7 +1673,7 @@ class Index_Maps():
         month_filter = list(pd.unique(dates.month))
         time_data = [[year1, year2], [month1, month2], month_filter]
 
-        return time_data        
+        return time_data
 
     def getMean(self):
         return self.dataset_interval.mean('time').value.data
@@ -1731,7 +1730,7 @@ class Index_Maps():
         category and mask out all cells with values above or below the category
         thresholds. If inclusive is 'True' it will only mask out all cells that
         fall above the chosen category.
-    
+
         For now this requires original values, percentiles even out too quickly
         '''
         # Specify choice in case it needs to be inverse for eddi
@@ -1796,7 +1795,7 @@ class Index_Maps():
                                                                     'lon'))
                 counts = arrays.where(arrays<d[0]).count(dim=('lat', 'lon'))
                 ratios = counts / totals
-                pcts = ratios.compute().data * 100                
+                pcts = ratios.compute().data * 100
                 return pcts
             else:
                 totals = arrays.where(~np.isnan(arrays)).count(
@@ -1804,20 +1803,20 @@ class Index_Maps():
                 counts = arrays.where((arrays<d[0]) &
                                       (arrays>=d[1])).count(dim=('lat', 'lon'))
                 ratios = counts / totals
-                pcts = ratios.compute().data * 100                
+                pcts = ratios.compute().data * 100
                 return pcts
 
         # print("starting offending loops...")
         pnincs = np.array([catFilter(arrays, cats[i]) for i in range(5)])  # <--- How to speed up, again?
         DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-        pincs = np.array([catFilter(arrays, cats[i],True) for i in range(5)]) 
+        pincs = np.array([catFilter(arrays, cats[i],True) for i in range(5)])
 
         # Return the list of five layers
         return pincs, pnincs, DSCI
 
     def getFunction(self, function):
         '''
-        To choose which function to return using a string from a dropdown app. 
+        To choose which function to return using a string from a dropdown app.
         '''
         functions = {"omean": self.getMean,
                      "omin": self.getMin,
@@ -1837,7 +1836,7 @@ class Location_Builder:
     '''
     This takes a location selection determined to be the triggering choice,
     decides what type of location it is, and builds the appropriate location
-    list object needed further down the line. To do so, it holds county, 
+    list object needed further down the line. To do so, it holds county,
     state, grid, and other administrative information.
     '''
 
@@ -1849,7 +1848,7 @@ class Location_Builder:
         self.admin_df = admin_df
         self.states_df = admin_df[['state', 'state_abbr',
                                    'state_fips']].drop_duplicates().dropna()
-        self.state_array = state_array  
+        self.state_array = state_array
         self.county_array = county_array
 
     def chooseRecent(self):
@@ -1895,7 +1894,7 @@ class Location_Builder:
             counties = admin_df['place'][admin_df.grid == gridid]
             county = counties.unique()
             label = county[0] + ' (Grid ' + str(int(gridid)) + ')'
-            location = ['grid', str(y), str(x), label]        
+            location = ['grid', str(y), str(x), label]
 
         # 3: Selection is a set of grid IDs
         elif 'selectedData' in trig_id:
@@ -1911,14 +1910,14 @@ class Location_Builder:
                                      d in selections])
                 local_df = admin_df[admin_df['place'].isin(
                                     list(np.unique(counties)))]
-    
+
                 # Use gradient to print NW and SE most counties as a range
                 NW = local_df['place'][
                     local_df['gradient'] == min(local_df['gradient'])].item()
                 SE = local_df['place'][
                     local_df['gradient'] == max(local_df['gradient'])].item()
                 label = NW + " to " + SE
-                location = ['grids', str(y), str(x), label]        
+                location = ['grids', str(y), str(x), label]
             else:
                 raise PreventUpdate
 
@@ -1927,7 +1926,7 @@ class Location_Builder:
             # Selection is the default 'all'
             if type(trig_val) is str:
                 location = ['all',  'y', 'x', 'Contiguous United States']
-        
+
             # Empty list, default to CONUS
             elif len(trig_val) == 0:
                 location = ['all',  'y', 'x', 'Contiguous United States']
