@@ -1592,10 +1592,6 @@ for i in range(1, 3):
             # ts_series, ts_series_ninc, dsci = retrieveAreaData(arrays, choice) # <------------ For caching later, when we have more space
             ts_series, ts_series_ninc, dsci = data.getArea(crdict)
 
-            print(str(dsci.shape))
-            print(str(ts_series_ninc.shape))
-            print(str(len(dates)))
-
             # Save to file for download option
             columns = OrderedDict({'month': dates,
                                    'd0': ts_series_ninc[0],
