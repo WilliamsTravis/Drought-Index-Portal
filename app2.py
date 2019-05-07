@@ -653,7 +653,6 @@ app.layout = html.Div([
                         ],
                         className='row'),
 
-    
                  # Rendering Options
                  html.Div(id='options_div',
                           children=[
@@ -822,7 +821,7 @@ def toggleDescription(click):
         button_children = "Description: Off"
 
     else:
-        desc_children = open('data/tables/description.txt').read()
+        desc_children = open('data/tables/description.txt').read()  # <-------- It makes no sense that the description doc is in the tables folder
         style = {'background-color': '#c7d4ea',
                  'border-radius': '4px',
                  'font-family': 'Times New Roman'}
