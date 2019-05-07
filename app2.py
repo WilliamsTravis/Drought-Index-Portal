@@ -1664,6 +1664,7 @@ for i in range(1, 3):
         elif function == 'oarea':
             yaxis = dict(title='Percent Area (%)',
                          range=[0, 100],
+                         # family='Time New Roman',
                          hovermode='y')
 
         print('Timeseries Reverse: ' + str(reverse))
@@ -1732,6 +1733,7 @@ for i in range(1, 3):
                                          anchor='x',
                                          overlaying='y',
                                          side='right',
+                                         # family='Time New Roman',
                                          position=0.15,
                                          font=dict(size=8))
             layout_copy['margin'] = dict(l=55, r=55, b=25, t=90, pad=10)
