@@ -10,7 +10,9 @@ Created on Tue Jan 22 18:02:17 2019
 # In[]: Environment
 import datetime as dt
 from dash.exceptions import PreventUpdate
+import dask.array as da
 from dateutil.relativedelta import relativedelta
+import functools
 import gc
 from glob import glob
 import json
@@ -28,6 +30,7 @@ import salem
 from scipy.stats import rankdata
 from tqdm import tqdm
 import sys
+import warnings
 import xarray as xr
 
 # Check if windows or linux
@@ -37,6 +40,7 @@ else:
     home_path = '/root/Sync'
     data_path = '/root/Sync'
 
+warnings.filterwarnings("ignore")
 
 # In[]: Variables
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
@@ -64,70 +68,6 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
 
 
 # In[]: Functions
-def areaSeries(location, arrays, dates, mask, state_array, albers_source, cd,
-               reproject=False):
-    '''
-    location = list output from app.callback function 'locationPicker'
-    arrays = a time series of arrays falling into each of 5 drought categories
-    inclusive = whether or to categorize drought by including all categories
-    '''
-    if len(location) > 4:
-        flag, y, x, label, idx = location
-        y = json.loads(y)
-        x = json.loads(x)
-        if type(y) is not list:
-            timeseries = np.array([round(a[y, x], 4) for a in arrays])
-        else:
-            gridids = cd.grid[y, x]
-            area_mask = cd.grid.copy()
-            area_mask[~np.isin(cd.grid, gridids)] = np.nan
-            area_mask = area_mask * 0 + 1
-            arrays = arrays  * area_mask
-            timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
-
-    else:
-        arrays = arrays * mask
-        flag, states, label, idx = location
-        timeseries = np.array([round(np.nanmean(a), 4) for a in arrays])
-
-    # If we are sending the output to the drought area function
-    if reproject:
-        arrays = wgsToAlbers(arrays, cd, albers_source)
-
-    # print("Area fitlering complete.")
-    return [timeseries, arrays, label]
-
-
-def calculateCV(indexlist):
-    '''
-     A single array showing the distribution of coefficients of variation
-         throughout the time period represented by the chosen rasters
-    '''
-    # is it a named list or not?
-    if type(indexlist[0]) is list:
-        # Get just the arrays from this
-        indexlist = [a[1] for a in indexlist]
-    else:
-        indexlist = indexlist
-
-    # Adjust for outliers
-    sd = np.nanstd(indexlist)
-    thresholds = [-3*sd, 3*sd]
-    for a in indexlist:
-        a[a <= thresholds[0]] = thresholds[0]
-        a[a >= thresholds[1]] = thresholds[1]
-
-    # Standardize Range
-    indexlist = standardize(indexlist)
-
-    # Simple Cellwise calculation of variance
-    sds = np.nanstd(indexlist, axis=0)
-    avs = np.nanmean(indexlist, axis=0)
-    covs = sds/avs
-
-    return covs
-
-
 @jit(nopython=True)
 def correlationField(ts, arrays):
     '''
@@ -139,9 +79,8 @@ def correlationField(ts, arrays):
     for i in range(arrays.shape[1]):
         for j in range(arrays.shape[2]):
             lst = arrays[:, i, j]
-            cor = np.corrcoef(ts, lst)[0,1]
+            cor = np.corrcoef(ts, lst)[0, 1]
             one_field[i, j] = cor
-
     return one_field
 
 
@@ -155,7 +94,7 @@ def datePrint(y1, y2, m1, m2, month_filter, monthmarks):
                               monthmarks[m2] + ' ' + str(y2))
         else:
             letters = "".join([monthmarks[m][0] for m in month_filter])
-            date_print =  '{} - {}'.format(y1, y2) + ' ' + letters            
+            date_print =  '{} - {}'.format(y1, y2) + ' ' + letters
     elif y1 == y2:
         if len(month_filter) == 12:
             if m1 == 1 and m2 == 12:
@@ -169,89 +108,10 @@ def datePrint(y1, y2, m1, m2, month_filter, monthmarks):
     return date_print
 
 
-def droughtArea(arrays, choice, inclusive=False):
-    '''
-    This will take in a time series of arrays and a drought severity
-    category and mask out all cells with values above or below the category
-    thresholds. If inclusive is 'True' it will only mask out all cells that
-    fall above the chosen category.
-
-    For now this requires original values, percentiles even out too quickly
-    '''
-    # Flip if this is EDDI
-    if 'eddi' in choice:
-        arrays = arrays*-1
-
-    # Drought Categories
-    # print("calculating drought area...")
-    drought_cats = {'sp': {0: [-0.5, -0.8],
-                           1: [-0.8, -1.3],
-                           2: [-1.3, -1.5],
-                           3: [-1.5, -2.0],
-                           4: [-2.0, -999]},
-                    'eddi': {0: [-0.5, -0.8],
-                             1: [-0.8, -1.3],
-                             2: [-1.3, -1.5],
-                             3: [-1.5, -2.0],
-                             4: [-2.0, -999]},
-                    'pdsi': {0: [-1.0, -2.0],
-                             1: [-2.0, -3.0],
-                             2: [-3.0, -4.0],
-                             3: [-4.0, -5.0],
-                             4: [-5.0, -999]},
-                    'leri': {0: [30, 20],
-                             1: [20, 10],
-                             2: [10, 5],
-                             3: [5, 2],
-                             4: [2, 0]}}
-
-    # Choose a set of categories
-    cat_key = [key for key in drought_cats.keys() if key in choice][0]
-    cats = drought_cats[cat_key]
-
-    def singleFilter(array, d, inclusive=False):
-        '''
-        There is some question about the Drought Severity Coverage Index. The
-        NDMC does not use inclusive drought categories though NIDIS appeared to
-        in the "Historical Character of US Northern Great Plains Drought"
-        study. In an effort to match NIDIS' sample chart, we are using the
-        inclusive method for now. It would be fine either way as long as the
-        index is compared to other values with the same calculation, but we
-        should really defer to NDMC. We could also add an option to display
-        inclusive vs non-inclusive drought severity coverages.
-        '''
-        if inclusive:
-            mask = array<d[0]
-        else:
-            mask = (array<d[0]) & (array>=d[1])
-        return array[mask]
-
-    # For each array
-    def filter(arrays, d, inclusive=False):
-        values = np.array([singleFilter(a, d, inclusive=inclusive) for
-                            a in arrays])
-        totals = [len(a[~np.isnan(a)]) for a in arrays]  # <------------------- Because the available area for LERI changes, this adjusts the total area for each time step
-        ps = np.array([(len(values[i])/totals[i]) * 100 for
-                       i in range(len(values))])
-        return ps
-
-    # print("starting offending loops...")
-    pnincs = np.array([filter(arrays, cats[i]) for i in range(5)])
-    DSCI = np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]), axis=0)
-    pincs = [np.sum(pnincs[i:], axis=0) for i in range(5)]
-
-    # Return the list of five layers
-    return pincs, pnincs, DSCI
-
-
 def im(array):
     '''
     This just plots an array as an image
     '''
-    # plt.close()
-    # window = plt.get_current_fig_manager()
-    # window.canvas.manager.window.raise_()
-    # plt.close()
     fig = plt.imshow(array)
     fig.figure.canvas.raise_()
 
@@ -264,49 +124,33 @@ def isInt(string):
         return False
 
 
-def makeMap(maps, function):
-    '''
-    To choose which function to return from Index_Maps. 
-
-    Production Notes:
-        This could be make into a dictionary rather than all of these if
-        statements. Perhaps it could be built into the Index_Maps class
-        to make that independently functional.
-    '''
-    gc.collect()
-    if function == "omean":
-        data = maps.meanOriginal()
-    if function == "omax":
-        data = maps.maxOriginal()
-    if function == "omin":
-        data = maps.minOriginal()
-    if function == "pmean":
-        data = maps.meanPercentile()
-    if function == "pmax":
-        data = maps.maxPercentile()
-    if function == "pmin":
-        data = maps.minPercentile()
-    if function == "ocv":
-        data = maps.coefficientVariation()
-    if function == "oarea":
-        data = maps.meanOriginal()
-    if function == "ocorr":
-        data = maps.meanOriginal()
-    if function == "pcorr":
-        data = maps.meanPercentile()
-    return data
-
-
-def movie(array, titles=None, axis=0):
+def movie(array, titles=None, axis=0, na=-9999):
     '''
     This takes a three dimensional numpy array and animates it. If the time
     axis is not 0, specify which it is. Just a heads up, some functions
-    organize along different axes; consider np.dstack vs np.array. 
+    organize along different axes; consider np.dstack vs np.array.
     '''
-    if titles is None:
-        titles = ["" for t in range(len(array))]
-    if type(titles) is str:
-        titles = [titles + ': ' + str(t) for t in range(len(array))]
+    if 'netCDF' in str(type(array)):
+        if titles is None:
+            titles = array.variables['time']
+        key = list(array.variables.keys())[3]  # I am guessing it's always 3
+        array = array.variables[key][:]
+        if na in array:
+            array[array==na] = np.nan
+    elif 'xarray' in str(type(array)):
+        if titles is None:
+            titles = array.time
+        array = array.value
+        if na in array:
+            array.data[array.data==na] = np.nan
+    else:
+        if titles is None:
+            titles = ["" for t in range(len(array))]
+        elif type(titles) is str:
+            titles = [titles + ': ' + str(t) for t in range(len(array))]
+        if na in array:
+            array[array==na] = np.nan
+
 
     fig, ax = plt.subplots()
 
@@ -358,7 +202,7 @@ def percentileArrays(arrays):
         import scipy.stats
         scipy.stats.moment(lst, 1)
 
-        pct = rankdata(lst)/len(lst)
+        pct = (rankdata(lst)/len(lst)) * 100
         return pct
 
     pcts = np.apply_along_axis(percentiles, axis=0, arr=arrays)
@@ -390,16 +234,49 @@ def readRaster(rasterpath, band, navalue=-9999):
     return(array, geometry, arrayref)
 
 
+def readRasters(files, navalue=-9999):
+    """
+    files = list of files to read in
+    navalue = a number (float) for nan values if we forgot 
+                to translate the file with one originally
+    
+    This converts monthly rasters into numpy arrays and them as a list in another
+            list. The other parts are the spatial features needed to write
+            any results to a raster file. The list order is:
+                
+      [[name_date (string),arraylist (numpy)], spatial geometry (gdal object),
+       coordinate reference system (gdal object)]
+    
+    The file naming convention required is: "INDEXNAME_YYYYMM.tif"
+
+    """
+    print("Converting raster to numpy array...")
+    files = [f for f in files if os.path.isfile(f)]
+    names = [os.path.basename(files[i]) for i in range(len(files))]
+    sample = gdal.Open(files[1])
+    geometry = sample.GetGeoTransform()
+    arrayref = sample.GetProjection()
+    alist = []
+    for i in tqdm(range(0,len(files))):
+        rast = gdal.Open(files[i])
+        array = np.array(rast.GetRasterBand(1).ReadAsArray())
+        array = array.astype(float)
+        array[array == navalue] = np.nan
+        name = str.upper(names[i][:-4])  # the file name excluding its extention (may need to be changed if the extension length is not 3)
+        alist.append([name,array])  # It's confusing but we need some way of holding these dates. 
+    return(alist,geometry,arrayref)
+
+
 def shapeReproject(src, dst, src_epsg, dst_epsg):
     '''
     There doesn't appear to be an ogr2ogr analog in Python's OGR module.
     This simply reprojects a shapefile from the file.
-    
+
     src = source file path
     dst = destination file path
     src_epsg = the epsg coordinate reference code for the source file
     dst_epsg = the epsg coordinate reference code for the destination file
-    
+
     src = 'data/shapefiles/temp/temp.shp'
     dst = 'data/shapefiles/temp/temp.shp'
     src_epsg = 102008
@@ -463,7 +340,7 @@ def shapeReproject(src, dst, src_epsg, dst_epsg):
 
     # Set coordinate extents?
     dst_layer.GetExtent()
-    
+
     # Save and close
     src_dataset = None
     dst_dataset = None
@@ -503,7 +380,7 @@ def standardize(indexlist):
     return(standardizedlist)
 
 
-def toNetCDF(file, ncfile, savepath, index, epsg=4326, wmode='w'):
+def toNetCDFSingle(file, ncfile, savepath, index, epsg=4326, wmode='w'):
     '''
     Take an individual tif and either write or append to netcdf.
     '''
@@ -593,9 +470,8 @@ def toNetCDF(file, ncfile, savepath, index, epsg=4326, wmode='w'):
     nco.close()
 
 
-def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
-              year2, month2, epsg=4326, percentiles=False,
-              wmode='w'):
+def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
+             proj=4326, percentiles=False, wmode='w'):
     '''
     Take multiple multiband netcdfs with unordered dates and multiple tiffs
     with desired geometries and write to a single netcdf as a single time
@@ -604,8 +480,11 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     As an expediency, if there isn't an nc file it defaults to reading dates
     from the file names.
 
+    I need to go back and parameterize the subtitle to reflect the actual dates
+    used in each dataset.
+
     Test parameters for toNetCDF2
-        tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/*tif')
+        tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/temp*')
         ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/*nc')
         savepath = 'testing.nc'
         index = 'spi1'
@@ -624,6 +503,7 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     # Use one tif (one array) for spatial attributes
     data = gdal.Open(tfiles[0])
     geom = data.GetGeoTransform()
+    res = abs(geom[1])
     proj = data.GetProjection()
     array = data.ReadAsArray()
     if len(array.shape) == 3:
@@ -636,7 +516,174 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
 
     # use osr for more spatial attributes
     refs = osr.SpatialReference()
-    refs.ImportFromEPSG(epsg)
+    if type(proj) is int:
+        refs.ImportFromEPSG(proj)
+    elif '+' in proj:
+        refs.ImportFromProj4(proj)
+
+    # Create Dataset
+    nco = Dataset(savepath, mode=wmode, format='NETCDF4')
+
+    # Dimensions
+    nco.createDimension('lat', nlat)
+    nco.createDimension('lon', nlon)
+    nco.createDimension('time', None)
+
+    # Variables
+    latitudes = nco.createVariable('lat',  'f4', ('lat',))
+    longitudes = nco.createVariable('lon',  'f4', ('lon',))
+    times = nco.createVariable('time', 'f8', ('time',))
+    variable = nco.createVariable('value', 'f4', ('time', 'lat', 'lon'),
+                                  fill_value=-9999)
+    variable.standard_name = 'index'
+    variable.units = 'unitless'
+    variable.long_name = 'Index Value'
+
+    # Appending the CRS information
+    crs = nco.createVariable('crs', 'c')
+    variable.setncattr('grid_mapping', 'crs')
+    crs.spatial_ref = proj
+    if type(crs) is int:
+        crs.epsg_code = "EPSG:" + str(proj)
+    elif '+' in proj:
+        crs.proj4 = proj
+    crs.GeoTransform = geom
+    crs.grid_mapping_name = 'latitude_longitude'
+    crs.longitude_of_prime_meridian = 0.0
+    crs.semi_major_axis = refs.GetSemiMajor()
+    crs.inverse_flattening = refs.GetInvFlattening()
+
+    # Attributes
+    # Global Attrs
+    nco.title = title_map[index]
+    nco.subtitle = "Monthly Index values since 1895-01-01"
+    nco.description = ('Monthly gridded data at '+ str(res) +
+                       ' decimal degree (15 arc-minute resolution, ' +
+                       'calibrated to 1895-2010 for the continental ' +
+                       'United States.'),
+    nco.original_author = 'John Abatzoglou - University of Idaho'
+    nco.date = pd.to_datetime(str(today)).strftime('%Y-%m-%d')
+    nco.projection = 'WGS 1984 EPSG: 4326'
+    nco.citation = ('Westwide Drought Tracker, ' +
+                    'http://www.wrcc.dri.edu/monitor/WWDT')
+    nco.Conventions = 'CF-1.6'  # Should I include this if I am not sure?
+
+    # Variable Attrs
+    times.units = 'days since 1900-01-01'
+    times.standard_name = 'time'
+    times.calendar = 'gregorian'
+    latitudes.units = 'degrees_south'
+    latitudes.standard_name = 'latitude'
+    longitudes.units = 'degrees_east'
+    longitudes.standard_name = 'longitude'
+
+    # Now getting the data, which is not in order because of how wwdt does it
+    # We need to associate each day with its array
+    try:
+        tfiles.sort()
+        ncfiles.sort()
+        test = Dataset(ncfiles[0])
+        test.close()
+        date_tifs = {}
+        for i in range(len(ncfiles)):
+            nc = Dataset(ncfiles[i])
+            days = nc.variables['day'][:]
+            rasters = gdal.Open(tfiles[i])
+            arrays = rasters.ReadAsArray()
+            for y in range(len(arrays)):
+                date_tifs[days[y]] = arrays[y]
+
+        # okay, that was just in case the dates wanted to bounce around
+        date_tifs = OrderedDict(sorted(date_tifs.items()))
+
+        # Now that everything is in the right order, split them back up
+        days = np.array(list(date_tifs.keys()))
+        arrays = np.array(list(date_tifs.values()))
+
+    except Exception as e:
+        tfiles.sort()
+
+        # print('Combining data using filename dates...')
+        datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
+        dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
+                  d in datestrings]
+        deltas = [d - dt.datetime(1900, 1, 1) for d in dates]
+        days = np.array([d.days for d in deltas])
+        arrays = []
+        for t in tfiles:
+            data = gdal.Open(t)
+            array = data.ReadAsArray()
+            arrays.append(array)
+        arrays = np.array(arrays)
+
+    # Filter out dates
+    base = dt.datetime(1900, 1, 1)
+    start = dt.datetime(year1, month1, 1)
+    day1 = start - base
+    day1 = day1.days
+    end = dt.datetime(year2, month2, 1)
+    day2 = end - base
+    day2 = day2.days
+    idx = len(days) - len(days[np.where(days >= day1)])
+    idx2 = len(days[np.where(days < day2)])
+    days = days[idx:idx2]
+    arrays = arrays[idx:idx2]
+
+    # This allows the option to store the data as percentiles
+    if percentiles:
+        arrays[arrays==-9999] = np.nan
+        arrays = percentileArrays(arrays)
+
+    # Write - set this to write one or multiple
+    latitudes[:] = lats
+    longitudes[:] = lons
+    times[:] = days.astype(int)
+    variable[:, :, :] = arrays
+
+    # Done
+    nco.close()
+
+
+def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
+                   year2, month2, epsg=4326, percentiles=False, wmode='w'):
+    '''
+    This does the same as above but is specific to the north american
+    albers equal area conic projection
+
+    Test parameters for toNetCDF2
+        tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/proj*')
+        ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/temp_*[0-9]*.nc')
+        savepath = 'f:/data/droughtindices/netcdfs/wwdt/testing.nc'
+        index = 'spi1'
+        year1=1895
+        month1=1
+        year2=2019
+        month2=12
+        epsg=102008
+        percentiles=False
+        wmode='w'
+    '''
+    # For attributes
+    todays_date = dt.datetime.today()
+    today = np.datetime64(todays_date)
+
+    # Use one tif (one array) for spatial attributes
+    data = gdal.Open(tfiles[0])
+    geom = data.GetGeoTransform()
+    res = abs(geom[1])
+    proj = data.GetProjection()
+    array = data.ReadAsArray()
+    if len(array.shape) == 3:
+        ntime, nlat, nlon = np.shape(array)
+    else:
+        nlat, nlon = np.shape(array)
+    lons = np.arange(nlon) * geom[1] + geom[0]
+    lats = np.arange(nlat) * geom[5] + geom[3]
+    del data
+
+    # use osr for more spatial attributes
+    refs = osr.SpatialReference()
+    refs.ImportFromProj4(epsg)
 
     # Create Dataset
     nco = Dataset(savepath, mode=wmode, format='NETCDF4')
@@ -662,18 +709,21 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     crs.spatial_ref = proj
     crs.epsg_code = "EPSG:" + str(epsg)
     crs.GeoTransform = geom
-    crs.grid_mapping_name = 'latitude_longitude'
-    crs.longitude_of_prime_meridian = 0.0
-    crs.semi_major_axis = refs.GetSemiMajor()
-    crs.inverse_flattening = refs.GetInvFlattening()
+    crs.grid_mapping_name = 'albers_conical_equal_area'
+    crs.standard_parallel = [20.0, 60.0]
+    crs.longitude_of_central_meridian = -32.0
+    crs.latitude_of_projection_origin = 40.0
+    crs.false_easting = 0.0
+    crs.false_northing = 0.0
 
     # Attributes
     # Global Attrs
     nco.title = title_map[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
-    nco.description = ('Monthly gridded data at 0.25 decimal degree' +
-                       ' (15 arc-minute resolution, calibrated to 1895-2010 ' +
-                       ' for the continental United States.'),
+    nco.description = ('Monthly gridded data at '+ str(res) +
+                       ' decimal degree (15 arc-minute resolution, ' +
+                       'calibrated to 1895-2010 for the continental ' +
+                       'United States.'),
     nco.original_author = 'John Abatzoglou - University of Idaho'
     nco.date = pd.to_datetime(str(today)).strftime('%Y-%m-%d')
     nco.projection = 'WGS 1984 EPSG: 4326'
@@ -685,14 +735,17 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
     times.units = 'days since 1900-01-01'
     times.standard_name = 'time'
     times.calendar = 'gregorian'
-    latitudes.units = 'degrees_south'
-    latitudes.standard_name = 'latitude'
-    longitudes.units = 'degrees_east'
-    longitudes.standard_name = 'longitude'
+    latitudes.units = 'meters'
+    latitudes.standard_name = 'projection_y_coordinate'
+    longitudes.units = 'meters'
+    longitudes.standard_name = 'projection_x_coordinate'
 
-    # Now getting the data, which is not in order because of how wwdt does it
-    # We need to associate each day with its array
+    # Now getting the data, which is not in order because of how wwdt does it.
+    # We need to associate each day with its array, let's sort files to start
+    # Dates may be gotten from either the original nc files or tif filenames
     try:
+        ncfiles.sort()
+        tfiles.sort()
         test = Dataset(ncfiles[0])
         test.close()
         date_tifs = {}
@@ -703,17 +756,16 @@ def toNetCDF2(tfiles, ncfiles, savepath, index, year1, month1,
             arrays = rasters.ReadAsArray()
             for y in range(len(arrays)):
                 date_tifs[days[y]] = arrays[y]
-    
+
         # okay, that was just in case the dates wanted to bounce around
         date_tifs = OrderedDict(sorted(date_tifs.items()))
-    
+
         # Now that everything is in the right order, split them back up
         days = np.array(list(date_tifs.keys()))
         arrays = np.array(list(date_tifs.values()))
 
     except Exception as e:
-        print(str(e))
-        # print('Combining data using filename dates...')
+        tfiles.sort()
         datestrings = [f[-10:-4] for f in tfiles if isInt(f[-10:-4])]
         dates = [dt.datetime(year=int(d[:4]), month=int(d[4:]), day=15) for
                   d in datestrings]
@@ -816,7 +868,7 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
     # Attributes
     # Global Attrs
     nco.title = title_map[index]
-    nco.subtitle = "Monthly Index values since 1948-01-01"
+    nco.subtitle = "Monthly Index values since 1895-01-01"
     nco.description = ('Monthly gridded data at 0.25 decimal degree' +
                        ' (15 arc-minute resolution, calibrated to 1895-2010 ' +
                        ' for the continental United States.'),
@@ -869,7 +921,7 @@ def toNetCDFPercentile(src_path, dst_path):
     Sample arguments:
     src_path = 'f:/data/droughtindices/netcdfs/spi2.nc'
     dst_path = 'f:/data/droughtindices/netcdfs/percentiles/spi2.nc'
-    
+
     src = Dataset(src_path)
     dst = Dataset(dst_path, 'w')
     '''
@@ -900,11 +952,11 @@ def toNetCDFPercentile(src_path, dst_path):
                                       fill_value=-9999)
         crs = dst.createVariable('crs', 'c')
         variable.setncattr('grid_mapping', 'crs')
-        
+
         # Set coordinate system attributes
         src_crs = src.variables['crs']
         for name in src_crs.ncattrs():
-            crs.setncattr(name, src_crs.getncattr(name))   
+            crs.setncattr(name, src_crs.getncattr(name))
 
         # Variable Attrs
         times.units = 'days since 1900-01-01'
@@ -934,7 +986,7 @@ def toRaster(array, path, geometry, srs, navalue=-9999):
     path = target path
     srs = spatial reference system
     """
-    xpixels = array.shape[1]    
+    xpixels = array.shape[1]
     ypixels = array.shape[0]
     path = path.encode('utf-8')
     image = gdal.GetDriverByName("GTiff").Create(path, xpixels, ypixels,
@@ -943,7 +995,7 @@ def toRaster(array, path, geometry, srs, navalue=-9999):
     image.SetProjection(srs)
     image.GetRasterBand(1).WriteArray(array)
     image.GetRasterBand(1).SetNoDataValue(navalue)
-      
+
 
 def toRasters(arraylist, path, geometry, srs):
     """
@@ -968,24 +1020,26 @@ def toRasters(arraylist, path, geometry, srs):
         image.SetGeoTransform(geometry)
         image.SetProjection(srs)
         image.GetRasterBand(1).WriteArray(ray[1])
-          
 
-def wgsToAlbers(arrays, cd, albers_source):
+
+def wgsToAlbers(arrays, crdict, proj_sample):
     '''
-    Takes a 3d array, or list of 2d arrays, in WGS 84 (epsg: 4326) to Alber's
-    North American Equal Area Conic (epsg: 102008).
+    Takes an xarray dataset in WGS 84 (epsg: 4326) with a specified mask and
+    returns that mask projected to Alber's North American Equal Area Conic
+    (epsg: 102008).
     '''
-    dates = range(len(arrays))
+    # dates = range(len(arrays.time))
     wgs_proj = Proj(init='epsg:4326')
-    geom = cd.source.transform
-    wgrid = salem.Grid(nxny=(cd.x_length, cd.y_length), dxdy=(cd.res, -cd.res),
+    geom = crdict.source.transform
+    wgrid = salem.Grid(nxny=(crdict.x_length, crdict.y_length),
+                       dxdy=(crdict.res, -crdict.res),
                        x0y0=(geom[0], geom[3]), proj=wgs_proj)
     lats = np.unique(wgrid.xy_coordinates[1])
     lats = lats[::-1]
     lons = np.unique(wgrid.xy_coordinates[0])
-    data_array = xr.DataArray(data=arrays,
-                              coords=[dates, lats, lons],
-                              dims=['time', 'lat', 'lon'])
+    data_array = xr.DataArray(data=arrays.value[0],
+                              coords=[lats, lons],
+                              dims=['lat', 'lon'])
     wgs_data = xr.Dataset(data_vars={'value': data_array})
 
     # Albers Equal Area Conic North America (epsg not working)
@@ -994,11 +1048,11 @@ def wgsToAlbers(arrays, cd, albers_source):
                         +datum=NAD83 +units=m +no_defs')
 
     # Create an albers grid
-    geom = albers_source.GetGeoTransform()
-    array = albers_source.ReadAsArray()
+    geom = proj_sample.crs.GeoTransform
+    array = proj_sample.value[0].values
     res = geom[1]
-    x_length = albers_source.RasterXSize 
-    y_length = albers_source.RasterYSize 
+    x_length = array.shape[1]
+    y_length = array.shape[0]
     agrid = salem.Grid(nxny=(x_length, y_length), dxdy=(res, -res),
                        x0y0=(geom[0], geom[3]), proj=albers_proj)
     lats = np.unique(agrid.xy_coordinates[1])
@@ -1007,11 +1061,26 @@ def wgsToAlbers(arrays, cd, albers_source):
     data_array = xr.DataArray(data=array,
                               coords=[lats, lons],
                               dims=['lat', 'lon'])
+    data_array = data_array
     albers_data = xr.Dataset(data_vars={'value': data_array})
     albers_data.salem.grid._proj = albers_proj
     projection = albers_data.salem.transform(wgs_data, 'linear')
-    arrays = projection.value.data
-    return(arrays)
+    proj_mask = projection.value.data
+    proj_mask = proj_mask * 0 + 1
+
+    # Set up grid info from coordinate dictionary
+    nlat, nlon = proj_mask.shape
+    xs = np.arange(nlon) * geom[1] + geom[0]
+    ys = np.arange(nlat) * geom[5] + geom[3]
+
+
+    # Create mask xarray
+    proj_mask = xr.DataArray(proj_mask,
+                              coords={'lat': ys.astype(np.float32),
+                                      'lon': xs.astype(np.float32)},
+                              dims={'lat': len(ys),
+                                    'lon': len(xs)})
+    return(proj_mask)
 
 
 # In[]:Classes
@@ -1025,10 +1094,10 @@ class Admin_Elements:
         res_ext = '_' + res_str.replace('.', '_')
         county_path = 'data/rasters/us_counties' + res_ext + '.tif'
         state_path = 'data/rasters/us_states' + res_ext + '.tif'
-        
+
         # Use the shapefile for just the county, it has state and county fips
-        src_path = 'data/shapefiles/contiguous_counties.shp' 
-    
+        src_path = 'data/shapefiles/contiguous_counties.shp'
+
         # And rasterize
         self.rasterize(src_path, county_path, attribute='COUNTYFP',
                        extent=[-130, 50, -55, 20])
@@ -1044,13 +1113,14 @@ class Admin_Elements:
         county_path = 'data/rasters/us_counties' + res_ext + '.tif'
         state_path = 'data/rasters/us_states' + res_ext + '.tif'
         admin_path = 'data/tables/admin_df' + res_ext + '.csv'
-    
+
         # There are several administrative elements used in the app
-        fips = pd.read_csv('data/tables/US_FIPS_Codes.csv', skiprows=1, index_col=0)
+        fips = pd.read_csv('data/tables/US_FIPS_Codes.csv', skiprows=1,
+                           index_col=0)
         res_ext = '_' + str(resolution).replace('.', '_')
         states = pd.read_table('data/tables/state_fips.txt', sep='|')
         states = states[['STATE_NAME', 'STUSAB', 'STATE']]
-    
+
         # Read, mask and flatten the arrays
         def flttn(array_path):
             '''
@@ -1061,12 +1131,12 @@ class Admin_Elements:
             na = grid[0, 0]
             grid[grid == na] = np.nan
             return grid.flatten()
-    
+
         grid = flttn(grid_path)
         gradient = flttn(gradient_path)
         carray = flttn(county_path)
         sarray = flttn(state_path)
-    
+
         # Associate county and state fips with grid ids
         cdf = pd.DataFrame(OrderedDict({'grid': grid, 'county_fips': carray,
                                         'state_fips': sarray,
@@ -1080,7 +1150,7 @@ class Admin_Elements:
         fips['fips'] = (fips['FIPS State'].map(frmt) +
                         fips['FIPS County'].map(frmt))
         cdf['fips'] = (cdf['state_fips'].map(frmt) +
-                       cdf['county_fips'].map(frmt))    
+                       cdf['county_fips'].map(frmt))
         df = cdf.merge(fips, left_on='fips', right_on='fips', how='inner')
         df = df.merge(states, left_on='state_fips', right_on='STATE',
                       how='inner')
@@ -1091,7 +1161,6 @@ class Admin_Elements:
                       'county_fips','state_fips', 'fips', 'state_abbr']
 
         df.to_csv(admin_path, index=False)
-
 
     def buildGrid(self):
         '''
@@ -1143,7 +1212,7 @@ class Admin_Elements:
         ds = gdal.Warp(out_path, src_path, dstSRS='EPSG:4326',
                        xRes=res, yRes=res, outputBounds=[-130, 20, -55, 50])
         del ds
-    
+
     def buildSource(self):
         '''
         take a single band raster and convert it to a data array for use as a
@@ -1166,10 +1235,10 @@ class Admin_Elements:
         lons = np.arange(nlon) * geom[1] + geom[0]
         lats = np.arange(nlat) * geom[5] + geom[3]
         del data
-    
+
         attributes = OrderedDict({'transform': geom,
                                   'res': (geom[1], geom[1])})
-    
+
         data = xr.DataArray(data=array,
                             name=('A ' + str(resolution) + ' resolution grid' +
                                   ' used as a source array'),
@@ -1184,8 +1253,7 @@ class Admin_Elements:
         grid_path = 'data/rasters/grid' + res_ext + '.tif'
         albers_path = 'data/rasters/source_albers' + res_ext + '.tif'
         ds = gdal.Warp(albers_path, grid_path, dstSRS='EPSG:102008')
-        ds = None
-
+        del ds
 
     def getElements(self):
         '''
@@ -1195,8 +1263,8 @@ class Admin_Elements:
         # Get paths
         [grid_path, gradient_path, county_path, state_path,
          source_path, albers_path, admin_path] = self.pathRequest()
-    
-        # Read in objects
+
+        # Read in/create objects
         states = gdal.Open(state_path).ReadAsArray()
         states[states==-9999] = np.nan
         cnty = gdal.Open(county_path).ReadAsArray()
@@ -1209,13 +1277,11 @@ class Admin_Elements:
         albers_source = gdal.Open(albers_path)
         with xr.open_dataarray(source_path) as data:
             source = data.load()
-            data.close()
 
         # We actually want full state-county fips for counties
         state_counties = np.stack([states, cnty])
 
-        # Our function will take as the input a list [state fips, county fips]
-        # for each index position on the map
+        # Format fips as 3-digit strings with leading zeros
         def formatFIPS(lst):
             try:
                 fips1 = '{:03d}'.format(int(lst[0]))
@@ -1258,7 +1324,7 @@ class Admin_Elements:
         # Return everything at once
         path_package = [grid_path, gradient_path, county_path, state_path,
                         source_path, albers_path, admin_path]
-    
+
         return path_package
 
     def rasterize(self, src, dst, attribute, all_touch=False,
@@ -1266,7 +1332,7 @@ class Admin_Elements:
         '''
         It seems to be unreasonably involved to do this in Python compared to
         the command line.
-        ''' 
+        '''
         resolution = self.resolution
 
         # Open shapefile, retrieve the layer
@@ -1281,16 +1347,16 @@ class Admin_Elements:
         trgt = gdal.GetDriverByName('GTiff').Create(dst, cols, rows, 1,
                                    gdal.GDT_Float32)
         trgt.SetGeoTransform((xmin, resolution, 0, ymax, 0, -resolution))
-    
+
         # Add crs
         refs = osr.SpatialReference()
         refs.ImportFromEPSG(epsg)
         trgt.SetProjection(refs.ExportToWkt())
-    
+
         # Set no value
         band = trgt.GetRasterBand(1)
         band.SetNoDataValue(na)
-    
+
         # Set options
         if all_touch is True:
             ops = ['-at', 'ATTRIBUTE=' + attribute]
@@ -1300,12 +1366,11 @@ class Admin_Elements:
         # Finally rasterize
         gdal.RasterizeLayer(trgt, [1], layer, options=ops)
 
-        # Close target raster
-        trgt = None
-        src_data = None
+        # Close target an source rasters
+        del trgt
+        del src_data
 
 
-    
 class Cacher:
     '''
     A simple stand in cache for storing objects in memory.
@@ -1335,7 +1400,7 @@ class Coordinate_Dictionaries:
     This translates cartesian coordinates to geographic coordinates and back.
     It also provides information about the coordinate system used in the
     source data set, and methods to translate grid ids to plotly point objects
-    and back. 
+    and back.
     '''
     def __init__(self, source_path, grid):
         # Source Data Array
@@ -1388,6 +1453,10 @@ class Index_Maps():
     rasters for use in the Ubuntu-Practice-Machine index comparison app.
     It also returns information needed for rendering.
 
+    I think I could also incorporate the location data into this, include the
+    correlation and area series functions, and simplify the logic built into
+    the call backs.
+
     Initializing arguments:
             time_data (list)    = [[Year1, Year2], Month1, Month2,
                                    Month_Filter]
@@ -1402,33 +1471,100 @@ class Index_Maps():
                                   'spi2', 'spi3', 'spi6', 'spei1', 'spei2',
                                   'spei3', 'spei6', 'eddi1', 'eddi2', 'eddi3',
                                   'eddi6'
-
-    Each function returns:
-
-            array      = Singular 2D Numpy array of function output
-            arrays     = Timeseries of 2D Numpy arrays within time range
-            dates      = List of Posix time stamps
-            dmax       = maximum value of array
-            dmin       = minimum value of array
     '''
-
-    # Reduce memory by preallocating attribute slots
-    __slots__ = ('year1', 'year2', 'month1', 'month2', 'month_filter',
-                 'function', 'colorscale', 'reverse', 'choice', 'na')
-
     # Create Initial Values
-    def __init__(self, time_data=[[2000, 2018], 1, 12, list(range(1, 13))],
-                 colorscale='Viridis',reverse='no', choice='pdsi'):
-        self.year1 = time_data[0][0]
-        self.year2 = time_data[0][1]
-        self.month1 = time_data[1]
-        self.month2 = time_data[2]
-        self.month_filter = time_data[3]
-        self.colorscale = colorscale
-        self.reverse = reverse
-        self.choice = choice
+    def __init__(self, choice='pdsi', choice_type='original',
+                 time_data=[[2000, 2018], [1, 12], list(range(1, 13))],
+                 color_class='Default', chunk=True):
+        self.chunk = chunk
+        self.choice = choice  # This does not yet update information
+        self.choice_type = choice_type
+        self.color_class = color_class
+        self.setData()
+        self.index_ranges = pd.read_csv('data/tables/index_ranges.csv')
+        self.time_data = time_data # This updates info but cannot be accessed  # <-- Help
 
-    def setColor(self, default='percentile'):
+    @property
+    def time_data(self):
+        return self.time_data
+
+    @property
+    def color_class(self):
+        return self.color_class
+
+    @time_data.setter
+    def time_data(self, time_data):
+        '''
+        To avoid reading in a new dataset when only changing dates, this
+        method is separate. It sets the beginning and end dates and months used
+        in all of the calculations and updates an xarray reference called
+        "dataset_interval".
+        '''
+        # Get the full data set
+        dataset = self.dataset
+
+        # Split up time information
+        year1 = time_data[0][0]
+        year2 = time_data[0][1]
+        month1 = time_data[1][0]
+        month2 = time_data[1][1]
+        month_filter = time_data[2]
+
+        # Filter the dataset by date and location
+        d1 = dt.datetime(year1, month1, 1)
+        d2 = dt.datetime(year2, month2, 1)
+        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)
+        data = dataset.sel(time=slice(d1, d2))
+        data = data.sel(time=np.in1d(data['time.month'], month_filter))
+
+        # If this filters all of the data out, return a special "NA" data set
+        if len(data.time) == 0:
+
+            # Get the right resolution file
+            res = data.crs.GeoTransform[1]
+            res_print = str(res).replace('.', '_')
+            na_path = 'data/rasters/na_banner_' + res_print + '.tif'
+
+            # The whole data set just says "NA" using the value -9999
+            today = dt.datetime.now()
+            # base = dt.datetime(1900, 1, 1)
+            na = readRaster(na_path, 1, -9999)[0]
+            na = na * 0 - 9999
+            # date_range = ((today.year - 1) - start.year) * 12 + today.month
+            arrays = np.repeat(na[np.newaxis, :, :], 2, axis=0)
+            arrays = da.from_array(arrays, chunks=100)
+            # days = (today - base).days
+            days = [today - dt.timedelta(30), today]
+
+            lats = data.coords['lat'].data
+            lons = data.coords['lon'].data
+            array = xr.DataArray(arrays,
+                                 coords={'time': days,
+                                         'lat': lats,
+                                         'lon': lons},
+                                 dims={'time': 2,
+                                       'lat': len(lats),
+                                       'lon': len(lons)})
+            data = xr.Dataset({'value': array})
+
+        self.dataset_interval = data
+
+        # I am also setting index ranges from the full data sets
+        if self.choice_type =='percentile' or 'leri' in self.choice:
+            self.data_min = 0
+            self.data_max = 100
+        else:
+            ranges = self.index_ranges
+            minimum = ranges['min'][ranges['index'] == self.choice].values[0]
+            maximum = ranges['max'][ranges['index'] == self.choice].values[0]
+
+            # For index value we want to be centered on zero
+            limits = [abs(minimum), abs(maximum)]
+            self.data_max = max(limits)
+            self.data_min = self.data_max * -1
+
+    @color_class.setter
+    def color_class(self, value):
         '''
         This is tricky because the color can be a string pointing to
         a predefined plotly color scale, or an actual color scale, which is
@@ -1470,357 +1606,285 @@ class Index_Maps():
                                   [0.5, 'rgb(76, 145, 33)'],
                                   [0.85, 'rgb(0, 92, 221)'],
                                    [1.00, 'rgb(0, 46, 110)']],
-                   'BrGn':  [[0.00, 'rgb(91, 74, 35)'],  #darkest brown
-                             [0.10, 'rgb(122, 99, 47)'], # almost darkest brown
-                             [0.15, 'rgb(155, 129, 69)'], # medium brown
-                             [0.25, 'rgb(178, 150, 87)'],  # almost meduim brown
-                             [0.30, 'rgb(223,193,124)'],  # light brown
-                             [0.40, 'rgb(237, 208, 142)'],  #lighter brown
-                             [0.45, 'rgb(245,245,245)'],  # white
-                             [0.55, 'rgb(245,245,245)'],  # white
-                             [0.60, 'rgb(198,234,229)'],  #lighter green
-                             [0.70, 'rgb(127,204,192)'],  # light green
-                             [0.75, 'rgb(62, 165, 157)'],  # almost medium green
-                             [0.85, 'rgb(52,150,142)'],  # medium green
-                             [0.90, 'rgb(1,102,94)'],  # almost darkest green
-                             [1.00, 'rgb(0, 73, 68)']], # darkest green
-                   }
+                   'BrGn':  [[0.00, 'rgb(91, 74, 35)'],
+                             [0.10, 'rgb(122, 99, 47)'],
+                             [0.15, 'rgb(155, 129, 69)'],
+                             [0.25, 'rgb(178, 150, 87)'],
+                             [0.30, 'rgb(223,193,124)'],
+                             [0.40, 'rgb(237, 208, 142)'],
+                             [0.45, 'rgb(245,245,245)'],
+                             [0.55, 'rgb(245,245,245)'],
+                             [0.60, 'rgb(198,234,229)'],
+                             [0.70, 'rgb(127,204,192)'],
+                             [0.75, 'rgb(62, 165, 157)'],
+                             [0.85, 'rgb(52,150,142)'],
+                             [0.90, 'rgb(1,102,94)'],
+                             [1.00, 'rgb(0, 73, 68)']]}
 
-        if self.colorscale == 'Default':
-            if default == 'percentile':
-                scale = options['RdWhBu']
-            elif default == 'original':
-                scale = options['BrGn']
-            elif default == 'cv':
-                scale = options['Portland']
+        # Default color schemes
+        defaults = {'percentile': options['RdWhBu'],
+                    'original':  options['BrGn'],
+                    'area': options['RdWhBu'],
+                    'correlation_o': 'Viridis',
+                    'correlation_p': 'Viridis'}
+
+        if value == 'Default':
+            scale = defaults[self.choice_type]
         else:
-            scale = options[self.colorscale]
-        return scale
+            scale = options[value]
 
+        self.color_scale = scale
 
-    def getData(self, array_path):
+    def setData(self):
         '''
         The challenge is to read as little as possible into memory without
-        slowing the app down. We need to slice by month and year first, then
-        filter by the month filter.
+        slowing the app down. So xarray and dask are lazy loaders, which means
+        we can access the full dataset hear without worrying about that.
         '''
-        # Get time series of values and filter by date and location
-        d1 = dt.datetime(self.year1, self.month1, 1)
-        d2 = dt.datetime(self.year2, self.month2, 1)
-        d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)
+        # There are three types of datsets
+        type_paths = {'original': 'data/droughtindices/netcdfs/',
+                      'area': 'data/droughtindices/netcdfs/',
+                      'correlation_o': 'data/droughtindices/netcdfs/',
+                      'correlation_p':
+                          'data/droughtindices/netcdfs/percentiles',
+                      'percentile': 'data/droughtindices/netcdfs/percentiles',
+                      'projected': 'data/droughtindices/netcdfs/albers'}
 
-        with xr.open_dataset(array_path) as data:
-            res = data.crs.GeoTransform[1]
-            data = data.sel(time=slice(d1, d2))
-            data = data.sel(time=np.in1d(data['time.month'],
-                                         self.month_filter))
-            indexlist = data
-            del data
+        # Build path and retrieve the data set
+        netcdf_path =  type_paths[self.choice_type]
+        file_path = os.path.join(data_path, netcdf_path, self.choice + '.nc')
+        if self.chunk:
+            dataset = xr.open_dataset(file_path, chunks=100)  # <------------------ Best chunk size/shape?
+        else:
+            dataset = xr.open_dataset(file_path)
 
-        if len(indexlist.time) == 0:
-            res_print = str(res).replace('.', '_')
-            na_path = 'data/rasters/na_banner_' + res_print + '.tif'
-            na = readRaster(na_path, 1, -9999)[0]
-            na = na * 0 - 9999
-            date_range = ((d2.year - d1.year) * 12) + d2.month - d1.month + 1
-            data = np.repeat(na[np.newaxis, :, :], date_range, axis=0)
-            days = [d1 + relativedelta(months=m) for m in range(date_range)]
-            lats = indexlist.coords['lat'].data
-            lons = indexlist.coords['lon'].data
-            darray = xr.DataArray(data,
-                                  coords={'time': days,
-                                          'lat': lats,
-                                          'lon': lons,},
-                                  dims={'time': len(days),
-                                        'lat': len(lats),
-                                        'lon': len(lons)})
-            indexlist = xr.Dataset({'value': darray})
-
+        # Leri is the only dataset that has missing information
         if 'leri' in self.choice:
-            arrays = indexlist.value.data
-            arrays[arrays < 0] = np.nan
-            indexlist.value.data = arrays
+            dataset.value.data[dataset.value.data < 0] = np.nan
 
-        return indexlist, res
+        # Set this as an attribute for easy retrieval
+        self.dataset = dataset
 
-
-    def getOriginal(self):
+    def setMask(self, location, crdict):
         '''
-        Retrieve Original Timeseries
+        Take a location object and the coordinate dictionary to create an
+        xarray for masking the dask datasets without pulling into memory.
+
+        location = location from Location_Builder or 1d array
+        crdict = coordinate dictionary
         '''
-        array_path = os.path.join(data_path,
-                                  "data/droughtindices/netcdfs/",
-                                  self.choice + '.nc')
-        indexlist, res = self.getData(array_path)
-        if len(indexlist.time) != 0:
-            limits = [abs(np.nanmin(indexlist.value.data)),
-                      abs(np.nanmax(indexlist.value.data))]
+        # Get x, y coordinates from location
+        flag, y, x, label, idx = location
+        mask = crdict.grid.copy()
+
+        # Create mask array
+        if flag != 'all':
+            y = json.loads(y)
+            x = json.loads(x)
+            gridids = crdict.grid[y, x]
+            mask[~np.isin(crdict.grid, gridids)] = np.nan
+            mask = mask * 0 + 1
         else:
-            limits = [0, 0]
-        dmax = max(limits)  # Makes an even graph
-        dmin = dmax*-1
-        gc.collect()
-        return [indexlist, dmin, dmax, res]
+            mask = mask * 0 + 1
+
+        # Set up grid info from coordinate dictionary
+        geom = crdict.source.transform
+        nlat, nlon = mask.shape
+        lons = np.arange(nlon) * geom[1] + geom[0]
+        lats = np.arange(nlat) * geom[5] + geom[3]
 
 
-    def getPercentile(self):
+        # Create mask xarray
+        xmask = xr.DataArray(mask,
+                             coords={'lat': lats,
+                                     'lon': lons},
+                             dims={'lat': len(lats),
+                                   'lon': len(lons)})
+        self.mask = xmask
+
+    def getTime(self):
+        # Now read in the corrollary albers data set
+        dates = pd.DatetimeIndex(self.dataset_interval.time[:].values)
+        year1 = min(dates.year)
+        year2 = max(dates.year)
+        month1 = dates.month[0]
+        month2 = dates.month[-1]
+        month_filter = list(pd.unique(dates.month))
+        time_data = [[year1, year2], [month1, month2], month_filter]
+
+        return time_data
+
+    def getMean(self):
+        return self.dataset_interval.mean('time').value.data
+
+    def getMin(self):
+        return self.dataset_interval.min('time').value.data
+
+    def getMax(self):
+        return self.dataset_interval.max('time').value.data
+
+    def getSeries(self, location, crdict):
         '''
-        Retrieve Percentiles of Original Timeseries
+        This uses the mask to get a monthly time series of values at a
+        specified location.
         '''
-        array_path = os.path.join(data_path,
-                                  "data/droughtindices/netcdfs/percentiles",
-                                  self.choice + '.nc')
-        indexlist, res = self.getData(array_path)
-        if len(indexlist.time) != 0:
-            indexlist.value.data = indexlist.value.data * 100
+        # Get filtered dataset
+        data = self.dataset_interval
 
-            # We want the color scale to be centered on 50, first get max/min
-            dmax = np.nanmax(indexlist.value.data)
-            dmin = np.nanmin(indexlist.value.data)
+        # Get the location coordinates
+        flag, y, x, label, idx = location
+
+        # Filter if needed and generate timeseries
+        if flag == 'all':
+            timeseries = data.mean(dim=('lat', 'lon'))
+            timeseries = timeseries.value.values
         else:
-            dmax = 0
-            dmin = 0
+            y = json.loads(y)
+            x = json.loads(x)
+            if flag == 'grid':
+                timeseries = data.value[:, y, x].values
+            else:
+                # self.setMask(location, crdict)
+                data = data.where(self.mask == 1)
+                timeseries = data.mean(dim=('lat', 'lon'))
+                timeseries = timeseries.value.values
 
-        # The maximum distance from 50
-        delta = max([dmax - 50, 50 - dmin])
+        # print("Area fitlering complete.")
+        return timeseries
 
-        # The same distance above and below 50
-        dmin = 50 - delta
-        dmax = 50 + delta
-
-        gc.collect()
-
-        return [indexlist, dmin, dmax, res]
-
-
-    def getAlbers(self):
+    def getCorr(self, location, crdict):
         '''
-        Retrieve Percentiles of Original Timeseries in North American
-        Albers Equal Area Conic.
+        Create a field of pearson's correlation coefficients with any one
+        selection.
+        '''
+        ts = self.getSeries(location, crdict)
+        arrays = self.dataset_interval.value.values
+        one_field = correlationField(ts, arrays)
+
+        return one_field
+
+    @functools.lru_cache()
+    def getArea(self, crdict):
+        '''
+        This will take in a time series of arrays and a drought severity
+        category and mask out all cells with values above or below the category
+        thresholds. If inclusive is 'True' it will only mask out all cells that
+        fall above the chosen category.
+
+        This should be cached with functools, and will be calculated only once
+        in the app if the Index_Maps object is properly cached with flask
+        caching.
+
+        For now this requires original values, percentiles even out too
+        quickly.
+        '''
+        # Specify choice in case it needs to be inverse for eddi
+        choice = self.choice
+        data = self.dataset_interval
+
+        # Now read in the corrollary albers data set
+        time_data = self.getTime()
+        choice_type = 'projected'
+        proj_data = Index_Maps(choice, choice_type, time_data, 'RdWhBu',
+                               chunk=True)
+
+        # Filter data by the mask (should be set already)
+        masked_arrays = data.where(self.mask == 1)
+        albers_mask = wgsToAlbers(masked_arrays, crdict, proj_data.dataset)
+        arrays = proj_data.dataset_interval.where(albers_mask == 1).value
+
+        # Flip if this is EDDI
+        if 'eddi' in choice:
+            arrays = arrays*-1
+
+        # Drought Categories
+        # print("calculating drought area...")
+        drought_cats = {'sp': {0: [-0.5, -0.8],
+                               1: [-0.8, -1.3],
+                               2: [-1.3, -1.5],
+                               3: [-1.5, -2.0],
+                               4: [-2.0, -999]},
+                        'eddi': {0: [-0.5, -0.8],
+                                 1: [-0.8, -1.3],
+                                 2: [-1.3, -1.5],
+                                 3: [-1.5, -2.0],
+                                 4: [-2.0, -999]},
+                        'pdsi': {0: [-1.0, -2.0],
+                                 1: [-2.0, -3.0],
+                                 2: [-3.0, -4.0],
+                                 3: [-4.0, -5.0],
+                                 4: [-5.0, -999]},
+                        'leri': {0: [30, 20],
+                                 1: [20, 10],
+                                 2: [10, 5],
+                                 3: [5, 2],
+                                 4: [2, 0]}}
+
+        # Choose a set of categories
+        cat_key = [key for key in drought_cats.keys() if key in choice][0]
+        cats = drought_cats[cat_key]
+
+        def catFilter(arrays, d, inclusive=False):
+            '''
+            There is some question about the Drought Severity Coverage Index.
+            The NDMC does not use inclusive drought categories though NIDIS
+            appeared to in the "Historical Character of US Northern Great
+            Plains Drought" study. In an effort to match NIDIS' sample chart,
+            we are using the inclusive method for now. It would be fine either
+            way as long as the index is compared to other values with the same
+            calculation, but we should really defer to NDMC. We could also add
+            an option to display inclusive vs non-inclusive drought severity
+            coverages.
+            '''
+            if inclusive:
+                totals = arrays.where(~np.isnan(arrays)).count(dim=('lat', 
+                                                                    'lon'))
+                counts = arrays.where(arrays<d[0]).count(dim=('lat', 'lon'))
+                ratios = counts / totals
+                pcts = ratios.compute().data * 100
+                return pcts
+            else:
+                totals = arrays.where(~np.isnan(arrays)).count(
+                                                            dim=('lat', 'lon'))
+                counts = arrays.where((arrays<d[0]) &
+                                      (arrays>=d[1])).count(dim=('lat', 'lon'))
+                ratios = counts / totals
+                pcts = ratios.compute().data * 100
+                return pcts
+
+        # print("starting offending loops...")
+        pincs = [list(catFilter(arrays, cats[i],True)) for i in range(5)]
+        pnincs = [catFilter(arrays, cats[i]) for i in tqdm(range(5), position=0)]  # <--- How to speed up, again?
+        DSCI = list(np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]),
+                              axis=0))
+        pnincs = [list(p) for p in pnincs]  # These need to work with json
         
-        I don't believe this is used in the application, and also depends on an
-        external file so I think it can be nixed
+        # Return the list of five layers
+        return pincs, pnincs, DSCI
+
+    def getFunction(self, function):
         '''
-        array_path = os.path.join(data_path,
-                                  "data/droughtindices/netcdfs/albers",
-                                  self.choice + '.nc')
-        indexlist, res = self.getData(array_path)
-        if len(indexlist.time) != 0:
-            limits = [abs(np.nanmin(indexlist.value.data)),
-                      abs(np.nanmax(indexlist.value.data))]
-        else:
-            limits = [0, 0]
-        dmax = max(limits)  # Makes an even graph
-        dmin = dmax*-1
-        gc.collect()
-        return [indexlist, dmin, dmax, res]
-
-
-    def calculateCV(arraylist):
+        To choose which function to return using a string from a dropdown app.
         '''
-         A single array showing the distribution of coefficients of variation
-             throughout the time period represented by the chosen rasters
-        '''
-        # is it a named list or not?
-        if type(arraylist[0]) is list:
-            # Get just the arrays from this
-            arraylist = [a[1] for a in arraylist]
-        else:
-            arraylist = arraylist
+        functions = {"omean": self.getMean,
+                     "omin": self.getMin,
+                     "omax": self.getMax,
+                     "pmean": self.getMean,
+                     "pmin": self.getMin,
+                     "pmax": self.getMax,
+                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now
+                     "ocorr": self.getMean,
+                     "pcorr": self.getMean}
+        function = functions[function]
 
-        # Adjust for outliers
-        sd = np.nanstd(arraylist)
-        thresholds = [-3*sd, 3*sd]
-        for a in arraylist:
-            a[a <= thresholds[0]] = thresholds[0]
-            a[a >= thresholds[1]] = thresholds[1]
-
-        # Standardize Range
-        arraylist = standardize(arraylist)
-
-        # Simple Cellwise calculation of variance
-        sds = np.nanstd(arraylist, axis=0)
-        avs = np.nanmean(arraylist, axis=0)
-        covs = sds/avs
-
-        return covs
-
-
-    def meanOriginal(self):
-        '''
-        Calculate mean of original index values
-        '''
-        # Get time series of values
-        [indexlist, dmin, dmax, res] = self.getOriginal()
-
-        # Get data
-        array = indexlist.mean('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
-        del indexlist
-
-        # Get color scale
-        colorscale = self.setColor(default='original')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
-
-
-    def maxOriginal(self):
-        '''
-        Calculate max of original index values
-        '''
-        # Get time series of values
-        [indexlist, dmin, dmax, res] = self.getOriginal()
-
-        # Get data
-        array = indexlist.max('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
-        del indexlist
-
-        # Get color scale
-        colorscale = self.setColor(default='original')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
-
-
-    def minOriginal(self):
-        '''
-        Calculate max of original index values
-        '''
-        # Get time series of values
-        [indexlist, dmin, dmax, res] = self.getOriginal()
-
-        # Get data
-        array = indexlist.min('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
-        del indexlist
-
-        # Get color scale
-        colorscale = self.setColor(default='original')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
-
-
-    def meanPercentile(self):
-        '''
-        Calculate mean of percentiles of original index values
-        '''
-        # Get time series of values
-        [indexlist, dmin, dmax, res] = self.getPercentile()
-
-        # Get data
-        array = indexlist.mean('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
-        del indexlist
-
-        # Get color scale
-        colorscale = self.setColor(default='percentile')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
-
-
-    def maxPercentile(self):
-        '''
-        Calculate mean of percentiles of original index values
-        '''
-         # Get time series of values
-        [indexlist, dmin, dmax, res] = self.getPercentile()
-
-        # Get data
-        array = indexlist.max('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
-        del indexlist
-
-        # Get color scale
-        colorscale = self.setColor(default='percentile')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
-
-
-    def minPercentile(self):
-        '''
-        Calculate mean of percentiles of original index values
-        '''
-         # Get time series of values
-        [indexlist, dmin, dmax, res] = self.getPercentile()
-
-        # Get data
-        array = indexlist.min('time').value.data
-        arrays = indexlist.value.data
-        dates = indexlist.time.data
-        del indexlist
-
-        # Get color scale
-        colorscale = self.setColor(default='percentile')
-
-        # EDDI has a reversed scale
-        if 'eddi' in self.choice:
-            reverse = True
-        else:
-            reverse = False
-
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
-
-
-    def coefficientVariation(self):
-        '''
-        Calculate mean of percentiles of original index values
-        '''
-        # Get time series of values
-        [indexlist, dmin, dmax, res] = self.getOriginal()
-
-        # Get data
-        arrays = indexlist.value.data
-        array = calculateCV(arrays)
-        dates = indexlist.time.data
-        del indexlist
-
-        # Get color scale
-        colorscale = self.setColor(default='cv')
-
-        # The colorscale will always mean the same thing
-        reverse = False
-
-        return [array, arrays, dates, colorscale, dmax, dmin, reverse, res]
+        return function()
 
 
 class Location_Builder:
     '''
     This takes a location selection determined to be the triggering choice,
     decides what type of location it is, and builds the appropriate location
-    list object needed further down the line. To do so, it holds county, 
+    list object needed further down the line. To do so, it holds county,
     state, grid, and other administrative information.
     '''
 
@@ -1832,7 +1896,7 @@ class Location_Builder:
         self.admin_df = admin_df
         self.states_df = admin_df[['state', 'state_abbr',
                                    'state_fips']].drop_duplicates().dropna()
-        self.state_array = state_array  
+        self.state_array = state_array
         self.county_array = county_array
 
     def chooseRecent(self):
@@ -1866,7 +1930,7 @@ class Location_Builder:
         if 'county' in trig_id:
             county = admin_df['place'][admin_df.fips == trig_val].unique()[0]
             y, x = np.where(county_array == trig_val)
-            location = ['county_id', str(list(y)), str(list(x)), county]
+            location = ['county', str(list(y)), str(list(x)), county]
 
         # 2: Selection is a single grid IDs
         elif 'clickData' in trig_id:
@@ -1878,7 +1942,7 @@ class Location_Builder:
             counties = admin_df['place'][admin_df.grid == gridid]
             county = counties.unique()
             label = county[0] + ' (Grid ' + str(int(gridid)) + ')'
-            location = ['grid_id',str(y), str(x), label]        
+            location = ['grid', str(y), str(x), label]
 
         # 3: Selection is a set of grid IDs
         elif 'selectedData' in trig_id:
@@ -1894,14 +1958,14 @@ class Location_Builder:
                                      d in selections])
                 local_df = admin_df[admin_df['place'].isin(
                                     list(np.unique(counties)))]
-    
+
                 # Use gradient to print NW and SE most counties as a range
                 NW = local_df['place'][
                     local_df['gradient'] == min(local_df['gradient'])].item()
                 SE = local_df['place'][
                     local_df['gradient'] == max(local_df['gradient'])].item()
                 label = NW + " to " + SE
-                location = ['grid_ids', str(y), str(x), label]        
+                location = ['grids', str(y), str(x), label]
             else:
                 raise PreventUpdate
 
@@ -1909,15 +1973,15 @@ class Location_Builder:
         elif 'update' in trig_id:
             # Selection is the default 'all'
             if type(trig_val) is str:
-                location = ['state_mask', 'all', 'Contiguous United States']
-        
+                location = ['all',  'y', 'x', 'Contiguous United States']
+
             # Empty list, default to CONUS
             elif len(trig_val) == 0:
-                location = ['state_mask', 'all', 'Contiguous United States']
+                location = ['all',  'y', 'x', 'Contiguous United States']
 
             # A selection of 'all' within a list
             elif len(trig_val) == 1 and trig_val[0] == 'all':
-                location = ['state_mask', 'all', 'Contiguous United States']
+                location = ['all',  'y', 'x', 'Contiguous United States']
 
             # Single or multiple, not 'all' or empty, state or list of states
             elif len(trig_val) >= 1:
@@ -1932,7 +1996,7 @@ class Location_Builder:
                 y, x = np.where(np.isin(state_array, trig_val))
 
                 # And return the location information
-                location = ['state_mask', str(list(y)), str(list(x)), states]
+                location = ['state', str(list(y)), str(list(x)), states]
 
         # 3: location is the basename of a shapefile saved as temp.shp
         elif 'shape' in trig_id:
@@ -1941,7 +2005,12 @@ class Location_Builder:
                 shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
                 shp[shp==-9999] = np.nan
                 y, x = np.where(~np.isnan(shp))
-                location = ['shape_mask', str(list(y)), str(list(x)), trig_val]
+                location = ['shape', str(list(y)), str(list(x)), trig_val]
             except:
-                location = ['state_mask', 'all', 'Contiguous United States']
+                location = ['all', 'y', 'x', 'Contiguous United States']
+
+        # 4: A reset button was clicked
+        elif 'reset_map' in trig_id:
+            location = ['all', 'y', 'x', 'Contiguous United States']
+
         return location
