@@ -1575,7 +1575,7 @@ for i in range(1, 3):
         if 'eddi' in choice:
             print("Reversing EDDI")
             reverse = not reverse
- 
+
         # Filter for state filters
         # print("location: " + str(location))
         flag, y, x, label, idx = location
@@ -1825,6 +1825,10 @@ for i in range(1, 3):
         if 'leri' in choice:  # <---------------------------------------------- Temporary
             dmin = 0
             dmax = 100
+
+	# EDDI switches
+        if 'eddi' in choice:
+            reverse = not reverse
 
         # The drought area graphs have there own configuration
         elif function == 'oarea':
