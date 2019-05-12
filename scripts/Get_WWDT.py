@@ -373,7 +373,7 @@ for index in indices:
                                     index_map[index] + '.nc')
 
         # This function smooshes everything into one netcdf file
-        toNetCDF(tfiles, ncfiles, nc_path, index, epsg=4326, year1=1895,
+        toNetCDF(tfiles, ncfiles, nc_path, index, proj=4326, year1=1895,
                  month1=1, year2=todays_date.year, month2=todays_date.month,
                  wmode='w', percentiles=False)
 
@@ -385,7 +385,7 @@ for index in indices:
         toNetCDFPercentile(nc_path, pc_path)
 
         # Now create the alber's netcdf
-        toNetCDFAlbers(tfiles_proj, ncfiles, nc_path_proj, index, epsg=proj,
+        toNetCDFAlbers(tfiles_proj, ncfiles, nc_path_proj, index, proj=proj,
                        year1=1895, month1=1, year2=todays_date.year,
                        month2=todays_date.month, wmode='w', percentiles=False)
 

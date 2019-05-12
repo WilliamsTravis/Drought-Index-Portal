@@ -313,10 +313,10 @@ for index in indices:
                                     "data/droughtindices/netcdfs/albers",
                                     index + ".nc")
         toNetCDF(tfiles=tfiles, ncfiles=None, savepath=nc_path, index=index,
-                 epsg=4326, year1=1980, month1=1, year2=todays_date.year,
+                 proj=4326, year1=1980, month1=1, year2=todays_date.year,
                  month2=12, wmode='w', percentiles=False)
         toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None, savepath=nc_path_proj,
-                       index=index, epsg=proj, year1=1980, month1=1,
+                       index=index, proj=proj, year1=1980, month1=1,
                        year2=todays_date.year, month2=12, wmode='w',                 # I subtracted one to go back and check the update mode
                        percentiles=False)
 

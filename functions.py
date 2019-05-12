@@ -45,27 +45,50 @@ warnings.filterwarnings("ignore")
 
 # In[]: Variables
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
+             'mdn1': 'Mean Temperature Departure  (1981 - 2010) - 1 month',
              'pdsi': 'Palmer Drought Severity Index',
              'scpdsi': 'Self-Calibrated Palmer Drought Severity Index',
              'pzi': 'Palmer Z-Index',
              'spi1': 'Standardized Precipitation Index - 1 month',
              'spi2': 'Standardized Precipitation Index - 2 month',
              'spi3': 'Standardized Precipitation Index - 3 month',
+             'spi4': 'Standardized Precipitation Index - 4 month',
+             'spi5': 'Standardized Precipitation Index - 5 month',
              'spi6': 'Standardized Precipitation Index - 6 month',
+             'spi7': 'Standardized Precipitation Index - 7 month',
+             'spi8': 'Standardized Precipitation Index - 8 month',
+             'spi9': 'Standardized Precipitation Index - 9 month',
+             'spi10': 'Standardized Precipitation Index - 10 month',
+             'spi11': 'Standardized Precipitation Index - 11 month',
+             'spi12': 'Standardized Precipitation Index - 12 month',
              'spei1': 'Standardized Precipitation-Evapotranspiration Index' +
                       ' - 1 month',
              'spei2': 'Standardized Precipitation-Evapotranspiration Index' +
                       ' - 2 month',
              'spei3': 'Standardized Precipitation-Evapotranspiration Index' +
                       ' - 3 month',
+             'spei4': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 4 month',
+             'spei5': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 5 month',
              'spei6': 'Standardized Precipitation-Evapotranspiration Index' +
                       ' - 6 month',
+             'spei7': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 7 month',
+             'spei8': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 8 month',
+             'spei9': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 9 month',
+             'spei10': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 10 month',
+             'spei11': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 11 month',
+             'spei12': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 12 month',
              'eddi1': 'Evaporative Demand Drought Index - 1 month',
              'eddi2': 'Evaporative Demand Drought Index - 2 month',
              'eddi3': 'Evaporative Demand Drought Index - 3 month',
-             'eddi6': 'Evaporative Demand Drought Index - 6 month',
-             'leri1': 'Landscape Evaporative Response Index - 1 month',
-             'leri3': 'Landscape Evaporative Response Index - 3 month'}
+             'eddi6': 'Evaporative Demand Drought Index - 6 month'}
 
 
 # In[]: Functions
@@ -646,7 +669,7 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
 
 
 def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
-                   year2, month2, epsg=4326, percentiles=False, wmode='w'):
+                   year2, month2, proj=4326, percentiles=False, wmode='w'):
     '''
     This does the same as above but is specific to the north american
     albers equal area conic projection
@@ -684,7 +707,7 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
 
     # use osr for more spatial attributes
     refs = osr.SpatialReference()
-    refs.ImportFromProj4(epsg)
+    refs.ImportFromProj4(proj)
 
     # Create Dataset
     nco = Dataset(savepath, mode=wmode, format='NETCDF4')
@@ -708,7 +731,7 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
     crs = nco.createVariable('crs', 'c')
     variable.setncattr('grid_mapping', 'crs')
     crs.spatial_ref = proj
-    crs.epsg_code = "EPSG:" + str(epsg)
+    # crs.epsg_code = "EPSG:" + str(proj)
     crs.GeoTransform = geom
     crs.grid_mapping_name = 'albers_conical_equal_area'
     crs.standard_parallel = [20.0, 60.0]
