@@ -58,7 +58,7 @@ if not os.path.exists(pc_folder):
 
 # In[] Data options
 variables = ['tmin', 'tmax', 'tdmean', 'tmean', 'ppt', 'vpdmax', 'vpdmin']
-
+variable = 'tmin'
 # In[] Define scraping routine
 def getPRISM(filename, temp_folder, ftp):
     '''
@@ -113,6 +113,10 @@ for variable in variables:
     for t in temps:
         if t != tif_folder:
             os.remove(t)
+
+    # Empty tif folder
+    for t in glob(os.path.join(tif_folder, '*')):
+        os.remove(t)
 
     ####### If we are only missing some dates #################################
     if os.path.exists(original_path):
@@ -193,25 +197,30 @@ for variable in variables:
                     if t != tif_folder:
                         os.remove(t)
 
-            # Now we can use the folder of tifs, first create projections
-            for f in glob(os.path.join(tif_folder, '*tif')):
-                filename = os.path.split(f)[-1]
-                in_path = f
-                out_path = os.path.join(tif_folder, 'proj_' + filename)
-                ds = gdal.Warp(out_path, in_path, dstSRS=proj)
-                ds = None
+        # Now we can use the folder of tifs, first create projections
+        for f in glob(os.path.join(tif_folder, '*tif')):
+            filename = os.path.split(f)[-1]
+            in_path = f
+            out_path = os.path.join(tif_folder, 'proj_' + filename)
+            ds = gdal.Warp(out_path, in_path, dstSRS=proj)
+            ds = None
 
-            # Now create the three netcdf files
-            tfiles = glob(os.path.join(tif_folder, variable + '*'))
-            tfiles_proj = glob(os.path.join(tif_folder, 'proj_*'))
+        # Now create the three netcdf files
+        tfiles = glob(os.path.join(tif_folder, variable + '*'))
+        tfiles_proj = glob(os.path.join(tif_folder, 'proj_*'))
 
-            # Original
-            toNetCDF(tfiles=tfiles, ncfiles=None, savepath=original_path,
-                     index=variable, proj=4326, year1=1895, month1=1,
-                     year2=todays_date.year - 2,  month2=12, wmode='w',
-                     percentiles=False)
-            toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None,
-                           savepath=albers_path, index=variable, proj=proj,
-                           year1=1895, month1=1, year2=todays_date.year - 2,
-                           month2=12, wmode='w', percentiles=False)           # I subtracted 2 to go back and check the update mode
-            toNetCDFPercentile(original_path, percentile_path)
+        # Original
+        toNetCDF(tfiles=tfiles, ncfiles=None, savepath=original_path,
+                 index=variable, proj=4326, year1=1895, month1=1,
+                 year2=todays_date.year - 2,  month2=12, wmode='w',
+                 percentiles=False)
+        toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None,
+                       savepath=albers_path, index=variable, proj=proj,
+                       year1=1895, month1=1, year2=todays_date.year - 2,
+                       month2=12, wmode='w', percentiles=False)           # I subtracted 2 to go back and check the update mode
+        toNetCDFPercentile(original_path, percentile_path)
+
+        # Empty tif folder
+        for t in glob(os.path.join(tif_folder, '*')):
+            os.remove(t)
+                

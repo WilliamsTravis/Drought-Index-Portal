@@ -1587,10 +1587,6 @@ for i in range(1, 3):
             gridids = grid[y, x]
             array[~np.isin(grid, gridids)] = np.nan
 
-        # Get the right print statement for the date used
-        # date_print = datePrint(year_range[0], year_range[1], month1, month2,
-        #                        month_filter, monthmarks)
-
         # If it is a correlation recreate the map array
         if 'corr' in function and flag != 'all':
             y = np.array(json.loads(y))
