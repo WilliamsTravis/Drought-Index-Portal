@@ -10,6 +10,7 @@ Created on Tue Jan 22 18:02:17 2019
 # In[]: Environment
 import datetime as dt
 from dash.exceptions import PreventUpdate
+import dask
 import dask.array as da
 from dateutil.relativedelta import relativedelta
 import functools
@@ -1849,12 +1850,17 @@ class Index_Maps():
                 counts = arrays.where((arrays<d[0]) &
                                       (arrays>=d[1])).count(dim=('lat', 'lon'))
                 ratios = counts / totals
-                pcts = ratios.compute().data * 100
+                pcts = ratios.data * 100
                 return pcts
 
         # print("starting offending loops...")
-        pincs = [list(catFilter(arrays, cats[i],True)) for i in range(5)]
-        pnincs = [catFilter(arrays, cats[i]) for i in tqdm(range(5), position=0)]  # <--- How to speed up, again?
+        pincs = [dask.delayed(catFilter)(arrays, cats[i], True) for
+                 i in range(5)]
+        pincs = dask.compute(*pincs)
+        pincs = [list(a) for a in pincs]
+        pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
+        pnincs = dask.compute(*pnincs)
+
         DSCI = list(np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]),
                               axis=0))
         pnincs = [list(p) for p in pnincs]  # These need to work with json

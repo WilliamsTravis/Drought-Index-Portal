@@ -735,9 +735,10 @@ app.layout = html.Div([
 
        # Signals
        html.Div(id='signal', style={'display': 'none'}),
-       html.Div(id='location_store', style={'display': 'none'}),
+       html.Div(id='location_store_1', style={'display': 'none'}),
+       html.Div(id='location_store_2', style={'display': 'none'}),
        html.Div(id='choice_store', style={'display': 'none'}),
-       html.Div(id='area_store_1', children='[0, 0]', # <---------------------- I cannot figure out how to properly cache these area time series
+       html.Div(id='area_store_1', children='[0, 0]',
                 style={'display': 'none'}),
        html.Div(id='area_store_2', children='[0, 0]',
                 style={'display': 'none'})
@@ -926,82 +927,145 @@ def submitSignal(click, colorscale, reverse, year_range, month1, month2,
     return json.dumps(signal)
 
 
-@app.callback(Output('location_store', 'children'),
-              [Input('map_1', 'clickData'),
-               Input('map_2', 'clickData'),
-               Input('map_1', 'selectedData'),
-               Input('map_2', 'selectedData'),
-               Input('county_1', 'value'),
-               Input('county_2', 'value'),
-               Input('shape_store_1', 'children'),
-               Input('shape_store_2', 'children'),
-               Input('update_graphs_1', 'n_clicks'),
-               Input('update_graphs_2', 'n_clicks'),
-               Input('reset_map_1', 'n_clicks'),
-               Input('reset_map_2', 'n_clicks')],
-              [State('state_1', 'value'),
-               State('state_2', 'value')])
-def locationPicker(click1, click2, select1, select2, county1, county2, shape1,
-                   shape2, update1, update2, reset1, reset2, state1, state2):
-        '''
-        The new context method allows us to select which input was most
-        recently changed. However, it is still necessary to have an
-        independent callback that identifies the most recent selection. Because
-        there are many types of buttons and clicks that could trigger a graph
-        update we would have to work through each input to check if it is a
-        location. It's still much nicer than setting up a dozen hidden divs,
-        timing callbacks, and writing long lines of logic to determine which
-        was most recently updated.
-        
-        I need to incorporate the reset button here, it does not currently
-        persistent...       
-        
-        '''
-        # package the selections for indexing
-        locations = [click1, click2, select1, select2, county1, county2,
-                     shape1, shape2, reset1, reset2, state1, state2]
-        updates = [update1, update2]
-        context = dash.callback_context
-        triggered_value = context.triggered[0]['value']
-        trigger = context.triggered[0]['prop_id']
-
-        # The update graph button activates state selections
-        if 'update_graph' in trigger:
-            # When you switch from county to state, there is no initial value
-            if triggered_value is None:
-                triggered_value = 'all'
-                sel_idx = 0
-            else:
-                # The position of the most recent update needs to be -2 or -1
-                update_idx = updates.index(triggered_value) - 2
-                if locations[update_idx] is None:
-                    raise PreventUpdate
-                triggered_value = locations[update_idx]
-                sel_idx = locations.index(triggered_value)
-        else:
-            sel_idx = locations.index(triggered_value)
-
-        # Use the triggered_value to create the selector object
-        selector = Location_Builder(trigger, triggered_value, crdict, admin_df,
-                                    state_array, county_array)
-
-        # Now retrieve information for the most recently updated element
-        location = selector.chooseRecent()
-
-        # 
-        if 'shape' in location[0] and location[3] is None:
-            default_loc = copy.deepcopy(default_location)
-            location = default_loc
-        try:
-            location.append(sel_idx)
-        except:
-            raise PreventUpdate
-
-        return location
-
-
 # In[] Any callback with multiple instances goes here
 for i in range(1, 3):
+    @app.callback(Output('location_store_{}'.format(i), 'children'),
+                  [Input('map_1', 'clickData'),
+                   Input('map_2', 'clickData'),
+                   Input('map_1', 'selectedData'),
+                   Input('map_2', 'selectedData'),
+                   Input('county_1', 'value'),
+                   Input('county_2', 'value'),
+                   Input('shape_store_1', 'children'),
+                   Input('shape_store_2', 'children'),
+                   Input('update_graphs_1', 'n_clicks'),
+                   Input('update_graphs_2', 'n_clicks'),
+                   Input('reset_map_1', 'n_clicks'),
+                   Input('reset_map_2', 'n_clicks')],
+                  [State('state_1', 'value'),
+                   State('state_2', 'value'),
+                   State('click_sync', 'children'),
+                   State('key_{}'.format(i), 'children')])
+    def locationPicker(click1, click2, select1, select2, county1, county2,
+                       shape1, shape2, update1, update2, reset1, reset2,
+                       state1, state2, sync, key):
+            '''
+            The new context method allows us to select which input was most
+            recently changed. However, it is still necessary to have an
+            independent callback that identifies the most recent selection.
+            Because there are many types of buttons and clicks that could
+            trigger a graph update we have to work through each input to check
+            if it is a   location. It's still much nicer than setting up a
+            dozen hidden divs, timing callbacks, and writing long lines of
+            logic to determine which was most recently updated.
+            
+            I need to incorporate the reset button here, it does not currently
+            persistent...       
+            
+            '''
+            # Figure out which element we are working with
+            key = int(key) - 1
+
+            # package all the selections for indexing
+            locations = [click1, click2, select1, select2, county1, county2,
+                         shape1, shape2, reset1, reset2, state1, state2]
+            updates = [update1, update2]
+
+            # Find which input triggered this callback
+            context = dash.callback_context
+            triggered_value = context.triggered[0]['value']
+            trigger = context.triggered[0]['prop_id']
+
+            # print out variables for developing
+            print("key = " + json.dumps(key))
+            print("sync = " + json.dumps(sync))
+            print("locations = " + str(locations))
+            print("updates = " + str(updates))
+            print("triggered_value = " + str(triggered_value))
+            print("trigger = " + json.dumps(trigger))
+
+            # Two cases, if syncing return a copy, if not split
+            if 'On' in sync:
+                # The update graph button activates US state selections
+                if 'update_graph' in trigger:
+                    if triggered_value is None:
+                        triggered_value = 'all'
+                        sel_idx = 0
+                        triggering_element = sel_idx % 2 + 1
+                    else:
+                        # The idx of the most recent update is -2 or -1
+                        update_idx = updates.index(triggered_value) - 2
+                        if locations[update_idx] is None:
+                            raise PreventUpdate
+                        triggered_value = locations[update_idx]
+                        sel_idx = locations.index(triggered_value)
+                        triggering_element = sel_idx % 2 + 1
+                else:
+                    sel_idx = locations.index(triggered_value)
+                    triggering_element = sel_idx % 2 + 1
+
+                # Use the triggered_value to create the selector object
+                selector = Location_Builder(trigger, triggered_value, crdict,
+                                            admin_df, state_array,
+                                            county_array)
+        
+                # Now retrieve information for the most recently updated element
+                location = selector.chooseRecent()
+        
+                # What is this about?
+                if 'shape' in location[0] and location[3] is None:
+                    location =  ['all', 'y', 'x', 'Contiguous United States']
+                try:
+                    location.append(triggering_element)
+                except:
+                    raise PreventUpdate
+
+            # If not syncing, only use the inputs for this element
+            if 'On' not in sync:
+                locations = locations[key::2]
+
+                # That also means that the triggering element is this one
+                triggering_element = key + 1
+
+                # The update graph button activates US state selections
+                if 'update_graph' in trigger:
+                    if triggered_value is None:
+                        triggered_value = 'all'
+                    else:
+                        # The idx of the most recent update is -2 or -1
+                        # update_idx = updates.index(triggered_value) - 2
+                        if locations[-1] is None:
+                            raise PreventUpdate
+                        triggered_value = locations[-1]
+
+                # If this element wasn't the trigger, prevent updates
+                if triggered_value not in locations:
+                    raise PreventUpdate
+                # else:
+                #     sel_idx = locations.index(triggered_value)
+                #     triggering_element = sel_idx % 2 + 1
+
+                # Use the triggered_value to create the selector object
+                selector = Location_Builder(trigger, triggered_value, crdict,
+                                            admin_df, state_array,
+                                            county_array)
+        
+                # Retrieve information for the most recently updated element
+                location = selector.chooseRecent()
+        
+                # What is this about?
+                if 'shape' in location[0] and location[3] is None:
+                    location =  ['all', 'y', 'x', 'Contiguous United States']
+   
+                # Add the triggering element key to prevent updates later
+                try:
+                    location.append(triggering_element)
+                except:
+                    raise PreventUpdate    
+    
+            return location
+    
+
     @app.callback([Output('county_div_{}'.format(i), 'style'),
                    Output('state_div_{}'.format(i), 'style'),
                    Output('shape_div_{}'.format(i), 'style')],
@@ -1234,7 +1298,7 @@ for i in range(1, 3):
     @app.callback(Output('state_{}'.format(i), 'placeholder'),
                   [Input('update_graphs_1', 'n_clicks'),
                    Input('update_graphs_2', 'n_clicks'),
-                   Input('location_store', 'children')],
+                   Input('location_store_{}'.format(i), 'children')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
     def dropState(update1, update2, location, key, sync):
@@ -1259,7 +1323,7 @@ for i in range(1, 3):
     @app.callback([Output('county_{}'.format(i), 'options'),
                    Output('county_{}'.format(i), 'placeholder'),
                    Output('label_store_{}'.format(i), 'children')],
-                  [Input('location_store', 'children')],
+                  [Input('location_store_{}'.format(i), 'children')],
                   [State('county_{}'.format(i), 'value'),
                    State('county_{}'.format(i), 'label'),
                    State('label_store_{}'.format(i), 'children'),
@@ -1320,7 +1384,7 @@ for i in range(1, 3):
                    Input('choice_2', 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
-                   Input('location_store', 'children')],
+                   Input('location_store_{}'.format(i), 'children')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children')])
@@ -1334,22 +1398,24 @@ for i in range(1, 3):
         location =  ['all', 'y', 'x', 'Contiguous United States', 0]
 
         '''
+        # Identify element number
+        key = int(key)
+
         # Prevent update from location unless it is a state or shape filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
-        if trig == 'location_store.children':
+        if trig == 'location_store_{}.children'.format(key):
             if 'corr' not in function:
                 if 'grid' in location[0] or 'county' in location[0]:
                     raise PreventUpdate
 
             # Check which element the selection came from
-            sel_idx = location[-1]
+            triggered_element = location[-1]
             if 'On' not in sync:
-                idx = int(key) - 1
-                if sel_idx not in idx + np.array([0, 2, 4, 6, 8, 10]):
+                if triggered_element != key:
                     raise PreventUpdate
 
-        print("Rendering Map #{}".format(int(key)))
+        print("Rendering Map #{}".format(key))
 
         # Create signal for the global_store
         signal = json.loads(signal)
@@ -1359,7 +1425,7 @@ for i in range(1, 3):
          colorscale, reverse] = signal
 
         # DASH doesn't seem to like passing True/False as values
-        verity = {'no': False,'yes':True}
+        verity = {'no': False, 'yes':True}
         reverse = verity[reverse]
 
         # Figure which choice is this panel's and which is the other
@@ -1395,7 +1461,6 @@ for i in range(1, 3):
             limit = np.nanmax([abs(amin), abs(amax)])
             amax = limit
             amin = limit * -1
-
 
         # Experimenting with leri  # <----------------------------------------- Temporary
         if 'leri' in choice:
@@ -1523,7 +1588,7 @@ for i in range(1, 3):
                    Input('signal', 'children'),
                    Input('choice_{}'.format(i), 'value'),
                    Input('choice_store', 'children'),
-                   Input('location_store', 'children'),
+                   Input('location_store_{}'.format(i), 'children'),
                    Input('dsci_button_{}'.format(i), 'n_clicks')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
@@ -1540,15 +1605,17 @@ for i in range(1, 3):
             function = 'oarea'
             location =  ['all', 'y', 'x', 'Contiguous United States', 0]
         '''
+        # Identify element number
+        key = int(key)
+
         # Prevent update from location unless it is a state filter
         trig = dash.callback_context.triggered[0]['prop_id']
 
-        # Check which element the selection came from
-        if trig == 'location_store.children':
-            sel_idx = location[-1]
+        # If we aren't syncing or changing the function or color
+        if trig == 'location_store_{}.children'.format(key):
+            triggered_element = location[-1]
             if 'On' not in sync:
-                idx = int(key) - 1
-                if sel_idx not in idx + np.array([0, 2, 4, 6, 8, 10]):
+                if triggered_element != key:
                     raise PreventUpdate
 
         # Create signal for the global_store
