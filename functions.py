@@ -96,7 +96,16 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'eddi9': 'Evaporative Demand Drought Index - 9 month',
              'eddi10': 'Evaporative Demand Drought Index - 10 month',
              'eddi11': 'Evaporative Demand Drought Index - 11 month',
-             'eddi12': 'Evaporative Demand Drought Index - 12 month'}
+             'eddi12': 'Evaporative Demand Drought Index - 12 month',
+             'leri1': 'Landscape Evaporative Response Index - 1 month',
+             'leri3': 'Landscape Evaporative Response Index - 3 month',
+             'tmin': 'Average Daily Minimum Temperature (PRISM)',
+             'tmax': 'Average Daily Maximum Temperature (PRISM)',
+             'tmean': 'Mean Temperature (PRISM)',
+             'tdmean': 'Mean Dew Point Temperature (PRISM)', 
+             'ppt': 'Total Precipitation (PRISM)',
+             'vpdmax': 'Maximum Vapor Pressure Deficit (PRISM)' ,
+             'vpdmin': 'Minimum Vapor Pressure Deficit (PRISM)'}
 
 
 # In[]: Functions

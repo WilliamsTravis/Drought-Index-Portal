@@ -54,6 +54,9 @@ Things to do:
        errors, but does improve speed. With the area calculations it worsens
        it significantly... Is this an inevitable tradeoff?
 
+    6) Describe new climate data sets:
+        http://www.prism.oregonstate.edu/documents/PRISM_datasets_aug2013.pdf
+
 Created on April 15th 2019
 
 @author: Travis Williams - Earth Lab of the Universty of Colorado Boulder
@@ -1813,6 +1816,10 @@ for i in range(1, 3):
             if 'p' in function:
                 dmin = 0
                 dmax = 100
+
+        # EDDI, and possible future indices, have an inverse scale
+        if 'eddi' in choice:
+            reverse = not reverse
 
         # Experimenting with LERI
         if 'leri' in choice:  # <---------------------------------------------- Temporary
