@@ -289,7 +289,7 @@ admin = Admin_Elements(resolution)
 
 # Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
-{'label': '0°C', 'style': {'color': '#77b0b1'}}
+months = [int(m) for m in range(1, 13)]
 yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
              y in years}
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
@@ -297,10 +297,13 @@ monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
 monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',
                    5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September',
                    10: 'October', 11: 'November', 12: 'December'}
-monthoptions = [{'label': monthmarks[i], 'value': i} for
-                 i in range(1, 13)]
-monthoptions_full = [{'label': monthmarks_full[i], 'value': i} for
-                      i in range(1, 13)]
+monthoptions = [{'label': monthmarks[i], 'value': i} for i in range(1, 13)]
+months_slanted = {months[i]: {'label': monthmarks[i+1],
+                              'style': {"transform": "rotate(45deg)"}} for
+                                                       i in range(len(months))}
+                                    
+# monthoptions_full = [{'label': monthmarks_full[i], 'value': i} for
+#                       i in range(1, 13)]
 
 # Only display every 5 years for space
 for y in years:
@@ -606,7 +609,7 @@ app.layout = html.Div([
                   # Year Slider
                   html.Div([
                     html.H3(id='date_range',
-                            children=['Year Range']),
+                            children=['Date Range']),
                     html.Div([
                       dcc.RangeSlider(id='year_slider',
                                       value=default_years,
@@ -618,26 +621,20 @@ app.layout = html.Div([
                              'margin-bottom': '80'})]),
 
                   # Month Slider
-                  html.Div(id='month_slider',
-                           children=[
+                  html.Div(children=[
                              html.Div([
-                               html.H5('Beginning Month'),
-                               dcc.Dropdown(id='month_1',
-                                            options=monthoptions_full,
-                                            value=1)],
-                               className='two columns',
+                               html.H5('Start and End Months'),
+                               dcc.RangeSlider(id='month_slider',
+                                               value=[1, 12],
+                                               marks=months_slanted,
+                                               min=1, 
+                                               max=12,
+                                               updatemode='drag')],
+                               className='four columns',
                                title=('Choose the first month of the first ' +
-                                      'year of the study period.')),
-                             html.Div([
-                               html.H5('Ending Month'),
-                               dcc.Dropdown(id='month_2',
-                                            options=monthoptions_full,
-                                            value=12)],
-                               className='two columns',
-                               title=('Choose the last month of the last ' +
-                                      'year of the study period.')),
+                                      'year and last month of the last year ' +
+                                      'of the study period.')),
                             html.Div(
-                              id='month_slider_holder',
                               children=[
                                 html.H5('Included Months'),
                                   dcc.Checklist(
@@ -735,6 +732,7 @@ app.layout = html.Div([
 
        # Signals
        html.Div(id='signal', style={'display': 'none'}),
+       html.Div(id='date_print', style={'display': 'none'}),
        html.Div(id='location_store_1', style={'display': 'none'}),
        html.Div(id='location_store_2', style={'display': 'none'}),
        html.Div(id='choice_store', style={'display': 'none'}),
@@ -748,17 +746,44 @@ app.layout = html.Div([
 
 
 # In[]: App Callbacks
-@app.callback(Output('date_range', 'children'),
-              [Input('year_slider', 'value')])
-def adjustYear(year_range):
+@app.callback([Output('date_range', 'children'),
+               Output('date_print', 'children')],
+              [Input('year_slider', 'value'),
+               Input('month_slider', 'value'),
+               Input('month', 'values')])
+def adjustDatePrint(year_range, month_range, months):
     '''
     If users select one year, only print it once
     '''
-    if year_range[0] == year_range[1]:
-        string = 'Year Range: {}'.format(year_range[0])
+    # Don't print months start and end if Jan through Dec
+    month_range = [monthmarks[m] for m in month_range]
+    if month_range[0] == 'Jan' and month_range[1] == 'Dec':
+        mrs = ['', '']
+        mjoin = ''
     else:
-        string = 'Year Range: {} - {}'.format(year_range[0], year_range[1])
-    return string
+        mrs = [month_range[0] + ' ', month_range[1] + ' ']
+        mjoin = ' - '
+
+    # Don't print months included if all are
+    if len(months) == 12:
+        month_incl_print = ""
+    else:
+        month_incl_print = "".join([monthmarks[a][0].upper() for a in months])
+        month_incl_print = ' (' + month_incl_print + ')'
+
+    # If a single year do this
+    if year_range[0] == year_range[1]:
+        string = str(year_range[0])
+        string = mrs[0] + mjoin + mrs[1] + str(year_range[0])
+    else:
+        string = (mrs[0] + str(year_range[0]) + ' - ' + mrs[1] +
+                  str(year_range[1]))
+
+    # And now add the month printouts
+    string = string + month_incl_print
+    full = 'Date Range: ' + string
+
+    return full, string  
 
 
 @app.callback([Output('options', 'style'),
@@ -913,16 +938,15 @@ def choiceStore(choice1, choice2):
               [State('colors', 'value'),
                State('reverse', 'value'),
                State('year_slider', 'value'),
-               State('month_1', 'value'),
-               State('month_2', 'value'),
+               State('month_slider', 'value'),
                State('month', 'values')])
-def submitSignal(click, colorscale, reverse, year_range, month1, month2,
+def submitSignal(click, colorscale, reverse, year_range, month_range,
                  month_filter):
     '''
     Collect and hide the options signal in the hidden 'signal' div.
     '''
     print('submitSignal reverse: ' + str(reverse))
-    signal = [[year_range, [month1, month2], month_filter], colorscale,
+    signal = [[year_range, month_range, month_filter], colorscale,
               reverse]
     return json.dumps(signal)
 
@@ -1387,9 +1411,10 @@ for i in range(1, 3):
                    Input('location_store_{}'.format(i), 'children')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children')])
+                   State('click_sync', 'children'),
+                   State('date_print', 'children')])
     def makeGraph(choice1, choice2, map_type, signal, location, function, key,
-                  sync):
+                  sync, date_print):
         '''
         This actually renders the map. I want to modularize, but am struggling
         on this.
@@ -1483,8 +1508,8 @@ for i in range(1, 3):
             array[~np.isin(grid, gridids)] = np.nan
 
         # Get the right print statement for the date used
-        date_print = datePrint(year_range[0], year_range[1], month1, month2,
-                               month_filter, monthmarks)
+        # date_print = datePrint(year_range[0], year_range[1], month1, month2,
+        #                        month_filter, monthmarks)
 
         # If it is a correlation recreate the map array
         if 'corr' in function and flag != 'all':

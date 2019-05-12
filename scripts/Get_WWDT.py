@@ -71,7 +71,7 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions2 import toNetCDF, toNetCDFAlbers, toNetCDFPercentile
+from functions import toNetCDF, toNetCDFAlbers, toNetCDFPercentile
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
 
@@ -94,28 +94,58 @@ if not os.path.exists(local_path2):
     os.makedirs(local_path2)
 
 # I came up with a slightly differentset of acroynms
-indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3', 'spei6',
-           'pdsi', 'scpdsi', 'pzi']
-local_indices = ['spi1', 'spi2', 'spi3', 'spi6', 'spei1', 'spei2', 'spei3',
-                 'spei6', 'pdsi', 'pdsisc', 'pdsiz']
+indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7', 'spi8',
+           'spi9', 'spi10', 'spi11', 'spi12', 'spei1', 'spei2', 'spei3',
+           'spei4', 'spei5', 'spei6', 'spei7', 'spei8', 'spei9', 'spei10',
+           'spei11', 'spei12', 'pdsi', 'scpdsi', 'pzi', 'mdn1']
+local_indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7',
+                 'spi8', 'spi9', 'spi10', 'spi11', 'spi12', 'spei1', 'spei2',
+                 'spei3', 'spei4', 'spei5', 'spei6', 'spei7', 'spei8', 'spei9',
+                 'spei10', 'spei11', 'spei12', 'pdsi', 'pdsisc', 'pdsiz',
+                 'mdn1']
 
 index_map = {indices[i]: local_indices[i] for i in range(len(indices))}
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
+             'mdn1': 'Mean Temperature Departure  (1981 - 2010) - 1 month',
              'pdsi': 'Palmer Drought Severity Index',
              'scpdsi': 'Self-Calibrated Palmer Drought Severity Index',
              'pzi': 'Palmer Z-Index',
              'spi1': 'Standardized Precipitation Index - 1 month',
              'spi2': 'Standardized Precipitation Index - 2 month',
              'spi3': 'Standardized Precipitation Index - 3 month',
+             'spi4': 'Standardized Precipitation Index - 4 month',
+             'spi5': 'Standardized Precipitation Index - 5 month',
              'spi6': 'Standardized Precipitation Index - 6 month',
+             'spi7': 'Standardized Precipitation Index - 7 month',
+             'spi8': 'Standardized Precipitation Index - 8 month',
+             'spi9': 'Standardized Precipitation Index - 9 month',
+             'spi10': 'Standardized Precipitation Index - 10 month',
+             'spi11': 'Standardized Precipitation Index - 11 month',
+             'spi12': 'Standardized Precipitation Index - 12 month',
              'spei1': 'Standardized Precipitation-Evapotranspiration Index' +
                       ' - 1 month',
              'spei2': 'Standardized Precipitation-Evapotranspiration Index' +
                       ' - 2 month',
              'spei3': 'Standardized Precipitation-Evapotranspiration Index' +
                       ' - 3 month',
+             'spei4': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 4 month',
+             'spei5': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 5 month',
              'spei6': 'Standardized Precipitation-Evapotranspiration Index' +
                       ' - 6 month',
+             'spei7': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 7 month',
+             'spei8': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 8 month',
+             'spei9': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 9 month',
+             'spei10': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 10 month',
+             'spei11': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 11 month',
+             'spei12': 'Standardized Precipitation-Evapotranspiration Index' +
+                      ' - 12 month',
              'eddi1': 'Evaporative Demand Drought Index - 1 month',
              'eddi2': 'Evaporative Demand Drought Index - 2 month',
              'eddi3': 'Evaporative Demand Drought Index - 3 month',
