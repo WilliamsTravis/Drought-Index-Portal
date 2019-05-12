@@ -977,12 +977,12 @@ for i in range(1, 3):
             trigger = context.triggered[0]['prop_id']
 
             # print out variables for developing
-            print("key = " + json.dumps(key))
-            print("sync = " + json.dumps(sync))
-            print("locations = " + str(locations))
-            print("updates = " + str(updates))
-            print("triggered_value = " + str(triggered_value))
-            print("trigger = " + json.dumps(trigger))
+            # print("key = " + json.dumps(key))
+            # print("sync = " + json.dumps(sync))
+            # print("locations = " + str(locations))
+            # print("updates = " + str(updates))
+            # print("triggered_value = " + str(triggered_value))
+            # print("trigger = " + json.dumps(trigger))
 
             # Two cases, if syncing return a copy, if not split
             if 'On' in sync:
@@ -1724,7 +1724,7 @@ for i in range(1, 3):
                          # family='Time New Roman',
                          hovermode='y')
 
-        print('Timeseries Reverse: ' + str(reverse))
+        # print('Timeseries Reverse: ' + str(reverse))
 
         # Build the plotly readable dictionaries (Two types)
         if function != 'oarea':

@@ -1850,21 +1850,24 @@ class Index_Maps():
                 counts = arrays.where((arrays<d[0]) &
                                       (arrays>=d[1])).count(dim=('lat', 'lon'))
                 ratios = counts / totals
-                pcts = ratios.data * 100
+                pcts = ratios.data.compute() * 100
                 return pcts
 
         # print("starting offending loops...")
-        pincs = [dask.delayed(catFilter)(arrays, cats[i], True) for
-                 i in range(5)]
-        pincs = dask.compute(*pincs)
-        pincs = [list(a) for a in pincs]
-        pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
-        pnincs = dask.compute(*pnincs)
+        # pincs = [dask.delayed(catFilter)(arrays, cats[i], True) for
+        #          i in range(5)]
+        # pincs = dask.compute(*pincs)  # <-------------------------------------- Parallelizing here speeds this up somewhat, but adds memory use :/
+        # pincs = [list(a) for a in pincs]
+        # pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
+        # pnincs = dask.compute(*pnincs)
 
+        pincs = [catFilter(arrays, cats[i], True) for i in range(5)]
+        pincs = [list(a) for a in pincs]
+        pnincs = [catFilter(arrays, cats[i]) for i in range(5)]
         DSCI = list(np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]),
                               axis=0))
         pnincs = [list(p) for p in pnincs]  # These need to work with json
-        
+
         # Return the list of five layers
         return pincs, pnincs, DSCI
 
