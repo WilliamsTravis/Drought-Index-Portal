@@ -39,6 +39,8 @@
                cronlog.log>
                 
             3) ctrl + x
+            4) This script, because it gets the bulk of the data, is also used
+               to set the index ranges for all indices, so schedule it last.
 
 Created on Fri Feb  10 14:33:38 2019
 
@@ -388,6 +390,31 @@ for index in indices:
         toNetCDFAlbers(tfiles_proj, ncfiles, nc_path_proj, index, proj=proj,
                        year1=1895, month1=1, year2=todays_date.year,
                        month2=todays_date.month, wmode='w', percentiles=False)
+
+
+# We use a pre-made min/max value data frame to set color scales
+print("Downloads and transformations complete, establishing index ranges...")
+index_paths = [os.path.join(data_path,'data/droughtindices/netcdfs',
+                            i  + '.nc') for i in local_indices]
+maxes = {}
+mins = {}
+for i in tqdm(range(len(index_paths)), position=0):
+    try:
+        with xr.open_dataset(index_paths[i]) as data:
+            indexlist = data
+            data.close()
+        mx = float(indexlist.max().value)
+        mn = float(indexlist.min().value)
+        maxes[local_indices[i]] = mx
+        mins[local_indices[i]] = mn
+    except:
+        pass
+
+df = pd.DataFrame([maxes, mins]).T
+df.columns = ['max', 'min']
+df['index'] = df.index
+df.to_csv('data/index_ranges.csv', index=False)
+
 
 print("Update Complete.")
 print("####################################################")

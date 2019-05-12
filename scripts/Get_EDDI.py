@@ -36,7 +36,7 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions2 import  isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
+from functions import isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
 
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
@@ -61,7 +61,8 @@ if not os.path.exists(pc_folder):
     os.makedirs(pc_folder)
 
 # In[] Index options
-indices = ['eddi1', 'eddi2', 'eddi3', 'eddi6']
+indices = ['eddi1', 'eddi2', 'eddi3', 'eddi4', 'eddi5', 'eddi6', 'eddi7',
+           'eddi8', 'eddi9', 'eddi10', 'eddi11', 'eddi12']
 
 # In[] Define scraping routine
 def getEDDI(scale, date, temp_folder, write=False):

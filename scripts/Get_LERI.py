@@ -47,7 +47,7 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions2 import toNetCDF, toNetCDFAlbers, toNetCDFPercentile, isInt
+from functions import toNetCDF, toNetCDFAlbers, toNetCDFPercentile, isInt
 
 # These make output logs too noisy to see what happened
 gdal.PushErrorHandler('CPLQuietErrorHandler')

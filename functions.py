@@ -88,7 +88,15 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'eddi1': 'Evaporative Demand Drought Index - 1 month',
              'eddi2': 'Evaporative Demand Drought Index - 2 month',
              'eddi3': 'Evaporative Demand Drought Index - 3 month',
-             'eddi6': 'Evaporative Demand Drought Index - 6 month'}
+             'eddi4': 'Evaporative Demand Drought Index - 4 month',
+             'eddi5': 'Evaporative Demand Drought Index - 5 month',
+             'eddi6': 'Evaporative Demand Drought Index - 6 month',
+             'eddi7': 'Evaporative Demand Drought Index - 7 month',
+             'eddi8': 'Evaporative Demand Drought Index - 8 month',
+             'eddi9': 'Evaporative Demand Drought Index - 9 month',
+             'eddi10': 'Evaporative Demand Drought Index - 10 month',
+             'eddi11': 'Evaporative Demand Drought Index - 11 month',
+             'eddi12': 'Evaporative Demand Drought Index - 12 month'}
 
 
 # In[]: Functions
@@ -504,8 +512,8 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
     As an expediency, if there isn't an nc file it defaults to reading dates
     from the file names.
 
-    I need to go back and parameterize the subtitle to reflect the actual dates
-    used in each dataset.
+    I need to go back and parameterize the subtitle and other attributes to 
+    reflect the actual dates used in each dataset.  # <------------------------ Not critical since we aren't sharing these files yet, but do this before we do
 
     Test parameters for toNetCDF2
         tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/temp*')
@@ -1879,7 +1887,7 @@ class Index_Maps():
         # print("starting offending loops...")
         # pincs = [dask.delayed(catFilter)(arrays, cats[i], True) for
         #          i in range(5)]
-        # pincs = dask.compute(*pincs)  # <-------------------------------------- Parallelizing here speeds this up somewhat, but adds memory use :/
+        # pincs = dask.compute(*pincs)  # <-------------------------------------- Parallelizing here speeds this up, but adds memory use :/
         # pincs = [list(a) for a in pincs]
         # pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
         # pnincs = dask.compute(*pnincs)

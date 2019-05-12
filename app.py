@@ -173,41 +173,100 @@ cache2.init_app(server)
 indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'PDSI-Self Calibrated', 'value': 'pdsisc'},
            {'label': 'Palmer Z Index', 'value': 'pdsiz'},
+           # {'label': 'MTD-1', 'value': 'mdn1'},  # <------------------------- I don't understand this product just yet
            {'label': 'SPI-1', 'value': 'spi1'},
            {'label': 'SPI-2', 'value': 'spi2'},
            {'label': 'SPI-3', 'value': 'spi3'},
+           {'label': 'SPI-4', 'value': 'spi4'},
+           {'label': 'SPI-5', 'value': 'spi5'},
            {'label': 'SPI-6', 'value': 'spi6'},
+           {'label': 'SPI-7', 'value': 'spi7'},
+           {'label': 'SPI-8', 'value': 'spi8'},
+           {'label': 'SPI-9', 'value': 'spi9'},
+           {'label': 'SPI-10', 'value': 'spi10'},
+           {'label': 'SPI-11', 'value': 'spi11'},
+           {'label': 'SPI-12', 'value': 'spi12'},
            {'label': 'SPEI-1', 'value': 'spei1'},
            {'label': 'SPEI-2', 'value': 'spei2'},
            {'label': 'SPEI-3', 'value': 'spei3'},
+           {'label': 'SPEI-4', 'value': 'spei4'},
+           {'label': 'SPEI-5', 'value': 'spei5'},
            {'label': 'SPEI-6', 'value': 'spei6'},
+           {'label': 'SPEI-7', 'value': 'spei7'},
+           {'label': 'SPEI-8', 'value': 'spei8'},
+           {'label': 'SPEI-9', 'value': 'spei9'},
+           {'label': 'SPEI-10', 'value': 'spei10'},
+           {'label': 'SPEI-11', 'value': 'spei11'},
+           {'label': 'SPEI-12', 'value': 'spei12'},
            {'label': 'EDDI-1', 'value': 'eddi1'},
            {'label': 'EDDI-2', 'value': 'eddi2'},
            {'label': 'EDDI-3', 'value': 'eddi3'},
+           {'label': 'EDDI-4', 'value': 'eddi4'},
+           {'label': 'EDDI-5', 'value': 'eddi5'},
            {'label': 'EDDI-6', 'value': 'eddi6'},
+           {'label': 'EDDI-7', 'value': 'eddi7'},
+           {'label': 'EDDI-8', 'value': 'eddi8'},
+           {'label': 'EDDI-9', 'value': 'eddi9'},
+           {'label': 'EDDI-10', 'value': 'eddi10'},
+           {'label': 'EDDI-11', 'value': 'eddi11'},
+           {'label': 'EDDI-12', 'value': 'eddi12'},
            {'label': 'LERI-1', 'value': 'leri1'},
            {'label': 'LERI-3', 'value': 'leri3'}]
 
 # Index dropdown labels
-indexnames = {'pdsi': 'Palmer Drought Severity Index',
-              'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
-              'pdsiz': 'Palmer Z Index',
+indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
+              'mdn1': 'Mean Temperature Departure  (1981 - 2010) - 1 month',
+              'pdsi': 'Palmer Drought Severity Index',
+              'scpdsi': 'Self-Calibrated Palmer Drought Severity Index',
+              'pzi': 'Palmer Z-Index',
               'spi1': 'Standardized Precipitation Index - 1 month',
               'spi2': 'Standardized Precipitation Index - 2 month',
               'spi3': 'Standardized Precipitation Index - 3 month',
+              'spi4': 'Standardized Precipitation Index - 4 month',
+              'spi5': 'Standardized Precipitation Index - 5 month',
               'spi6': 'Standardized Precipitation Index - 6 month',
+              'spi7': 'Standardized Precipitation Index - 7 month',
+              'spi8': 'Standardized Precipitation Index - 8 month',
+              'spi9': 'Standardized Precipitation Index - 9 month',
+              'spi10': 'Standardized Precipitation Index - 10 month',
+              'spi11': 'Standardized Precipitation Index - 11 month',
+              'spi12': 'Standardized Precipitation Index - 12 month',
               'spei1': 'Standardized Precipitation-Evapotranspiration Index' +
                        ' - 1 month',
               'spei2': 'Standardized Precipitation-Evapotranspiration Index' +
                        ' - 2 month',
               'spei3': 'Standardized Precipitation-Evapotranspiration Index' +
                        ' - 3 month',
+              'spei4': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 4 month',
+              'spei5': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 5 month',
               'spei6': 'Standardized Precipitation-Evapotranspiration Index' +
                        ' - 6 month',
+              'spei7': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 7 month',
+              'spei8': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 8 month',
+              'spei9': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 9 month',
+              'spei10': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 10 month',
+              'spei11': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 11 month',
+              'spei12': 'Standardized Precipitation-Evapotranspiration Index' +
+                       ' - 12 month',
               'eddi1': 'Evaporative Demand Drought Index - 1 month',
               'eddi2': 'Evaporative Demand Drought Index - 2 month',
               'eddi3': 'Evaporative Demand Drought Index - 3 month',
+              'eddi4': 'Evaporative Demand Drought Index - 4 month',
+              'eddi5': 'Evaporative Demand Drought Index - 5 month',
               'eddi6': 'Evaporative Demand Drought Index - 6 month',
+              'eddi7': 'Evaporative Demand Drought Index - 7 month',
+              'eddi8': 'Evaporative Demand Drought Index - 8 month',
+              'eddi9': 'Evaporative Demand Drought Index - 9 month',
+              'eddi10': 'Evaporative Demand Drought Index - 10 month',
+              'eddi11': 'Evaporative Demand Drought Index - 11 month',
+              'eddi12': 'Evaporative Demand Drought Index - 12 month',
               'leri1': 'Landscape Evaporative Response Index - 1 month',
               'leri3': 'Landscape Evaporative Response Index - 3 month'}
 
@@ -290,17 +349,26 @@ admin = Admin_Elements(resolution)
 # Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
 months = [int(m) for m in range(1, 13)]
+months2 = copy.copy(months)
+for m in months[:-1]:
+    months2.append(m + 12)
+
+
+
+# months_inv = months[::-1][1:]  # I am tricking it for the slider options
+# months_inv = [m + .1 for m in months_inv]
 yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
              y in years}
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-              7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+              7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec',
+              13: 'Nov ', 14: 'Oct ', 15: 'Sep ', 16: 'Aug ', 17: 'Jul ', 18: 'Jun ',
+              19: 'May ', 20: 'Apr ', 21: 'Mar ', 22: 'Feb ', 23: 'Jan '}
 monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',
                    5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September',
                    10: 'October', 11: 'November', 12: 'December'}
 monthoptions = [{'label': monthmarks[i], 'value': i} for i in range(1, 13)]
-months_slanted = {months[i]: {'label': monthmarks[i+1],
-                              'style': {"transform": "rotate(45deg)"}} for
-                                                       i in range(len(months))}
+months_slanted = {i: {'label': monthmarks[i],
+                      'style': {"transform": "rotate(45deg)"}} for i in months2}
                                     
 # monthoptions_full = [{'label': monthmarks_full[i], 'value': i} for
 #                       i in range(1, 13)]
@@ -628,9 +696,10 @@ app.layout = html.Div([
                                                value=[1, 12],
                                                marks=months_slanted,
                                                min=1, 
-                                               max=12,
-                                               updatemode='drag')],
-                               className='four columns',
+                                               max=23,
+                                               updatemode='drag',
+                                               )],
+                               className='six columns',
                                title=('Choose the first month of the first ' +
                                       'year and last month of the last year ' +
                                       'of the study period.')),
@@ -644,8 +713,8 @@ app.layout = html.Div([
                                     values=list(range(1, 13)),
                                     labelStyle={'display':
                                                 'inline-block'})],
-                               className='eight columns',
-                               title=('Choose which months of the year to ' +
+                                className='five columns',
+                                title=('Choose which months of the year to ' +
                                       'be included.'))
                         ],
                         className='row'),
@@ -756,6 +825,7 @@ def adjustDatePrint(year_range, month_range, months):
     If users select one year, only print it once
     '''
     # Don't print months start and end if Jan through Dec
+    month_range = [int(month_range[0]), int(month_range[1])]
     month_range = [monthmarks[m] for m in month_range]
     if month_range[0] == 'Jan' and month_range[1] == 'Dec':
         mrs = ['', '']
@@ -946,6 +1016,13 @@ def submitSignal(click, colorscale, reverse, year_range, month_range,
     Collect and hide the options signal in the hidden 'signal' div.
     '''
     print('submitSignal reverse: ' + str(reverse))
+    # This is necessary to translate the month range
+    
+    overflow = {13:11, 14:10, 15: 9, 16: 8, 17: 7, 18: 6, 19: 5, 20: 4, 21: 3,
+                22: 2, 23:1}
+    for i in [0, 1]:
+        if month_range[i] > 12:
+            month_range[i] = overflow[month_range[i]]
     signal = [[year_range, month_range, month_filter], colorscale,
               reverse]
     return json.dumps(signal)
