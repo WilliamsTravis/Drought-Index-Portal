@@ -58,7 +58,7 @@ if not os.path.exists(pc_folder):
 
 # In[] Data options
 variables = ['tmin', 'tmax', 'tdmean', 'tmean', 'ppt', 'vpdmax', 'vpdmin']
-variable = 'tmin'
+
 # In[] Define scraping routine
 def getPRISM(filename, temp_folder, ftp):
     '''

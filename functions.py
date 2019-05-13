@@ -1521,9 +1521,11 @@ class Index_Maps():
         self.choice = choice  # This does not yet update information
         self.choice_type = choice_type
         self.color_class = color_class
+        self.reverse = False
         self.setData()
+        self.setReverse()
         self.index_ranges = pd.read_csv('data/tables/index_ranges.csv')
-        self.time_data = time_data # This updates info but cannot be accessed  # <-- Help
+        self.time_data = time_data  # This updates info but cannot be accessed  # <-- Help
 
     @property
     def time_data(self):
@@ -1599,10 +1601,16 @@ class Index_Maps():
             minimum = ranges['min'][ranges['index'] == self.choice].values[0]
             maximum = ranges['max'][ranges['index'] == self.choice].values[0]
 
-            # For index value we want to be centered on zero
-            limits = [abs(minimum), abs(maximum)]
-            self.data_max = max(limits)
-            self.data_min = self.data_max * -1
+            # For index values we want them to be centered on zero
+            nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
+                          'vpdmin']
+            if self.choice not in nonindices:
+                limits = [abs(minimum), abs(maximum)]
+                self.data_max = max(limits)
+                self.data_min = self.data_max * -1
+            else:
+                self.data_max = maximum
+                self.data_min = minimum
 
     @color_class.setter
     def color_class(self, value):
@@ -1742,6 +1750,18 @@ class Index_Maps():
                              dims={'lat': len(lats),
                                    'lon': len(lons)})
         self.mask = xmask
+
+    def setReverse(self):
+        '''
+        Set an attribute to reverse the colorscale if needed for the indicator.
+        '''
+        choice = self.choice
+        reversals = ['eddi', 'tmin', 'tmax', 'tmean', 'tdmean', 'vpdmax',
+                     'vpdmin']
+        if any(r in choice for r in reversals):
+            self.reverse = True
+        else:
+            self.reverse = False
 
     def getTime(self):
         # Now read in the corrollary albers data set

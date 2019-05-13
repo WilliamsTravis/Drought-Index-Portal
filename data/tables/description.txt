@@ -1,5 +1,5 @@
 
-This application displays two panels of drought indices over the Contiguous United States for comparison. For each panel, you may select an index from the list below this description. Data was acquired from the [WestWide Drought Tracker](https://wrcc.dri.edu/wwdt/current.php?folder=spi3&region=ww) of the Desert Research Institue and [NOAA's Physical Sciences Division](https://www.esrl.noaa.gov/psd/products/monitor/).
+This application displays two side-by-side panels of drought indices and/or climate variables over the Contiguous United States for comparison. For each panel, you may select an index or variable from the list below this description. Data was acquired from the [WestWide Drought Tracker](https://wrcc.dri.edu/wwdt/current.php?folder=spi3&region=ww) of the Desert Research Institue and [NOAA's Physical Sciences Division](https://www.esrl.noaa.gov/psd/products/monitor/).
 
 For each panel, you may select a function to apply to the index, adjust the time period over which the function is calculated, change the base map, and change the colorscale.  Each point in the map represents a 0.25 by 0.25 decimal degree grid cell. Hovering over these points shows the index value, county, and specific grid cell ID of each location. Hovering over the map and scrolling allows you to zoom and search the base map for a particular location. Clicking and dragging the mouse allows you to pan the map. Holding control, clicking, and dragging the mouse allows you to change the viewing aspect. You may also generate a time series of monthly values as a bar chart for any particular location by clicking on a point in the map, selecting a specific county, selecting a specific state, or uploading a shapefile. Hovering over the bar chart shows the date and index value for individual months within the time period selected. 
 
@@ -15,13 +15,27 @@ Click [here](https://github.com/WilliamsTravis/Ubuntu-Practice-Machine/raw/maste
 
 **Palmer Z Index**: &emsp; The Palmer Z Index
 
-**SPI**: &emsp; The Standardized Precipitation Index at 1, 2, 3, or 6 months
+**SPI**: &emsp; The Standardized Precipitation Index - 1 to 12 months
 
-**SPEI**: &emsp; The Standardized Precipitation-Evapotranspiration Index at 1, 2, 3, or 6 months
+**SPEI**: &emsp; The Standardized Precipitation-Evapotranspiration Index - 1 to 12 months
 
-**EDDI**: &emsp; The Evaporative Demand Drought Index at 1, 2, 3, or 6 months
+**EDDI**: &emsp; The Evaporative Demand Drought Index - 1 to 12 months
 
-**LERI**: &emsp; The Landscape Evaporative Response Index at 1 or 3 months
+**LERI**: &emsp; The Landscape Evaporative Response Index - 1 or 3 months
+
+**TMIN**: &emsp; Average Daily Minimum Temperature (°C)
+
+**TMAX**: &emsp; Average Daily Maximum Temperature (°C)
+
+**TMEAN**: &emsp; Mean Temperature (°C)
+
+**TDMEAN**: &emsp; Mean Dew Point Temperature (°C)
+
+**PPT**: &emsp; Average Precipitation (mm)
+
+**VPDMAX**: &emsp; Maximum Vapor Pressure Deficit
+
+**VPDMIN**: &emsp; Minimum Vapor Pressure Deficit
 
 &nbsp;
 

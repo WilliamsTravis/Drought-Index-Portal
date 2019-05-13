@@ -214,7 +214,14 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'EDDI-11', 'value': 'eddi11'},
            {'label': 'EDDI-12', 'value': 'eddi12'},
            {'label': 'LERI-1', 'value': 'leri1'},
-           {'label': 'LERI-3', 'value': 'leri3'}]
+           {'label': 'LERI-3', 'value': 'leri3'},
+           {'label': 'TMIN', 'value': 'tmin'},
+           {'label': 'TMAX', 'value': 'tmax'},
+           {'label': 'TMEAN', 'value': 'tmean'},
+           {'label': 'TDMEAN', 'value': 'tdmean'},
+           {'label': 'PPT', 'value': 'ppt'},
+           {'label': 'VPDMAX', 'value': 'vpdmax'},
+           {'label': 'VPDMIN', 'value': 'vpdmin'}]
 
 # Index dropdown labels
 indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
@@ -271,7 +278,14 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'eddi11': 'Evaporative Demand Drought Index - 11 month',
               'eddi12': 'Evaporative Demand Drought Index - 12 month',
               'leri1': 'Landscape Evaporative Response Index - 1 month',
-              'leri3': 'Landscape Evaporative Response Index - 3 month'}
+              'leri3': 'Landscape Evaporative Response Index - 3 month',
+              'tmin': 'Average Daily Minimum Temperature (°C)',
+              'tmax': 'Average Daily Maximum Temperature (°C)',
+              'tmean': 'Mean Temperature (°C)',
+              'tdmean': 'Mean Dew Point Temperature (°C)', 
+              'ppt': 'Average Precipitation (mm)',
+              'vpdmax': 'Maximum Vapor Pressure Deficit' ,
+              'vpdmin': 'Minimum Vapor Pressure Deficit'}
 
 # Function options
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
@@ -631,7 +645,7 @@ app.layout = html.Div([
 
         # Title
         html.Div([
-            html.H1('Drought Index Comparison Portal'),
+            html.H1('Weather Index Comparison Service'),
             html.Hr()],
             className='twelve columns',
             style={'font-weight': 'bolder',
@@ -1541,6 +1555,9 @@ for i in range(1, 3):
 
         # Get/cache data
         data = retrieveData(signal, function, choice, location)
+        choice_reverse = data.reverse
+        if choice_reverse:
+            reverse = not reverse
 
         # Pull array into memory
         array = data.getFunction(function).compute()
@@ -1550,6 +1567,8 @@ for i in range(1, 3):
         amin = np.nanmin(array)
 
         # Now, we want to use the same value range for colors for both maps
+        nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
+                      'vpdmin']
         if function == 'pmean':
             # Get the data for the other panel for its value range
             data2 = retrieveData(signal, function, choice2, location)
@@ -1562,6 +1581,9 @@ for i in range(1, 3):
         elif 'min' in function or 'max' in function:
             amax = amax
             amin = amin
+        elif choice in nonindices:
+            amax = amax
+            amin = amin
         else:
             limit = np.nanmax([abs(amin), abs(amax)])
             amax = limit
@@ -1570,11 +1592,6 @@ for i in range(1, 3):
         # Experimenting with leri  # <----------------------------------------- Temporary
         if 'leri' in choice:
             amin = 0
-
-        # EDDI has an inverse scale
-        if 'eddi' in choice:
-            print("Reversing EDDI")
-            reverse = not reverse
 
         # Filter for state filters
         # print("location: " + str(location))
@@ -1729,11 +1746,14 @@ for i in range(1, 3):
          month_filter], colorscale, reverse] = signal
 
         # DASH doesn't seem to like passing True/False as values
-        verity = {'no': False,'yes': True}
+        verity = {'no': False, 'yes': True}
         reverse = verity[reverse]
 
         # Get/cache data
         data = retrieveData(signal, function, choice, location)
+        choice_reverse = data.reverse
+        if choice_reverse:
+            reverse = not reverse
         dates = data.dataset_interval.time.values
         dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
         dmin = data.data_min
@@ -1813,18 +1833,10 @@ for i in range(1, 3):
                 dmin = 0
                 dmax = 100
 
-        # EDDI, and possible future indices, have an inverse scale
-        if 'eddi' in choice:
-            reverse = not reverse
-
         # Experimenting with LERI
         if 'leri' in choice:  # <---------------------------------------------- Temporary
             dmin = 0
             dmax = 100
-
-	# EDDI switches
-        if 'eddi' in choice:
-            reverse = not reverse
 
         # The drought area graphs have there own configuration
         elif function == 'oarea':
@@ -1832,8 +1844,6 @@ for i in range(1, 3):
                          range=[0, 100],
                          # family='Time New Roman',
                          hovermode='y')
-
-        # print('Timeseries Reverse: ' + str(reverse))
 
         # Build the plotly readable dictionaries (Two types)
         if function != 'oarea':

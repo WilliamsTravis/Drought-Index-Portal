@@ -23,10 +23,10 @@ local_indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7',
                  'spei3', 'spei4', 'spei5', 'spei6', 'spei7', 'spei8', 'spei9',
                  'spei10', 'spei11', 'spei12', 'pdsi', 'pdsisc', 'pdsiz',
                  'eddi1', 'eddi2', 'eddi3', 'eddi4', 'eddi5', 'eddi6', 'eddi7',
-                 'eddi8', 'eddi9', 'eddi10', 'eddi11', 'eddi12', 'mdn1']
+                 'eddi8', 'eddi9', 'eddi10', 'eddi11', 'eddi12', 'tmin',
+                 'tmax', 'tdmean', 'tmean', 'ppt', 'vpdmax', 'vpdmin']
 index_paths = [os.path.join(data_path,'data/droughtindices/netcdfs',
                             i  + '.nc') for i in local_indices]
-
 
 maxes = {}
 mins = {}
