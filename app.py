@@ -57,6 +57,18 @@ Things to do:
     6) Describe new climate data sets:
         http://www.prism.oregonstate.edu/documents/PRISM_datasets_aug2013.pdf
 
+    7) Consolidate all of the download scripts into one. Also, incorporate the
+       scale setting script into this.
+
+    8) Reconsider the property decorator for certain attributes in
+       Index_Maps(). It works to automatically update these attributes, but
+       does not allow us to access them.
+
+    9) I would like to see the GRACE soil moisture models in here.
+
+    10) There are no preset categories for severity in the climate variables,
+        create them or print out "Not Available."
+
 Created on April 15th 2019
 
 @author: Travis Williams - Earth Lab of the Universty of Colorado Boulder
@@ -297,7 +309,6 @@ function_options_orig = [{'label': 'Mean', 'value': 'omean'},
                          {'label': 'Minimum', 'value': 'omin'},
                          {'label': 'Drought Severity Area', 'value':'oarea'},
                          {'label': 'Correlation', 'value': 'ocorr'}]
-
 function_names = {'pmean': 'Average Percentiles',
                   'pmax': 'Maxmium Percentiles',
                   'pmin': 'Minimum Percentiles',
@@ -1740,7 +1751,6 @@ for i in range(1, 3):
         choice_store = json.loads(choice_store)
         signal = json.loads(signal)
 
-
         # Collect signals
         [[year_range, [month1, month2],
          month_filter], colorscale, reverse] = signal
@@ -1765,7 +1775,9 @@ for i in range(1, 3):
 
         # If the function is oarea, we plot five overlapping timeseries
         label = location[3]
-        if function != 'oarea':
+        nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
+                      'vpdmin']
+        if function != 'oarea' or choice in nonindices:
             # Get the time series from the data object
             timeseries = data.getSeries(location, crdict)
 
@@ -1780,6 +1792,9 @@ for i in range(1, 3):
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
             bar_type = 'bar'
             area_store = ['', '']
+
+            if choice in nonindices and function == 'oarea':
+                label = 'Drought Severity Categories Not Available'
 
         else:
             bar_type = 'overlay'
