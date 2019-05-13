@@ -872,7 +872,10 @@ def adjustDatePrint(year_range, month_range, months):
     # If a single year do this
     if year_range[0] == year_range[1]:
         string = str(year_range[0])
-        string = mrs[0] + mjoin + mrs[1] + str(year_range[0])
+        if mrs[0] == mrs[1]:
+            string = mrs[0] + str(year_range[0])
+        else:
+            string = mrs[0] + mjoin + mrs[1] + str(year_range[0])
     else:
         string = (mrs[0] + str(year_range[0]) + ' - ' + mrs[1] +
                   str(year_range[1]))
