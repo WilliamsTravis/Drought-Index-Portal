@@ -23,13 +23,13 @@ Click [here](https://github.com/WilliamsTravis/Ubuntu-Practice-Machine/raw/maste
 
 **LERI**: &emsp; The Landscape Evaporative Response Index - 1 or 3 months
 
-**TMIN**: &emsp; Average Daily Minimum Temperature (°C)
+**TMIN**: &emsp; Average Daily Minimum Temperature (U+2103C)
 
-**TMAX**: &emsp; Average Daily Maximum Temperature (°C)
+**TMAX**: &emsp; Average Daily Maximum Temperature (U+2103C)
 
-**TMEAN**: &emsp; Mean Temperature (°C)
+**TMEAN**: &emsp; Mean Temperature (U+2103C)
 
-**TDMEAN**: &emsp; Mean Dew Point Temperature (°C)
+**TDMEAN**: &emsp; Mean Dew Point Temperature (U+2103C)
 
 **PPT**: &emsp; Average Precipitation (mm)
 
