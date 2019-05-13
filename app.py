@@ -1794,7 +1794,7 @@ for i in range(1, 3):
             area_store = ['', '']
 
             if choice in nonindices and function == 'oarea':
-                label = 'Drought Severity Categories Not Available'
+                label = '(Drought Severity Categories Not Available)'
 
         else:
             bar_type = 'overlay'
@@ -1826,7 +1826,7 @@ for i in range(1, 3):
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
 
         # Set up y-axis depending on selection
-        if function != 'oarea':
+        if function != 'oarea' or choice in nonindices:
             if 'p' in function:
                 yaxis = dict(title='Percentiles', range=[0, 100])
             elif 'o' in function:
@@ -1854,14 +1854,14 @@ for i in range(1, 3):
             dmax = 100
 
         # The drought area graphs have there own configuration
-        elif function == 'oarea':
+        elif function == 'oarea' and choice not in nonindices:
             yaxis = dict(title='Percent Area (%)',
                          range=[0, 100],
                          # family='Time New Roman',
                          hovermode='y')
 
         # Build the plotly readable dictionaries (Two types)
-        if function != 'oarea':
+        if function != 'oarea' or choice in nonindices:
             data = [dict(type='bar',
                          x=dates,
                          y=timeseries,
