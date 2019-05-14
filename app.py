@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 An Application to visualize time series of drought indices.
 
@@ -66,8 +66,13 @@ Things to do:
 
     9) I would like to see the GRACE soil moisture models in here.
 
-    10) There are no preset categories for severity in the climate variables,
-        create them or print out "Not Available."
+    10) There are no preset categories for severity in the climate variables.
+
+    11) An interesting new bug. I you select by state, then click on a point, 
+        it some times breaks and point selection won't return until you restart
+        the browser. Not easy to reproduce. Also, if you do select a point and
+        then change the settings it will reset the map. (the stored location
+        object changes).
 
 Created on April 15th 2019
 
@@ -1109,12 +1114,12 @@ for i in range(1, 3):
             trigger = context.triggered[0]['prop_id']
 
             # print out variables for developing
-            # print("key = " + json.dumps(key))
-            # print("sync = " + json.dumps(sync))
-            # print("locations = " + str(locations))
-            # print("updates = " + str(updates))
-            # print("triggered_value = " + str(triggered_value))
-            # print("trigger = " + json.dumps(trigger))
+            print("key = " + json.dumps(key))
+            print("sync = " + json.dumps(sync))
+            print("locations = " + str(locations))
+            print("updates = " + str(updates))
+            print("triggered_value = " + str(triggered_value))
+            print("trigger = " + json.dumps(trigger))
 
             # Two cases, if syncing return a copy, if not split
             if 'On' in sync:
@@ -1142,7 +1147,7 @@ for i in range(1, 3):
                                             county_array)
         
                 # Now retrieve information for the most recently updated element
-                location = selector.chooseRecent()
+                location, crds = selector.chooseRecent()
         
                 # What is this about?
                 if 'shape' in location[0] and location[3] is None:
@@ -1173,17 +1178,14 @@ for i in range(1, 3):
                 # If this element wasn't the trigger, prevent updates
                 if triggered_value not in locations:
                     raise PreventUpdate
-                # else:
-                #     sel_idx = locations.index(triggered_value)
-                #     triggering_element = sel_idx % 2 + 1
 
                 # Use the triggered_value to create the selector object
-                selector = Location_Builder(trigger, triggered_value, crdict,
-                                            admin_df, state_array,
-                                            county_array)
+                selector = Location_Builder(trigger, triggered_value,
+                                                  crdict, admin_df, state_array,
+                                                  county_array)
         
                 # Retrieve information for the most recently updated element
-                location = selector.chooseRecent()
+                location, crds = selector.chooseRecent()
         
                 # What is this about?
                 if 'shape' in location[0] and location[3] is None:
@@ -1195,9 +1197,8 @@ for i in range(1, 3):
                 except:
                     raise PreventUpdate    
     
-            return location
+            return json.dumps([location, crds])
     
-
     @app.callback([Output('county_div_{}'.format(i), 'style'),
                    Output('state_div_{}'.format(i), 'style'),
                    Output('shape_div_{}'.format(i), 'style')],
@@ -1438,6 +1439,10 @@ for i in range(1, 3):
         This is supposed to update the opposite placeholder of the updated map
         to reflect the state selection if there was a state selection.
         '''
+        # Temporary, split location up for coordinates
+        location = json.loads(location)
+        location, crds = location
+
         # Check which element the selection came from
         sel_idx = location[-1]
         if 'On' not in sync:
@@ -1477,6 +1482,10 @@ for i in range(1, 3):
         Check that we are working with the right selection, and do this first
         to prevent update if not syncing
         '''
+        # Temporary, split location up
+        location = json.loads(location)
+        location, crds = location
+
         # Check which element the selection came from
         sel_idx = location[-1]
         if 'On' not in sync:
@@ -1531,6 +1540,10 @@ for i in range(1, 3):
         location =  ['all', 'y', 'x', 'Contiguous United States', 0]
 
         '''
+        # Temporary, split location up
+        location = json.loads(location)
+        location, crds = location
+
         # Identify element number
         key = int(key)
 
@@ -1737,6 +1750,10 @@ for i in range(1, 3):
             function = 'oarea'
             location =  ['all', 'y', 'x', 'Contiguous United States', 0]
         '''
+        # Temporary, split location up
+        location = json.loads(location)
+        location, crds = location
+
         # Identify element number
         key = int(key)
 
@@ -1789,7 +1806,8 @@ for i in range(1, 3):
                                    'value': list(timeseries),
                                    'function': function_names[function],  # <-- This doesn't always make sense
                                    'location': location[-2],
-                                   'index': indexnames[choice]})
+                                   'index': indexnames[choice],
+                                   'coord_extent': str(crds)})
             df = pd.DataFrame(columns)
             df_str = df.to_csv(encoding='utf-8', index=False)
             href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
@@ -1823,6 +1841,7 @@ for i in range(1, 3):
                                    'dsci': dsci,
                                    'function': 'Percent Area',
                                    'location':  label,
+                                   'coord_extent': str(crds),
                                    'index': indexnames[choice]})
             df = pd.DataFrame(columns)
             df_str = df.to_csv(encoding='utf-8', index=False)

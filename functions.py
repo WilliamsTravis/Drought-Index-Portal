@@ -1999,12 +1999,14 @@ class Location_Builder:
         if 'county' in trig_id:
             county = admin_df['place'][admin_df.fips == trig_val].unique()[0]
             y, x = np.where(county_array == trig_val)
+            # crds = 
             location = ['county', str(list(y)), str(list(x)), county]
 
         # 2: Selection is a single grid IDs
         elif 'clickData' in trig_id:
             lon = trig_val['points'][0]['lon']
             lat = trig_val['points'][0]['lat']
+            crds = [lat, lon]
             x = cd.londict[lon]
             y = cd.latdict[lat]
             gridid = cd.grid[y, x]
@@ -2017,6 +2019,9 @@ class Location_Builder:
         elif 'selectedData' in trig_id:
             if trig_val is not None:
                 selections = trig_val['points']
+                lats = [d['lat'] for d in selections]
+                lons = [d['lon'] for d in selections]
+                crds = [max(lats), min(lons), min(lats), max(lons)]
                 y = list([cd.latdict[d['lat']] for d in selections])
                 x = list([cd.londict[d['lon']] for d in selections])
                 try:
@@ -2074,6 +2079,7 @@ class Location_Builder:
                 shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
                 shp[shp==-9999] = np.nan
                 y, x = np.where(~np.isnan(shp))
+                # crds = 
                 location = ['shape', str(list(y)), str(list(x)), trig_val]
             except:
                 location = ['all', 'y', 'x', 'Contiguous United States']
@@ -2082,4 +2088,10 @@ class Location_Builder:
         elif 'reset_map' in trig_id:
             location = ['all', 'y', 'x', 'Contiguous United States']
 
-        return location
+        # I am not done creating coord objects yet
+        try:
+            crds
+        except:
+            crds = "Coordinates not available yet"
+
+        return location, crds
