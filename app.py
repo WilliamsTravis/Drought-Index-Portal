@@ -661,7 +661,7 @@ app.layout = html.Div([
 
         # Title
         html.Div([
-            html.H1('Weather Index Comparison Service'),
+            html.H1('Drought Index Comparison Portal'),
             html.Hr()],
             className='twelve columns',
             style={'font-weight': 'bolder',
