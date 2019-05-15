@@ -22,7 +22,7 @@ for i in range(len(event_loc)-1):
     if event_loc[i+1] == event_loc[i]+1:
         events[event_loc[i]] = event
     else:
-        events[event_loc[i]] = 0 
+        events[event_loc[i]] = 0  # this will knock a few months off...fix
         event += 1
 
 unique_events = np.unique(events.astype(int))
@@ -44,8 +44,8 @@ for e in unique_events:
 
 # Build dataframe
 df = pd.DataFrame(OrderedDict({'id':unique_events,
-                               'max_areas': maxes,
-                               'durations': durations,
+                               'max_area': maxes,
+                               'duration': durations,
                                'period': month_ranges}))
 
 df.to_csv('c:/users/user/desktop/sample_drought_df.csv', index=False)
