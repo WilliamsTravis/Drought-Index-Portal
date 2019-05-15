@@ -385,17 +385,13 @@ months = [int(m) for m in range(1, 13)]
 months2 = copy.copy(months)
 for m in months[:-1]:
     months2.append(m + 12)
-
-
-
-# months_inv = months[::-1][1:]  # I am tricking it for the slider options
-# months_inv = [m + .1 for m in months_inv]
 yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
              y in years}
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec',
-              13: 'Nov ', 14: 'Oct ', 15: 'Sep ', 16: 'Aug ', 17: 'Jul ', 18: 'Jun ',
-              19: 'May ', 20: 'Apr ', 21: 'Mar ', 22: 'Feb ', 23: 'Jan '}
+              13: 'Nov ', 14: 'Oct ', 15: 'Sep ', 16: 'Aug ', 17: 'Jul ',
+              18: 'Jun ', 19: 'May ', 20: 'Apr ', 21: 'Mar ', 22: 'Feb ',
+              23: 'Jan '}
 monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',
                    5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September',
                    10: 'October', 11: 'November', 12: 'December'}
@@ -403,9 +399,6 @@ monthoptions = [{'label': monthmarks[i], 'value': i} for i in range(1, 13)]
 months_slanted = {i: {'label': monthmarks[i],
                       'style': {"transform": "rotate(45deg)"}} for i in months2}
                                     
-# monthoptions_full = [{'label': monthmarks_full[i], 'value': i} for
-#                       i in range(1, 13)]
-
 # Only display every 5 years for space
 for y in years:
     if y % 5 != 0:
@@ -476,7 +469,9 @@ def divMaker(id_num, index='noaa'):
                                  style=tablet_style,
                                  selected_style=tablet_style)),
               dcc.Dropdown(id='choice_{}'.format(id_num),
-                           options=indices, value=index)],
+                           options=indices,
+                           value=index,
+                           clearable=False)],
               style={'width': '25%', 'float': 'left'},
               title='Select a drought index for this element'),
             html.Div([
@@ -1616,10 +1611,6 @@ for i in range(1, 3):
             amax = limit
             amin = limit * -1
 
-        # Experimenting with leri  # <----------------------------------------- Temporary
-        if 'leri' in choice:
-            amin = 0
-
         # Filter for state filters
         # print("location: " + str(location))
         flag, y, x, label, idx = location
@@ -1869,11 +1860,6 @@ for i in range(1, 3):
             if 'p' in function:
                 dmin = 0
                 dmax = 100
-
-        # Experimenting with LERI
-        if 'leri' in choice:  # <---------------------------------------------- Temporary
-            dmin = 0
-            dmax = 100
 
         # The drought area graphs have there own configuration
         elif function == 'oarea' and choice not in nonindices:

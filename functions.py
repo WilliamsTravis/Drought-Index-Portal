@@ -1593,7 +1593,7 @@ class Index_Maps():
         self.dataset_interval = data
 
         # I am also setting index ranges from the full data sets
-        if self.choice_type =='percentile' or 'leri' in self.choice:
+        if self.choice_type =='percentile':
             self.data_min = 0
             self.data_max = 100
         else:
@@ -1706,10 +1706,6 @@ class Index_Maps():
             dataset = xr.open_dataset(file_path, chunks=100)  # <------------------ Best chunk size/shape?
         else:
             dataset = xr.open_dataset(file_path)
-
-        # Leri is the only dataset that has missing information
-        if 'leri' in self.choice:
-            dataset.value.data[dataset.value.data < 0] = np.nan
 
         # Set this as an attribute for easy retrieval
         self.dataset = dataset
