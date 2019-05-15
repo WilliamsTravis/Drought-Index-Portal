@@ -5,12 +5,13 @@ Created on Tue May 14 16:09:16 2019
 @author: User
 """
 
-
-import pandas as pd
-import numpy as np
 from collections import OrderedDict
+import numpy as np
+import pandas as pd
+import sys
 
-df = pd.read_csv('c:/users/user/downloads/timeseries_1 (13).csv')
+csv_path = sys.argv[1]
+df = pd.read_csv(csv_path)
 d4s = df[['month', 'd4']]
 months = df['month']
 array = np.array(d4s['d4'])
@@ -18,16 +19,26 @@ events = np.copy(array)
 event = 1
 event_loc = np.where(array != 0)[0]
 
+# Loop through even locations 
 for i in range(len(event_loc)-1):
+    # If there is no gap
     if event_loc[i+1] == event_loc[i]+1:
+        # assign an event id to the full event array
         events[event_loc[i]] = event
+    # If there is a gap
     else:
-        events[event_loc[i]] = 0  # this will knock a few months off...fix
+        # We have a new event id
         event += 1
+        events[event_loc[i]] = event
 
-unique_events = np.unique(events.astype(int))
-unique_events = unique_events[unique_events != 0]
+# End case
+if events[-1] > 0:
+    events[-1] = events[-2]
 
+# Unique event array
+unique_events = np.unique(events[events != 0])
+
+# Required information lists
 month_ranges = []
 maxes = []
 durations = []
