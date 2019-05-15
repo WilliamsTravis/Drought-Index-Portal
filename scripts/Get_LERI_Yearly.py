@@ -134,6 +134,9 @@ for index in indices:
         # Not ready yet
         print("Update mode not available yet")
 
+
+
+
     ############## If we need to start over ###################################
     else:
         ftp.cwd('/Projects/LERI/CONUS_archive/data/time_series/LERI_INDEX/')
@@ -147,7 +150,13 @@ for index in indices:
 
         # Loop through these files, download and transform data
         for file in tqdm(files, position=0):
-            in_path = getLERI(file, temp_folder)
+            try:
+                in_path = getLERI(file, temp_folder)
+            except:
+                ftp = ftplib.FTP('ftp.cdc.noaa.gov', 'anonymous',
+                                 'anonymous@cdc.noaa.gov')
+                ftp.cwd('/Projects/LERI/CONUS_archive/data/time_series/LERI_INDEX/')
+                in_path = getLERI(file, temp_folder)
             year = file[-7: -3]
 
             # The are rather large files, this could take a while
@@ -176,7 +185,7 @@ for index in indices:
                 month = '{:02d}'.format(i)
                 new_name = 'temp_' + year + month + '.tif'
                 new_file = os.path.join(temp_folder, new_name)
-                band, geom, proj = readRaster(f, 1, 9999.)
+                band, geom, proj = readRaster(f, i, 9999.)
                 toRaster(band, new_file, geom, proj)
 
             # As we're finished we can remove the larger tifs
@@ -188,7 +197,7 @@ for index in indices:
                 month = '{:02d}'.format(i)
                 new_name = 'proj_temp_' + year + month + '.tif'
                 new_file = os.path.join(temp_folder, new_name)
-                band, geom, proj = readRaster(f, 1, 9999.)
+                band, geom, proj = readRaster(f, i, 9999.)
                 toRaster(band, new_file, geom, proj)
             os.remove(f)
 

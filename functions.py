@@ -1776,13 +1776,13 @@ class Index_Maps():
         return time_data
 
     def getMean(self):
-        return self.dataset_interval.mean('time').value.data
+        return self.dataset_interval.mean('time', skipna=True).value.data
 
     def getMin(self):
-        return self.dataset_interval.min('time').value.data
+        return self.dataset_interval.min('time', skipna=True).value.data
 
     def getMax(self):
-        return self.dataset_interval.max('time').value.data
+        return self.dataset_interval.max('time', skipna=True).value.data
 
     def getSeries(self, location, crdict):
         '''
@@ -1797,7 +1797,7 @@ class Index_Maps():
 
         # Filter if needed and generate timeseries
         if flag == 'all':
-            timeseries = data.mean(dim=('lat', 'lon'))
+            timeseries = data.mean(dim=('lat', 'lon'), skipna=True)
             timeseries = timeseries.value.values
         else:
             y = json.loads(y)
@@ -1807,7 +1807,7 @@ class Index_Maps():
             else:
                 # self.setMask(location, crdict)
                 data = data.where(self.mask == 1)
-                timeseries = data.mean(dim=('lat', 'lon'))
+                timeseries = data.mean(dim=('lat', 'lon'), skipna=True)
                 timeseries = timeseries.value.values
 
         # print("Area fitlering complete.")
