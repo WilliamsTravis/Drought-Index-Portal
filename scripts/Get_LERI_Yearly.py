@@ -103,7 +103,12 @@ print(str(today) + '\n')
 # Connect to FTP 
 ftp = ftplib.FTP('ftp.cdc.noaa.gov', 'anonymous', 'anonymous@cdc.noaa.gov')
 for index in indices:
-    ftp.cwd('/Projects/LERI/CONUS_archive/data/time_series/LERI_INDEX/')
+    try:
+        ftp.cwd('/Projects/LERI/CONUS_archive/data/time_series/LERI_INDEX/')
+    except:
+        ftp = ftplib.FTP('ftp.cdc.noaa.gov', 'anonymous',
+                         'anonymous@cdc.noaa.gov')
+        ftp.cwd('/Projects/LERI/CONUS_archive/data/time_series/LERI_INDEX/')
     print('\n' + index)
     original_path = os.path.join(data_path, "data/droughtindices/netcdfs/",
                                  index + ".nc")
