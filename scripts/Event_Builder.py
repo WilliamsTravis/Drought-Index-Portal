@@ -10,7 +10,11 @@ import numpy as np
 import pandas as pd
 import sys
 
-csv_path = sys.argv[1]
+try:
+    csv_path = sys.argv[1]
+except:
+    csv_path = 'C:/users/user/downloads/quadthree.csv'
+
 df = pd.read_csv(csv_path)
 d4s = df[['month', 'd4']]
 months = df['month']
@@ -28,12 +32,12 @@ for i in range(len(event_loc)-1):
     # If there is a gap
     else:
         # We have a new event id
-        event += 1
         events[event_loc[i]] = event
+        event += 1
 
 # End case
-if events[-1] > 0:
-    events[-1] = events[-2]
+if events[event_loc[-1]] > 0:
+    events[event_loc[-1]] = events[event_loc[-2]]
 
 # Unique event array
 unique_events = np.unique(events[events != 0])
