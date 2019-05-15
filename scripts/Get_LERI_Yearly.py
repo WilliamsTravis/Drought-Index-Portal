@@ -125,110 +125,9 @@ for index in indices:
         with xr.open_dataset(original_path) as data:
             dates = pd.DatetimeIndex(data.time.data)
             data.close()
-        
-        # Extract dates
-        d1 = dates[0]
-        d2 = dates[-1]
 
-        # Get a list of the dates already in the netcdf file
-        existing_dates = pd.date_range(d1, d2, freq="M")
-
-        # Get all of the last day of month files for the index
-        ftp_years = ftp.nlst()
-        ftp_years = [f for f in ftp_years if isInt(f)]
-
-        # First Date
-        # ftp.cwd(os.path.join('/Projects/LERI/CONUS_archive/data/',
-        #                      ftp_years[0]))
-        ftp_files = ftp.nlst()
-        ftp_files = [f for f in ftp_files
-                     if f[-16:-12] == "{:02d}mn".format(scale)]
-        ftp_first = ftp_files[0]
-        first_date = pd.to_datetime(ftp_first[-11:-3], format='%Y%m%d')
-
-        # Last Date
-        ftp.cwd(os.path.join('/Projects/LERI/CONUS_archive/data/',
-                             ftp_years[-1]))
-        ftp_files = ftp.nlst()
-        ftp_files = [f for f in ftp_files
-                     if f[-16:-12] == "{:02d}mn".format(scale)]
-        ftp_last = ftp_files[-1]
-        last_date = pd.to_datetime(ftp_last[-11:-3], format='%Y%m%d')
-
-        # All dates available
-        available_dates = pd.date_range(first_date, last_date, freq='M')
-
-        # Get needed dates
-        needed_dates = [a for a in available_dates if
-                        a not in existing_dates]
-
-        # Download missing files
-        if len(needed_dates) > 0:
-            print_statement = '{} missing file(s) since {}...\n'
-            print(print_statement.format(len(needed_dates),
-                                         needed_dates[0]))
-
-            for date in tqdm(needed_dates, position=0):
-                ftp.cwd(os.path.join('/Projects/LERI/CONUS_archive/data/',
-                                     str(date.year)))
-
-                # This returns the filename of the downloaded asc file
-                in_path = getLERI(scale, date, temp_folder)
-
-                # Save each to a geotiff to use the netcdf builders
-                file_name = ('leri_' + str(date.year) +
-                             '{:02d}'.format(date.month) + '.tif')
-                out_path = os.path.join(temp_folder, file_name)
-                tif_path = out_path
-
-                # Resample each, working from disk
-                ds = gdal.Warp(out_path, in_path, dstSRS='EPSG:4326',
-                               xRes=res, yRes=res, outputBounds=[-130, 20,
-                                                                 -55, 50])
-                del ds
-
-                # Reproject the output from above
-                in_path = out_path
-                out_path = os.path.join(temp_folder, 'proj_' + file_name)
-                tif_path_proj = out_path
-                ds = gdal.Warp(out_path, in_path, dstSRS=proj)
-                del ds
-
-                # Open old data sets
-                old = Dataset(original_path, 'r+')
-                old_proj = Dataset(albers_path, 'r+')
-                times = old.variables['time']
-                times_proj = old_proj.variables['time']
-                values = old.variables['value']
-                values_proj = old_proj.variables['value']
-                n = times.shape[0]
-
-                # Convert new date to days
-                date = dt.datetime(date.year, date.month, day=15)
-                days = date - dt.datetime(1900, 1, 1)
-                days = np.float64(days.days)
-
-                # Convert new data to array
-                base_data = gdal.Open(tif_path)
-                base_data_proj = gdal.Open(tif_path_proj)
-                array = base_data.ReadAsArray()
-                array_proj = base_data_proj.ReadAsArray()
-                del base_data
-                del base_data_proj
-
-                # Write changes to file and close
-                times[n] = days
-                times_proj[n] = days
-                values[n] = array
-                values_proj[n] = array_proj
-                old.close()
-                old_proj.close()
-
-            # Now recreate the entire percentile data set
-            print('Reranking percentiles...')
-            pc_path = os.path.join(pc_folder, index + '.nc')    
-            os.remove(pc_path)
-            toNetCDFPercentile(original_path, pc_path)  
+        # Not ready yet
+        print("Update mode not available yet")
 
     ############## If we need to start over ###################################
     else:
@@ -262,9 +161,6 @@ for index in indices:
             out_path = os.path.join(temp_folder, out_file)            
             ds = gdal.Warp(out_path, in_path, dstSRS=proj)
             del ds
-
-            # Now we can remove the large nc file
-            os.remove(file)
 
         # Now that we have all of the tif files, we can split them into months
         tfiles = glob(os.path.join(temp_folder, 'temp*'))
@@ -316,6 +212,8 @@ for index in indices:
         pc_path = os.path.join(data_path, "data/droughtindices/netcdfs/" +
                                "percentiles", index + ".nc")
         toNetCDFPercentile(ncdir, pc_path)
+
+        
 
 # Close connection with FTP server
 ftp.quit()
