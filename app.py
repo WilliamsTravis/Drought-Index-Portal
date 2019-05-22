@@ -114,8 +114,8 @@ path = os.path.dirname(os.path.abspath(frame))
 os.chdir(path)
 
 # Import functions and classes
-from functions import Admin_Elements, datePrint, Index_Maps, Location_Builder
-from functions import shapeReproject
+from functions import Admin_Elements, Index_Maps, Location_Builder
+from functions import shapeReproject, unit_map
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
@@ -301,8 +301,8 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'tmean': 'Mean Temperature (°C)',
               'tdmean': 'Mean Dew Point Temperature (°C)', 
               'ppt': 'Average Precipitation (mm)',
-              'vpdmax': 'Maximum Vapor Pressure Deficit' ,
-              'vpdmin': 'Minimum Vapor Pressure Deficit'}
+              'vpdmax': 'Maximum Vapor Pressure Deficit (hPa)' ,
+              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)'}
 
 # Function options
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
@@ -1547,7 +1547,7 @@ for i in range(1, 3):
 
         if trig == 'location_store_{}.children'.format(key):
             if 'corr' not in function:
-                if 'grid' in location[0] or 'county' in location[0]:
+                if 'grid' in location[0]: # or 'county' in location[0]:  # <--- Updates are only needed if the maps isn't going to change
                     raise PreventUpdate
 
             # Check which element the selection came from
@@ -1612,9 +1612,9 @@ for i in range(1, 3):
             amin = limit * -1
 
         # Filter for state filters
-        # print("location: " + str(location))
         flag, y, x, label, idx = location
-        if flag == 'state':
+        print('FLAG:' + flag)
+        if flag == 'state' or flag == 'county':
             array = array * data.mask
         elif flag == 'shape':
             y = np.array(json.loads(y))
@@ -1843,7 +1843,7 @@ for i in range(1, 3):
             if 'p' in function:
                 yaxis = dict(title='Percentiles', range=[0, 100])
             elif 'o' in function:
-                yaxis = dict(range=[dmin, dmax], title='Index')
+                yaxis = dict(range=[dmin, dmax], title=unit_map[choice])
 
                 # Center the color scale
                 xmask = data.mask

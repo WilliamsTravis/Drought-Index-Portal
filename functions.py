@@ -10,7 +10,6 @@ Created on Tue Jan 22 18:02:17 2019
 # In[]: Environment
 import datetime as dt
 from dash.exceptions import PreventUpdate
-import dask
 import dask.array as da
 from dateutil.relativedelta import relativedelta
 import functools
@@ -106,6 +105,57 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'ppt': 'Total Precipitation (PRISM)',
              'vpdmax': 'Maximum Vapor Pressure Deficit (PRISM)' ,
              'vpdmin': 'Minimum Vapor Pressure Deficit (PRISM)'}
+
+unit_map = {'noaa': '%',
+            'mdn1': '°C',
+            'pdsi': 'Index',
+            'scpdsi': 'Index',
+            'pzi': 'Index',
+            'spi1': 'Index',
+            'spi2': 'Index',
+            'spi3': 'Index',
+            'spi4': 'Index',
+            'spi5': 'Index',
+            'spi6': 'Index',
+            'spi7': 'Index',
+            'spi8': 'Index',
+            'spi9': 'Index',
+            'spi10': 'Index',
+            'spi11': 'Index',
+            'spi12': 'Index',
+            'spei1': 'Index',
+            'spei2': 'Index',
+            'spei3': 'Index',
+            'spei4': 'Index',
+            'spei5': 'Index',
+            'spei6': 'Index',
+            'spei7': 'Index',
+            'spei8': 'Index',
+            'spei9': 'Index',
+            'spei10': 'Index',
+            'spei11': 'Index',
+            'spei12': 'Index',
+            'eddi1': 'Index',
+            'eddi2': 'Index',
+            'eddi3': 'Index',
+            'eddi4': 'Index',
+            'eddi5': 'Index',
+            'eddi6': 'Index',
+            'eddi7': 'Index',
+            'eddi8': 'Index',
+            'eddi9': 'Index',
+            'eddi10': 'Index',
+            'eddi11': 'Index',
+            'eddi12': 'Index',
+            'leri1': 'Index',
+            'leri3': 'Index',
+            'tmin': '°C',
+            'tmax': '°C',
+            'tmean': '°C',
+            'tdmean': '°C', 
+            'ppt': 'mm',
+            'vpdmax': 'hPa' ,
+            'vpdmin': 'hPa'}
 
 
 # In[]: Functions

@@ -33,9 +33,9 @@ Click [here](https://github.com/WilliamsTravis/Ubuntu-Practice-Machine/raw/maste
 
 **PPT**: &emsp; Average Precipitation (mm) (PRISM)
 
-**VPDMAX**: &emsp; Maximum Vapor Pressure Deficit (PRISM)
+**VPDMAX**: &emsp; Maximum Vapor Pressure Deficit (hPa) (PRISM)
 
-**VPDMIN**: &emsp; Minimum Vapor Pressure Deficit (PRISM)
+**VPDMIN**: &emsp; Minimum Vapor Pressure Deficit (hPa) (PRISM)
 
 &nbsp;
 
