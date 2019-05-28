@@ -1423,96 +1423,96 @@ for i in range(1, 3):
         return style, children
 
 
-    @app.callback(Output('state_{}'.format(i), 'placeholder'),
-                  [Input('update_graphs_1', 'n_clicks'),
-                   Input('update_graphs_2', 'n_clicks'),
-                   Input('location_store_{}'.format(i), 'children')],
-                  [State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children')])
-    def dropState(update1, update2, location, key, sync):
-        '''
-        This is supposed to update the opposite placeholder of the updated map
-        to reflect the state selection if there was a state selection.
-        '''
-        # Temporary, split location up for coordinates
-        location = json.loads(location)
-        location, crds = location
+    # @app.callback(Output('state_{}'.format(i), 'placeholder'),
+    #               [Input('update_graphs_1', 'n_clicks'),
+    #                Input('update_graphs_2', 'n_clicks'),
+    #                Input('location_store_{}'.format(i), 'children')],
+    #               [State('key_{}'.format(i), 'children'),
+    #                State('click_sync', 'children')])
+    # def dropState(update1, update2, location, key, sync):
+    #     '''
+    #     This is supposed to update the opposite placeholder of the updated map
+    #     to reflect the state selection if there was a state selection.
+    #     '''
+    #     # Temporary, split location up for coordinates
+    #     location = json.loads(location)
+    #     location, crds = location
 
-        # Check which element the selection came from
-        sel_idx = location[-1]
-        if 'On' not in sync:
-            idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
-                raise PreventUpdate
-        try:
-            if 'state' in location[0]:
-                states = location[-2]
-            return states
-        except Exception as e:
-            raise PreventUpdate
+    #     # Check which element the selection came from
+    #     sel_idx = location[-1]
+    #     if 'On' not in sync:
+    #         idx = int(key) - 1
+    #         if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
+    #             raise PreventUpdate
+    #     try:
+    #         if 'state' in location[0]:
+    #             states = location[-2]
+    #         return states
+    #     except Exception as e:
+    #         raise PreventUpdate
 
 
-    @app.callback([Output('county_{}'.format(i), 'options'),
-                   Output('county_{}'.format(i), 'placeholder'),
-                   Output('label_store_{}'.format(i), 'children')],
-                  [Input('location_store_{}'.format(i), 'children')],
-                  [State('county_{}'.format(i), 'value'),
-                   State('county_{}'.format(i), 'label'),
-                   State('label_store_{}'.format(i), 'children'),
-                   State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children')])
-    def dropCounty(location, current_fips, current_label, previous_fips, key,
-                   sync):
-        '''
-        As a work around to updating synced dropdown labels and because we
-        can't change the dropdown value with out creating an infinite loop, we
-        are temporarily changing the options so that the value stays the same,
-        but the one label to that value is the synced county name.
+    # @app.callback([Output('county_{}'.format(i), 'options'),
+    #                Output('county_{}'.format(i), 'placeholder'),
+    #                Output('label_store_{}'.format(i), 'children')],
+    #               [Input('location_store_{}'.format(i), 'children')],
+    #               [State('county_{}'.format(i), 'value'),
+    #                State('county_{}'.format(i), 'label'),
+    #                State('label_store_{}'.format(i), 'children'),
+    #                State('key_{}'.format(i), 'children'),
+    #                State('click_sync', 'children')])
+    # def dropCounty(location, current_fips, current_label, previous_fips, key,
+    #                sync):
+    #     '''
+    #     As a work around to updating synced dropdown labels and because we
+    #     can't change the dropdown value with out creating an infinite loop, we
+    #     are temporarily changing the options so that the value stays the same,
+    #     but the one label to that value is the synced county name.
 
-        So, this has obvious issues. In the case one clicks on the altered
-        county selector, another one entirely will show.
+    #     So, this has obvious issues. In the case one clicks on the altered
+    #     county selector, another one entirely will show.
 
-        I wonder how long it will take for someone to find this out :).
+    #     I wonder how long it will take for someone to find this out :).
 
-        Check that we are working with the right selection, and do this first
-        to prevent update if not syncing
-        '''
-        # Temporary, split location up
-        location = json.loads(location)
-        location, crds = location
+    #     Check that we are working with the right selection, and do this first
+    #     to prevent update if not syncing
+    #     '''
+    #     # Temporary, split location up
+    #     location = json.loads(location)
+    #     location, crds = location
 
-        # Check which element the selection came from
-        sel_idx = location[-1]
-        if 'On' not in sync:
-            idx = int(key) - 1
-            if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
-                raise PreventUpdate
-        try:
-            # Only update if it is a singular point
-            location[0].index('id')
+    #     # Check which element the selection came from
+    #     sel_idx = location[-1]
+    #     if 'On' not in sync:
+    #         idx = int(key) - 1
+    #         if sel_idx not in idx + np.array([0, 2, 4, 6, 8]):
+    #             raise PreventUpdate
+    #     try:
+    #         # Only update if it is a singular point
+    #         location[0].index('id')
 
-            # Recreate the county options
-            current_options = copy.deepcopy(county_options)
+    #         # Recreate the county options
+    #         current_options = copy.deepcopy(county_options)
 
-            # Grid id is labeled differently
-            if location[0] == 'grid_id':
-                current_label = location[3]
-                current_county = current_label[:current_label.index(" (")]
-            elif location[0] == 'county_id':
-                current_county = location[3]
-            else:
-                current_county = 'Multiple Counties'
-            try:
-                old_idx = fips_pos[current_fips]
-            except:
-                old_idx = label_pos[current_county]
+    #         # Grid id is labeled differently
+    #         if location[0] == 'grid_id':
+    #             current_label = location[3]
+    #             current_county = current_label[:current_label.index(" (")]
+    #         elif location[0] == 'county_id':
+    #             current_county = location[3]
+    #         else:
+    #             current_county = 'Multiple Counties'
+    #         try:
+    #             old_idx = fips_pos[current_fips]
+    #         except:
+    #             old_idx = label_pos[current_county]
 
-            current_options[old_idx]['label'] = current_county
+    #         current_options[old_idx]['label'] = current_county
 
-            return current_options, current_county, current_fips
+    #         return current_options, current_county, current_fips
 
-        except:
-            raise PreventUpdate
+    #     except:
+    #         raise PreventUpdate
 
 
     @app.callback(Output("map_{}".format(i), 'figure'),
