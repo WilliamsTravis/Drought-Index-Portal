@@ -188,7 +188,8 @@ for index in indices:
                 month = '{:02d}'.format(i)
                 new_name = 'temp_' + year + month + '.tif'
                 new_file = os.path.join(temp_folder, new_name)
-                band, geom, proj = readRaster(f, i, -9999.)
+                band, geom, proj = readRaster(f, i)
+                band[band == 9999.] = -9999
                 toRaster(band, new_file, geom, proj)
 
             # As we're finished we can remove the larger tifs
@@ -200,7 +201,8 @@ for index in indices:
                 month = '{:02d}'.format(i)
                 new_name = 'proj_temp_' + year + month + '.tif'
                 new_file = os.path.join(temp_folder, new_name)
-                band, geom, proj = readRaster(f, i, -9999.)
+                band, geom, proj = readRaster(f, i)
+                band[band > 9000.] = -9999
                 toRaster(band, new_file, geom, proj)
             os.remove(f)
 
