@@ -120,6 +120,8 @@ from functions import shapeReproject, unit_map
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
     data_path = 'f:/'
+elif 'travis' in os.getcwd():
+    data_path = '/media/travis/My Passport/'
 else:
     data_path = '/root/Sync/'
 
@@ -1007,22 +1009,6 @@ def retrieveData(signal, function, choice, location):
 
     return data
 
-
-# @cache2.memoize()  # <--------------------------------------------------------- This is not caching!
-# def retrieveAreaData(data):
-#     '''
-#     This is here just to cache the output of 'droughtArea', which returns both
-#     the 5 categorical drought coverages (% area) and the singlular DSCI. The
-#     DSCI cannot be calculated from the 5 coverages because these are inclusive
-#     for display purposes while the DSCI uses only the percentage of area in
-#     each category.
-
-#     When there is enough memory to use this, toggling the DSCI on and off will
-#     be immediate because it will not need to be recalculated each time.
-#     '''
-#     ts_series, ts_series_ninc, dsci = data.getArea()
-#     return [ts_series, ts_series_ninc, dsci]
-
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
               [Input('choice_1', 'value'),
@@ -1532,7 +1518,7 @@ for i in range(1, 3):
         on this.
 
         Sample arguments
-        location =  ['all', 'y', 'x', 'Contiguous United States', 0]
+        location =  '[['all', 'y', 'x', 'Contiguous United States', 0], 9]'
 
         '''
         # Temporary, split location up

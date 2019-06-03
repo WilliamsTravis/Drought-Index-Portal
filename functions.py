@@ -36,8 +36,9 @@ import xarray as xr
 # Check if windows or linux
 if sys.platform == 'win32':
     data_path = 'f:/'
+elif 'travis' in os.getcwd():
+    data_path = '/media/travis/My Passport/'
 else:
-    home_path = '/root/Sync'
     data_path = '/root/Sync'
 
 warnings.filterwarnings("ignore")

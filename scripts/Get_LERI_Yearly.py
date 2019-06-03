@@ -42,6 +42,10 @@ if sys.platform == 'win32':
     sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
     os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
+elif 'travis' in os.getcwd():
+    sys.path.insert(0, '/home/travis/github/Ubuntu-Practice-Machine')
+    os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
+    data_path = '/media/travis/My Passport/'
 else:
     sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
@@ -135,8 +139,6 @@ for index in indices:
         print("Update mode not available yet")
 
 
-
-
     ############## If we need to start over ###################################
     else:
         ftp.cwd('/Projects/LERI/CONUS_archive/data/time_series/LERI_INDEX/')
@@ -165,7 +167,8 @@ for index in indices:
 
             # Resample each, working from disk
             ds = gdal.Warp(out_path, in_path, dstSRS='EPSG:4326', xRes=res,
-                           yRes=res, outputBounds=[-130, 20, -55, 50])
+                           yRes=res, outputBounds=[-130, 20, -55, 50],
+                           dstNodata=9999)
             del ds
             os.remove(in_path)
 
@@ -185,7 +188,7 @@ for index in indices:
                 month = '{:02d}'.format(i)
                 new_name = 'temp_' + year + month + '.tif'
                 new_file = os.path.join(temp_folder, new_name)
-                band, geom, proj = readRaster(f, i, 9999.)
+                band, geom, proj = readRaster(f, i, -9999.)
                 toRaster(band, new_file, geom, proj)
 
             # As we're finished we can remove the larger tifs
@@ -197,7 +200,7 @@ for index in indices:
                 month = '{:02d}'.format(i)
                 new_name = 'proj_temp_' + year + month + '.tif'
                 new_file = os.path.join(temp_folder, new_name)
-                band, geom, proj = readRaster(f, i, 9999.)
+                band, geom, proj = readRaster(f, i, -9999.)
                 toRaster(band, new_file, geom, proj)
             os.remove(f)
 
