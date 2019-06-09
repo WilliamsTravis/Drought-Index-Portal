@@ -14,6 +14,9 @@ import xarray as xr
 if sys.platform == 'win32':
     os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
+elif 'travis' in os.getcwd():
+    os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
+    data_path = ''
 else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine/')  # might need for automation...though i could automate cd and back
     data_path = '/root/Sync'

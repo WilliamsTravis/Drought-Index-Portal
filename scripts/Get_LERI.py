@@ -42,6 +42,9 @@ if sys.platform == 'win32':
     sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
     os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
+elif 'travis' in os.getcwd():
+    os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
+    data_path = ''
 else:
     sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')

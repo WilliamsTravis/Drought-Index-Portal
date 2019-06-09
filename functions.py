@@ -15,6 +15,7 @@ from dateutil.relativedelta import relativedelta
 import functools
 import gc
 from glob import glob
+from inspect import currentframe, getframeinfo
 import json
 from collections import OrderedDict
 import os
@@ -33,11 +34,15 @@ import sys
 import warnings
 import xarray as xr
 
+# Set Working Directory
+frame = getframeinfo(currentframe()).filename
+dirpath = os.path.dirname(os.path.abspath(frame))
+
 # Check if windows or linux
 if sys.platform == 'win32':
     data_path = 'f:/'
 elif 'travis' in os.getcwd():
-    data_path = '/media/travis/My Passport/'
+    data_path = ''
 else:
     data_path = '/root/Sync'
 

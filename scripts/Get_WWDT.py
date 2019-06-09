@@ -33,11 +33,11 @@
             1) enter <crontab -e>
 
             2) insert (but with spaces at these line breaks):
-              <30 01 02 * *   
+              <30 01 02 * *
                /root/Sync/Ubuntu-Practice-Machine/env/bin/python3
                /root/Sync/Ubuntu-Practice-Machine/scripts/Get_WWDT.py >> 
                cronlog.log>
-                
+
             3) ctrl + x
             4) This script, because it gets the bulk of the data, is also used
                to set the index ranges for all indices, so schedule it last.
@@ -68,6 +68,10 @@ if sys.platform == 'win32':
     sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
     os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
     data_path = 'f:/'
+elif 'travis' in os.getcwd():
+    sys.path.insert(0, '/home/travis//github/Ubuntu-Practice-Machine')
+    os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
+    data_path = ''
 else:
     sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
@@ -84,16 +88,21 @@ except:
     res = 0.25
 
 # In[] Set up paths and urls
-wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM' 
+wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM'
 local_path1 = os.path.join(data_path,
                           'data/droughtindices/netcdfs/wwdt/tifs')
 local_path2 = os.path.join(data_path,
                            'data/droughtindices/netcdfs/percentiles')
+local_path3 = os.path.join(data_path,
+                           'data/droughtindices/netcdfs/albers')
 local_path = os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt')
+
 if not os.path.exists(local_path):
     os.makedirs(local_path1)
 if not os.path.exists(local_path2):
     os.makedirs(local_path2)
+if not os.path.exists(local_path3):
+    os.mkdir(local_path3)
 
 # I came up with a slightly differentset of acroynms
 indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7', 'spi8',

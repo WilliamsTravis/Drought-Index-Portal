@@ -346,3 +346,28 @@ vpdmax
 vpdmin
 /root/Sync/data/droughtindices/netcdfs/vpdmin.nc not detected, building new dataset...
 
+  0%|          | 0/12 [00:00<?, ?it/s]  8%|▊         | 1/12 [00:18<03:19, 18.10s/it] 17%|█▋        | 2/12 [00:34<02:55, 17.58s/it] 25%|██▌       | 3/12 [00:50<02:34, 17.17s/it] 33%|███▎      | 4/12 [01:07<02:16, 17.04s/it] 42%|████▏     | 5/12 [01:24<01:58, 16.94s/it] 50%|█████     | 6/12 [01:38<01:36, 16.04s/it] 58%|█████▊    | 7/12 [01:52<01:17, 15.52s/it] 67%|██████▋   | 8/12 [02:05<00:59, 14.77s/it] 75%|███████▌  | 9/12 [02:18<00:42, 14.22s/it] 83%|████████▎ | 10/12 [02:33<00:29, 14.66s/it] 92%|█████████▏| 11/12 [02:52<00:15, 15.70s/it]100%|██████████| 12/12 [03:09<00:00, 16.23s/it]
+  0%|          | 0/12 [00:00<?, ?it/s]  8%|▊         | 1/12 [00:02<00:23,  2.16s/it] 17%|█▋        | 2/12 [00:03<00:20,  2.03s/it] 25%|██▌       | 3/12 [00:05<00:17,  1.99s/it] 33%|███▎      | 4/12 [00:07<00:15,  1.91s/it] 42%|████▏     | 5/12 [00:09<00:12,  1.85s/it] 50%|█████     | 6/12 [00:11<00:11,  1.84s/it] 58%|█████▊    | 7/12 [00:12<00:09,  1.83s/it] 67%|██████▋   | 8/12 [00:14<00:07,  1.83s/it] 75%|███████▌  | 9/12 [00:16<00:05,  1.82s/it] 83%|████████▎ | 10/12 [00:18<00:03,  1.82s/it] 92%|█████████▏| 11/12 [00:20<00:01,  1.82s/it]100%|██████████| 12/12 [00:21<00:00,  1.82s/it]
+##
+#####
+############
+#######################
+#######################################
+####################################################
+
+Running Get_WWDT.py using a 0.25 degree resolution:
+
+2019-06-09T13:44:11.117679
+
+data/droughtindices/netcdfs/spi1.nc not detected, building new data set...
+Downloading the 12 netcdf files for spi1...
+Transforming downloaded netcdfs into properly shaped tiffs...
+Calculating Percentiles...
+Traceback (most recent call last):
+  File "scripts/Get_WWDT.py", line 396, in <module>
+    month2=todays_date.month, wmode='w', percentiles=False)
+  File "/home/travis//github/Ubuntu-Practice-Machine/functions.py", line 786, in toNetCDFAlbers
+    nco = Dataset(savepath, mode=wmode, format='NETCDF4')
+  File "netCDF4/_netCDF4.pyx", line 2135, in netCDF4._netCDF4.Dataset.__init__
+  File "netCDF4/_netCDF4.pyx", line 1752, in netCDF4._netCDF4._ensure_nc_success
+PermissionError: [Errno 13] Permission denied: b'data/droughtindices/netcdfs/albers/spi1.nc'

@@ -45,7 +45,7 @@ if sys.platform == 'win32':
 elif 'travis' in os.getcwd():
     sys.path.insert(0, '/home/travis/github/Ubuntu-Practice-Machine')
     os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
-    data_path = '/media/travis/My Passport/'
+    data_path = ''
 else:
     sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')

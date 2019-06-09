@@ -81,7 +81,7 @@ Created on April 15th 2019
 """
 
 # Functions and Libraries
-import netCDF4  # Leave this, without it there are problems in Linux
+import netCDF4  # Leave this, without it there ave been problems in Linux
 import base64
 import copy
 from collections import OrderedDict
@@ -96,7 +96,6 @@ import fiona
 from flask_caching import Cache
 import gc
 import geopandas as gpd
-from inspect import currentframe, getframeinfo
 import json
 import numpy as np
 import os
@@ -108,20 +107,19 @@ import urllib
 import warnings
 import xarray as xr
 
-# Set Working Directory
-frame = getframeinfo(currentframe()).filename
-path = os.path.dirname(os.path.abspath(frame))
-os.chdir(path)
 
 # Import functions and classes
 from functions import Admin_Elements, Index_Maps, Location_Builder
-from functions import shapeReproject, unit_map
+from functions import shapeReproject, unit_map, dirpath
+
+# Set Working Directory
+os.chdir(dirpath)
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
     data_path = 'f:/'
 elif 'travis' in os.getcwd():
-    data_path = '/media/travis/My Passport/'
+    data_path = ''
 else:
     data_path = '/root/Sync/'
 
