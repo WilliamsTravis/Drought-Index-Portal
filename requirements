@@ -7,7 +7,6 @@ flask_caching==1.4.0
 geopandas
 gunicorn==19.9.0
 joblib==0.13.2
-libgdal-dev
 matplotlib==3.0.2
 netcdf4==1.4.2
 numpy==1.16.2

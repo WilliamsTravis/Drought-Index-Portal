@@ -1209,7 +1209,7 @@ for i in range(1, 3):
 
 
     @app.callback(Output('shape_store_{}'.format(i), 'children'),
-                  [Input('shape_{}'.format(i), 'contents')],
+                  [Input('shape_{}'.format(i), 'contents')],  # <-------------- Somehow this is being triggered and causing problems unless there is an existing temporary file
                   [State('shape_{}'.format(i), 'filename'),
                    State('shape_{}'.format(i), 'last_modified')])
     def parseShape(contents, filenames, last_modified):
@@ -1279,11 +1279,13 @@ for i in range(1, 3):
             admin.rasterize(src, dst, attribute=attr, all_touch=False)  # <---- All touch not working.
 
             # Cut to extent
+#            try:
             tif = gdal.Translate('data/shapefiles/temp/temp.tif',
                                  'data/shapefiles/temp/temp1.tif',
-                                  projWin=[-130, 50, -55, 20])
-            del tif
-
+                                 projWin=[-130, 50, -55, 20])
+            tif = None
+#            except:
+#                pass
             return basename
 
 
