@@ -39,9 +39,9 @@ from tqdm import tqdm
 import xarray as xr
 
 if sys.platform == 'win32':
-    sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
-    os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
-    data_path = 'f:/'
+    sys.path.insert(0, 'C:/Users/travi/github/Ubuntu-Practice-Machine')
+    os.chdir('C:/Users/travi/github/Ubuntu-Practice-Machine')
+    data_path = 'C:/Users/travi/github/data'
 elif 'travis' in os.getcwd():
     sys.path.insert(0, '/home/travis/github/Ubuntu-Practice-Machine')
     os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
@@ -72,10 +72,14 @@ except:
 # In[] Data Source and target directories
 temp_folder = os.path.join(data_path, 'data/droughtindices/netcdfs/leri')
 pc_folder = os.path.join(data_path, 'data/droughtindices/netcdfs/percentiles')
+albers_folder = os.path.join(data_path, 'data/droughtindices/netcdfs/albers')
+
 if not os.path.exists(temp_folder):
     os.makedirs(temp_folder)
 if not os.path.exists(pc_folder):
     os.makedirs(pc_folder)
+if not os.path.exists(albers_folder):
+    os.makedirs(albers_folder)
 
 # In[] Index Options
 indices = ['leri1', 'leri3']
@@ -100,7 +104,7 @@ print("############")
 print("#######################")
 print("#######################################")
 print("####################################################")
-print("\nRunning Get_LERI.py using a " + str(res) + " degree resolution:\n")
+print("\nRunning Get_LERI_Yearly.py using a " + str(res) + " degree resolution:\n")
 print(str(today) + '\n')
 
 # In[] Get time series of currently available values
@@ -148,7 +152,17 @@ for index in indices:
         files = ftp.nlst()
 
         # Filter for the desired time-scale
-        files = [f for f in files if int(f[-12:-10]) == scale]
+        def scaleCheck(scale, string):
+            try:
+                value = int(string)
+                if value == scale:
+                    return True
+                else:
+                    return False
+            except:
+                return False
+
+        files = [f for f in files if scaleCheck(scale, f[-12:-10])]
 
         # Loop through these files, download and transform data
         for file in tqdm(files, position=0):
