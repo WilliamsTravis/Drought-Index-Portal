@@ -1711,6 +1711,7 @@ for i in range(1, 3):
                   mode='markers',
                   hoverinfo='text',
                   hovermode='closest',
+                  showlegend=False,
                   marker=dict(colorscale=data.color_scale,
                               reversescale=reverse,
                               color=df['data'],
@@ -1729,6 +1730,7 @@ for i in range(1, 3):
                   lat=df['latbin'],
                   mode='markers',
                   hovermode='closest',
+                  showlegend=False,
                   marker=dict(color='#000000',
                               size=source.res[0] * 20 + .5))
 
