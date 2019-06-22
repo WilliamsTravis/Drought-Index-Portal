@@ -1961,10 +1961,10 @@ class Index_Maps():
         # Calculate non-inclusive percentages # <------------------------------ parallelizing with delayed speeds it up but takes more memory
 #        pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
 #        pnincs = np.array(dask.compute(*pnincs))
-        pnincs = [catFilter(arrays, cats[i]) for i in range(5)]
+        pnincs =  np.array([catFilter(arrays, cats[i]) for i in range(5)])
 
         # Use the noninclusive percentages to create the inclusive percentages
-        pincs = [np.sum(pnincs[i:], axis=0) for i in range(pnincs.shape[0])]
+        pincs = [np.sum(pnincs[i:], axis=0) for i in range(len(pnincs))]
 
         # Also use the noninclusive arrays to get the DSCI
         pnacc = np.array([pnincs[i]*(i+1) for i in range(5)])
