@@ -13,7 +13,6 @@ from dash.exceptions import PreventUpdate
 import dask
 import dask.array as da
 from dateutil.relativedelta import relativedelta
-import functools
 import gc
 from glob import glob
 from inspect import currentframe, getframeinfo
@@ -53,8 +52,8 @@ warnings.filterwarnings("ignore")
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'mdn1': 'Mean Temperature Departure  (1981 - 2010) - 1 month',
              'pdsi': 'Palmer Drought Severity Index',
-             'scpdsi': 'Self-Calibrated Palmer Drought Severity Index',
-             'pzi': 'Palmer Z-Index',
+             'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
+             'pdsiz': 'Palmer Z-Index',
              'spi1': 'Standardized Precipitation Index - 1 month',
              'spi2': 'Standardized Precipitation Index - 2 month',
              'spi3': 'Standardized Precipitation Index - 3 month',
@@ -116,7 +115,7 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
 unit_map = {'noaa': '%',
             'mdn1': '°C',
             'pdsi': 'Index',
-            'scpdsi': 'Index',
+            'pdsisc': 'Index',
             'pzi': 'Index',
             'spi1': 'Index',
             'spi2': 'Index',

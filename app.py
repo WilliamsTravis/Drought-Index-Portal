@@ -1,9 +1,7 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 An Application to visualize time series of drought indices.
-
 Things to do:
-
     1) Much of the functionality of this was added in a rather ad hoc manner
        for time's sake. It's time to go through and modularize everything.
             a) Read this: "https://dev.to/ice_lenor/modularization-and-
@@ -12,14 +10,12 @@ Things to do:
             d) Within each function, determine the selection type (point,
                multi-point, county, state, shapefile), rather than using if
                statements.
-
     2) Also, less important, the styling needs help on two fronts:
             a) Move all styling to the css file for consistency and readability
             b) Learn to read the css locally. Periodically, depending on the
                browser and perhaps the position of the moon, the css fails to
                load completely. It is possible that reading it directly from a
                local repository will fix this issue.
-
     3) The correlation function is new and simple. It would be good to talk
        with the team about what would be most useful. I think it would be neat
        to express the time series as ranges of covariance from where a point is
@@ -32,7 +28,6 @@ Things to do:
        a specific threshold correlation coefficient (eg. 500 km to 0.5). We
        are, however, just now learning of non-linear dependence...this might be
        a future addition.
-
     4) Long-term goal. Retrieve data from a data base. Learning to do this with
        PostgreSQL was actually the main reason why I created the
        "Ubuntu-Practice-Machine" to begin with. I'd had trouble storing NetCDF
@@ -48,34 +43,25 @@ Things to do:
                 through PostGIS?
              c) It would be more organized and possibly simpler to share data
                 with a GIS.
-
     5) Fully integrate DASK. It turns out that xarray already uses dask and
        was keeping much of the data on disk. This helps to avoid memory
        errors, but does improve speed. With the area calculations it worsens
        it significantly... Is this an inevitable tradeoff?
-
     6) Describe new climate data sets:
         http://www.prism.oregonstate.edu/documents/PRISM_datasets_aug2013.pdf
-
     7) Consolidate all of the download scripts into one. Also, incorporate the
        scale setting script into this.
-
     8) Reconsider the property decorator for certain attributes in
        Index_Maps(). It works to automatically update these attributes, but
        does not allow us to access them.
-
     9) I would like to see the GRACE soil moisture models in here.
-
     10) There are no preset categories for severity in the climate variables.
-
     11) An interesting new bug. I you select by state, then click on a point, 
         it some times breaks and point selection won't return until you restart
         the browser. Not easy to reproduce. Also, if you do select a point and
         then change the settings it will reset the map. (the stored location
         object changes).
-
 Created on April 15th 2019
-
 @author: Travis Williams - Earth Lab of the Universty of Colorado Boulder
          Travis.Williams@colorado.edu
 """
@@ -130,19 +116,21 @@ warnings.filterwarnings("ignore")
 # For testing
 source_signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
 source_choice = 'pdsi'
-source_function = 'pmean'
+source_function = 'omean'
 source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
                    '[243, 242, 243, 244, 241, 242, 243, 244]',
                    'Aroostook County, ME to Aroostook County, ME', 2]
 
 # Initializing Values
-default_function = 'pmean'
+default_function = 'omean'
 default_sample = 'spi1'
 default_1 = 'pdsi'
 default_2 = 'spei6'
 default_date = '2000 - 2019'
 default_location = '[["all", "y", "x", "Contiguous United States", 0], 9]'
 default_years = [2000, 2019]
+default_extent = {'mapbox.center': {'lon': -92, 'lat': 40},
+                  'mapbox.zoom': 2.2, 'mapbox.bearing': 0, 'mapbox.pitch': 20}
 
 # Default click before the first click for any map (might not be necessary)
 default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
@@ -242,8 +230,8 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
 indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'mdn1': 'Mean Temperature Departure  (1981 - 2010) - 1 month',
               'pdsi': 'Palmer Drought Severity Index',
-              'scpdsi': 'Self-Calibrated Palmer Drought Severity Index',
-              'pzi': 'Palmer Z-Index',
+              'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
+              'pdsiz': 'Palmer Z-Index',
               'spi1': 'Standardized Precipitation Index - 1 month',
               'spi2': 'Standardized Precipitation Index - 2 month',
               'spi3': 'Standardized Precipitation Index - 3 month',
@@ -454,7 +442,7 @@ off_button_style =  {'background-color': '#a8b3c4',
 # Dynamic Elements
 def divMaker(id_num, index='noaa'):
     div = html.Div([
-            html.Div([
+         html.Div([
 
             # Tabs and dropdowns
             html.Div([
@@ -602,9 +590,9 @@ def divMaker(id_num, index='noaa'):
 
 # Static Elements
 app.layout = html.Div([
-      html.Div([
 
-         # Sponsers
+      # Sponsers
+      html.Div([
          html.A(
            html.Img(
              src=("https://github.com/WilliamsTravis/Pasture-Rangeland-" +
@@ -651,156 +639,171 @@ app.layout = html.Div([
              href="https://cires.colorado.edu/",
              target="_blank")],
          className='row'),
+        # End Sponsers
 
-        # Title
-        html.Div([
-            html.H1('Drought Index Comparison Portal'),
-            html.Hr()],
+      # Title
+      html.Div([
+        html.H1('Drought Index Comparison Portal'),
+          html.Hr()],
             className='twelve columns',
             style={'font-weight': 'bolder',
                    'text-align': 'center',
                    'font-size': '50px',
                    'font-family': 'Times New Roman',
                    'margin-top': '25'}),
+      # End Title
 
-        # Toggle Options
-        html.Div([
-                html.Button(id='toggle_options',
-                            children='Toggle Options: Off',
-                            type='button',
-                            title=('Display/hide options that ' +
-                                   'apply to each map below.'),
-                            style={'display': 'none'}),
-                html.Button(id="desc_button",
-                            children='Project Description: Off',
-                            title=('Display/hide a description of ' +
-                                   'the application with instructions.'),
-                            style={'display': 'none'}),
-                html.Button(id="click_sync",
-                            children='Location Syncing: On',
-                            title=('Sync/unsync the location ' +
-                                   'of the time series between each map.'),
-                            style={'display': 'none'})],
-                style={'margin-bottom': '30',
-                       'text-align': 'center'}),
+      # Toggle Options
+      html.Div([
+        html.Button(id='toggle_options',
+                    children='Toggle Options: Off',
+                    type='button',
+                    title=('Display/hide options that ' +
+                           'apply to each map below.'),
+                    style={'display': 'none'}),
+        html.Button(id="desc_button",
+                    children='Project Description: Off',
+                    title=('Display/hide a description of ' +
+                           'the application with instructions.'),
+                    style={'display': 'none'}),
+        html.Button(id="click_sync",
+                    children='Location Syncing: On',
+                    title=('Sync/unsync the location ' +
+                           'of the time series between each map.'),
+                    style={'display': 'none'})],
+        style={'margin-bottom': '30', 'text-align': 'center'}),
+     # End Toggle Options
 
-       # Description
+     # Description
+     html.Div([
        html.Div([
-         html.Div([
-           dcc.Markdown(id='description')],
-                        style={'text-align':'center',
-                               'width':'70%',
-                               'margin':'0px auto'}),
-           html.Hr()],
-           style={'text-align':'center',
-                  'margin': '0 auto',
-                  'width': '100%'}),
+         dcc.Markdown(id='description')],
+                      style={'text-align':'center',
+                             'width':'70%',
+                             'margin':'0px auto'}),
+         html.Hr()],
+         style={'text-align':'center',
+                'margin': '0 auto',
+                'width': '100%'}),
+     # End Description
 
-       # Options
-       html.Div(id='options',
-                children=[
-
-                  # Year Slider
+     # Options
+     html.Div(id='options',
+              children=[
+ 
+                # Year Slider
+                html.Div([
+                  html.H3(id='date_range',
+                          children=['Date Range']),
                   html.Div([
-                    html.H3(id='date_range',
-                            children=['Date Range']),
-                    html.Div([
-                      dcc.RangeSlider(id='year_slider',
-                                      value=default_years,
-                                      min=min_year,
-                                      max=max_year,
-                                      updatemode='drag',
-                                      marks=yearmarks)],
-                      style={'margin-top': '0',
-                             'margin-bottom': '80'})]),
+                    dcc.RangeSlider(id='year_slider',
+                                    value=default_years,
+                                    min=min_year,
+                                    max=max_year,
+                                    updatemode='drag',
+                                    marks=yearmarks)],
+                    style={'margin-top': '0', 'margin-bottom': '80'})]),
+                # End Year Slider
 
-                  # Month Slider
-                  html.Div(children=[
-                             html.Div([
-                               html.H5('Start and End Months'),
-                               dcc.RangeSlider(id='month_slider',
-                                               value=[1, 12],
-                                               marks=months_slanted,
-                                               min=1, 
-                                               max=23,
-                                               updatemode='drag',
-                                               )],
-                               className='six columns',
-                               title=('Choose the first month of the first ' +
-                                      'year and last month of the last year ' +
-                                      'of the study period.')),
-                            html.Div(
-                              children=[
-                                html.H5('Included Months'),
-                                  dcc.Checklist(
-                                    className='check_blue',
-                                    id='month',
-                                    options=monthoptions,
-                                    values=list(range(1, 13)),
-                                    labelStyle={'display':
-                                                'inline-block'})],
-                                className='five columns',
-                                title=('Choose which months of the year to ' +
-                                      'be included.'))
-                        ],
+                # Month Options
+                html.Div(children=[
+                           html.Div([
+                             html.H5('Start and End Months'),
+                             dcc.RangeSlider(id='month_slider',
+                                             value=[1, 12],
+                                             marks=months_slanted,
+                                             min=1, 
+                                             max=23,
+                                             updatemode='drag')],
+                             className='six columns',
+                             title=('Choose the first month of the first ' +
+                                    'year and last month of the last year ' +
+                                    'of the study period.')),
+                          html.Div(
+                            children=[
+                              html.H5('Included Months'),
+                              dcc.Checklist(
+                                className='check_blue',
+                                id='month',
+                                options=monthoptions,
+                                values=list(range(1, 13)),
+                                labelStyle={'display':
+                                            'inline-block'}),
+                              html.Button(id='all_months', type='button',
+                                          children='All',
+                                          style={'height': '25px',
+                                                 'line-height': '25px'}),
+                              html.Button(id='no_months', type='button',
+                                          children='None',
+                                          style={'height': '25px',
+                                                 'line-height': '25px'})],
+                            className='five columns',
+                            title=('Choose which months of the year to ' +
+                                   'be included.'))],
                         className='row'),
+                # End Month Options
 
-                 # Rendering Options
-                 html.Div(id='options_div',
-                          children=[
-                            # Maptype
-                            html.Div([
-                              html.H3("Map Type"),
-                              dcc.Dropdown(id="map_type",
-                                           value="basic",
-                                           options=maptypes)],
-                              className='two columns'),
+                # Rendering Options
+                html.Div(id='options_div',
+                         children=[
 
-                            # Functions
-                            html.Div([
-                              html.H3("Function"),
-                              dcc.Tabs(
-                                id='function_type',
-                                value='index',
-                                style=tab_style,
-                                children=[
-                                  dcc.Tab(label='Index Values',
-                                          value='index',
-                                          style=tablet_style,
-                                          selected_style=tablet_style),
-                                  dcc.Tab(label='Percentiles',
-                                          value='perc',
-                                          style=tablet_style,
-                                          selected_style=tablet_style)]),
-                              dcc.Dropdown(id='function_choice',
-                                           options=function_options_perc,
-                                           value='pmean')],
-                              className='three columns'),
+                           # Maptype
+                           html.Div([
+                             html.H3("Map Type"),
+                             dcc.Dropdown(id="map_type",
+                                          value="basic",
+                                          options=maptypes)],
+                             className='two columns'),
+                            # End Maptype
 
-                            # Customize Color Scales
-                            html.Div([
-                              html.H3('Color Gradient'),
-                              dcc.Tabs(
-                                id='reverse',
-                                value='no',
-                                style=tab_style,
-                                children=[
-                                  dcc.Tab(value='no',
-                                          label="Not Reversed",
-                                          style=tab_style,
-                                          selected_style=tablet_style),
-                                  dcc.Tab(value='yes',
-                                          label='Reversed',
-                                          style=tab_style,
-                                          selected_style=tablet_style)]),
-                              dcc.Dropdown(id='colors',
-                                           options=color_options,
-                                           value='Default')],
-                              className='three columns')],
-                            style={'margin-bottom': '50',
-                                   'margin-top': '50',
-                                   'text-align': 'left'})], 
-                          className='row'),
+                           # Functions
+                           html.Div([
+                             html.H3("Function"),
+                             dcc.Tabs(
+                               id='function_type',
+                               value='index',
+                               style=tab_style,
+                               children=[
+                                 dcc.Tab(label='Index Values',
+                                         value='index',
+                                         style=tablet_style,
+                                         selected_style=tablet_style),
+                                 dcc.Tab(label='Percentiles',
+                                         value='perc',
+                                         style=tablet_style,
+                                         selected_style=tablet_style)]),
+                             dcc.Dropdown(id='function_choice',
+                                          options=function_options_perc,
+                                          value=default_function)],
+                             className='three columns'),
+                           # End Functions
+
+                           # Color Scales
+                           html.Div([
+                             html.H3('Color Gradient'),
+                             dcc.Tabs(
+                               id='reverse',
+                               value='no',
+                               style=tab_style,
+                               children=[
+                                 dcc.Tab(value='no',
+                                         label="Not Reversed",
+                                         style=tab_style,
+                                         selected_style=tablet_style),
+                                 dcc.Tab(value='yes',
+                                         label='Reversed',
+                                         style=tab_style,
+                                         selected_style=tablet_style)]),
+                             dcc.Dropdown(id='colors',
+                                          options=color_options,
+                                          value='Default')],
+                             className='three columns')],
+                        # End Color Scales
+               style={'margin-bottom': '50',
+                      'margin-top': '50',
+                      'text-align': 'left'})], 
+               className='row'),
+               # End Options
 
        # Break
        html.Br(style={'line-height': '500%'}),
@@ -816,6 +819,7 @@ app.layout = html.Div([
                             'border-radius': '2px',
                             'font-family': 'Times New Roman'})],
          style={'text-align': 'center'}),
+       # End Submission Button
 
        # Break line
        html.Hr(),
@@ -867,8 +871,12 @@ def adjustDatePrint(year_range, month_range, months):
     if len(months) == 12:
         month_incl_print = ""
     else:
-        month_incl_print = "".join([monthmarks[a][0].upper() for a in months])
-        month_incl_print = ' (' + month_incl_print + ')'
+        if months[0]:
+            month_incl_print = "".join([monthmarks[a][0].upper() for
+                                        a in months])
+            month_incl_print = ' (' + month_incl_print + ')'
+        else:
+            month_incl_print = ''
 
     # If a single year do this
     if year_range[0] == year_range[1]:
@@ -911,6 +919,24 @@ def toggleOptions(click):
                         'font-family': 'Times New Roman'}
         children = "Display Options: Off"
     return div_style, button_style, children
+
+
+@app.callback(Output('month', 'values'),
+              [Input('all_months', 'n_clicks'),
+               Input('no_months', 'n_clicks')])
+def monthFilterToggle(all_months, no_months):
+    if not any([all_months, no_months]):
+        raise PreventUpdate
+
+    # Find which input triggered this callback
+    context = dash.callback_context
+    triggered_value = context.triggered[0]['value']
+    trigger = context.triggered[0]['prop_id']
+    if triggered_value:
+        if 'all' in trigger:
+            return list(range(1, 13))
+        else:
+            return [None]
 
 
 @app.callback([Output('click_sync', 'style'),
@@ -978,7 +1004,6 @@ def retrieveData(signal, function, choice, location):
     This takes the user defined signal and uses the Index_Map class to filter'
     by the selected dates and return the singular map, the 3d timeseries array,
     and the colorscale.
-
     sample arguments:
         signal = [[[2000, 2017], [1, 12], [ 4, 5, 6, 7]], 'Viridis', 'no']
         choice = 'pdsi'
@@ -1284,13 +1309,11 @@ for i in range(1, 3):
             admin.rasterize(src, dst, attribute=attr, all_touch=False)  # <---- All touch not working.
 
             # Cut to extent
-#            try:
             tif = gdal.Translate('data/shapefiles/temp/temp.tif',
                                  'data/shapefiles/temp/temp1.tif',
                                  projWin=[-130, 50, -55, 20])
             tif = None
-#            except:
-#                pass
+
             return basename
 
 
@@ -1515,20 +1538,34 @@ for i in range(1, 3):
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
-                   State('date_print', 'children')])
-    def makeGraph(choice1, choice2, map_type, signal, location, function, key,
-                  sync, date_print):
+                   State('date_print', 'children'),
+                   State('map_{}'.format(i), 'relayoutData')])
+    def makeMap(choice1, choice2, map_type, signal, location, function, key,
+                sync, date_print, map_extent):
         '''
         This actually renders the map. I want to modularize, but am struggling
         on this.
 
-        Sample arguments
-        location =  '[['all', 'y', 'x', 'Contiguous United States', 0], 9]'
-
+        Sample arguments:
+    
+        location =  '[["all", "y", "x", "Contiguous United States", 0], 9]'
+        key = '1'
+        signal = '[[[2000, 2017], [1, 12], [5, 6, 7, 8]], "Viridis", "no"]'
+        choice1 = 'pdsi'
+        choice2 = 'spi4'
+        function = 'omean'
+        date_print = '2000 - 2019'
         '''
         # Temporary, split location up
         location = json.loads(location)
         location, crds = location
+
+        # To save zoom levels and extent between map options (funny how this works)
+        if not map_extent:
+            map_extent = default_extent
+        elif 'mapbox.center' not in map_extent.keys():
+            map_extent = default_extent
+        print(str(map_extent))
 
         # Identify element number
         key = int(key)
@@ -1667,31 +1704,48 @@ for i in range(1, 3):
         df = df_flat[np.isfinite(df_flat['data'])]
 
         # Create the scattermapbox object
-        data = [dict(type='scattermapbox',
-                     lon=df['lonbin'],
-                     lat=df['latbin'],
-                     text=df['printdata'],
-                     mode='markers',
-                     hoverinfo='text',
-                     hovermode='closest',
-                     marker=dict(colorscale=data.color_scale,
-                                 reversescale=reverse,
-                                 color=df['data'],
-                                 cmax=amax,
-                                 cmin=amin,
-                                 opacity=1.0,
-                                 size=source.res[0] * 20,
-                                 colorbar=dict(textposition="auto",
-                                               orientation="h",
-                                               font=dict(size=15,
-                                                         fontweight='bold'))))]
+        d1 = dict(type='scattermapbox',
+                  lon=df['lonbin'],
+                  lat=df['latbin'],
+                  text=df['printdata'],
+                  mode='markers',
+                  hoverinfo='text',
+                  hovermode='closest',
+                  marker=dict(colorscale=data.color_scale,
+                              reversescale=reverse,
+                              color=df['data'],
+                              cmax=amax,
+                              cmin=amin,
+                              opacity=1.0,
+                              size=source.res[0] * 20,
+                              colorbar=dict(textposition="auto",
+                                            orientation="h",
+                                            font=dict(size=15,
+                                                      fontweight='bold'))))
 
+        # Add an outline to help see when zoomed in
+        d2 = dict(type='scattermapbox',
+                  lon=df['lonbin'],
+                  lat=df['latbin'],
+                  mode='markers',
+                  hovermode='closest',
+                  marker=dict(color='#000000',
+                              size=source.res[0] * 20 + .5))
+
+        # package these in a list
+        data = [d2, d1]
+
+        # Set up layout
         layout_copy = copy.deepcopy(layout)
         layout_copy['mapbox'] = dict(
             accesstoken=mapbox_access_token,
             style=map_type,
             center=dict(lon=-95.7, lat=37.1),
             zoom=2)
+        layout_copy['mapbox']['center'] = map_extent['mapbox.center']
+        layout_copy['mapbox']['zoom'] = map_extent['mapbox.zoom']
+        layout_copy['mapbox']['bearing'] = map_extent['mapbox.bearing']
+        layout_copy['mapbox']['pitch'] = map_extent['mapbox.pitch']
         layout_copy['titlefont']=dict(color='#CCCCCC', size=title_size,
                                       family='Time New Roman',
                                       fontweight='bold')
@@ -1725,7 +1779,6 @@ for i in range(1, 3):
                    key, sync, function, area_store):
         '''
         This makes the time series graph below the map.
-
         Sample arguments:
             signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
             choice = 'pdsi'
