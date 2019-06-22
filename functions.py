@@ -10,6 +10,7 @@ Created on Tue Jan 22 18:02:17 2019
 # In[]: Environment
 import datetime as dt
 from dash.exceptions import PreventUpdate
+import dask
 import dask.array as da
 from dateutil.relativedelta import relativedelta
 import functools
@@ -359,8 +360,8 @@ def readRasters(files, navalue=-9999):
         array = np.array(rast.GetRasterBand(1).ReadAsArray())
         array = array.astype(float)
         array[array == navalue] = np.nan
-        name = str.upper(names[i][:-4])  # the file name excluding its extention (may need to be changed if the extension length is not 3)
-        alist.append([name,array])  # It's confusing but we need some way of holding these dates. 
+        name = str.upper(names[i][:-4])
+        alist.append([name,array])
     return(alist,geometry,arrayref)
 
 
@@ -1876,7 +1877,6 @@ class Index_Maps():
 
         return one_field
 
-    @functools.lru_cache()
     def getArea(self, crdict):
         '''
         This will take in a time series of arrays and a drought severity
@@ -1911,7 +1911,6 @@ class Index_Maps():
             arrays = arrays*-1
 
         # Drought Categories
-        # print("calculating drought area...")
         drought_cats = {'sp': {0: [-0.5, -0.8],
                                1: [-0.8, -1.3],
                                2: [-1.3, -1.5],
@@ -1949,36 +1948,31 @@ class Index_Maps():
             an option to display inclusive vs non-inclusive drought severity
             coverages.
             '''
+            totals = arrays.where(~np.isnan(arrays)).count(dim=('lat', 'lon'))
             if inclusive:
-                totals = arrays.where(~np.isnan(arrays)).count(dim=('lat', 
-                                                                    'lon'))
                 counts = arrays.where(arrays<d[0]).count(dim=('lat', 'lon'))
-                ratios = counts / totals
-                pcts = ratios.compute().data * 100
-                return pcts
             else:
-                totals = arrays.where(~np.isnan(arrays)).count(
-                                                            dim=('lat', 'lon'))
                 counts = arrays.where((arrays<d[0]) &
                                       (arrays>=d[1])).count(dim=('lat', 'lon'))
-                ratios = counts / totals
-                pcts = ratios.data.compute() * 100
-                return pcts
+            ratios = counts / totals
+            pcts = ratios.compute().data * 100
+            return pcts
 
-        # print("starting offending loops...")
-        # pincs = [dask.delayed(catFilter)(arrays, cats[i], True) for
-        #          i in range(5)]
-        # pincs = dask.compute(*pincs)  # <-------------------------------------- Parallelizing here speeds this up, but adds memory use :/
-        # pincs = [list(a) for a in pincs]
-        # pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
-        # pnincs = dask.compute(*pnincs)
+        # Calculate non-inclusive percentages # <------------------------------ parallelizing with delayed speeds it up but takes more memory
+        pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
+        pnincs = np.array(dask.compute(*pnincs))
+#        pnincs = [catFilter(arrays, cats[i]) for i in range(5)]
 
-        pincs = [catFilter(arrays, cats[i], True) for i in range(5)]
+        # Use the noninclusive percentages to create the inclusive percentages
+        pincs = [np.sum(pnincs[i:], axis=0) for i in range(pnincs.shape[0])]
+
+        # Also use the noninclusive arrays to get the DSCI
+        pnacc = np.array([pnincs[i]*(i+1) for i in range(5)])
+        DSCI = list(np.nansum(pnacc, axis=0))
+
+        # To store these in a div they need to work with json
         pincs = [list(a) for a in pincs]
-        pnincs = [catFilter(arrays, cats[i]) for i in range(5)]
-        DSCI = list(np.nansum(np.array([pnincs[i]*(i+1) for i in range(5)]),
-                              axis=0))
-        pnincs = [list(p) for p in pnincs]  # These need to work with json
+        pnincs = [list(p) for p in pnincs]
 
         # Return the list of five layers
         return pincs, pnincs, DSCI

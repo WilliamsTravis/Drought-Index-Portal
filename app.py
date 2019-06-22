@@ -137,14 +137,12 @@ source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
 
 # Initializing Values
 default_function = 'pmean'
-default_sample = 'leri1'  # Move these down to experiment with "high" res
-default_1 = 'leri1'
-default_2 = 'leri3'
 default_sample = 'spi1'
 default_1 = 'pdsi'
 default_2 = 'spei6'
+default_date = '2000 - 2019'
+default_location = '[["all", "y", "x", "Contiguous United States", 0], 9]'
 default_years = [2000, 2019]
-default_location = ['all', 'y', 'x', 'Contiguous United States']
 
 # Default click before the first click for any map (might not be necessary)
 default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
@@ -829,9 +827,12 @@ app.layout = html.Div([
 
        # Signals
        html.Div(id='signal', style={'display': 'none'}),
-       html.Div(id='date_print', style={'display': 'none'}),
-       html.Div(id='location_store_1', style={'display': 'none'}),
-       html.Div(id='location_store_2', style={'display': 'none'}),
+       html.Div(id='date_print', children=default_date,
+                style={'display': 'none'}),
+       html.Div(id='location_store_1', children=default_location,
+                style={'display': 'none'}),
+       html.Div(id='location_store_2', children=default_location,
+                style={'display': 'none'}),
        html.Div(id='choice_store', style={'display': 'none'}),
        html.Div(id='area_store_1', children='[0, 0]',
                 style={'display': 'none'}),
@@ -982,7 +983,9 @@ def retrieveData(signal, function, choice, location):
         signal = [[[2000, 2017], [1, 12], [ 4, 5, 6, 7]], 'Viridis', 'no']
         choice = 'pdsi'
         function = 'omean'
+        location = ["all", "y", "x", "Contiguous United States", 0]
     '''
+
     # Retrieve signal elements
     time_data = signal[0]
     colorscale = signal[1]
@@ -1213,6 +1216,8 @@ for i in range(1, 3):
                   [State('shape_{}'.format(i), 'filename'),
                    State('shape_{}'.format(i), 'last_modified')])
     def parseShape(contents, filenames, last_modified):
+        if not contents:
+            raise PreventUpdate
         if filenames:
             basename = os.path.splitext(filenames[0])[0]
             if len(filenames) == 1:
