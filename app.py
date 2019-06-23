@@ -1110,6 +1110,14 @@ for i in range(1, 3):
             # Figure out which element we are working with
             key = int(key) - 1
 
+#            # With the outline we have twice the points, half of which are real
+            if select1:
+                plen = len(select1['points'])
+                select1['points'] = select1['points'][int(plen/2):]
+            if select2:
+                plen = len(select2['points'])
+                select2['points'] = select2['points'][int(plen/2):]
+
             # package all the selections for indexing
             locations = [click1, click2, select1, select2, county1, county2,
                          shape1, shape2, reset1, reset2, state1, state2]
@@ -1119,6 +1127,12 @@ for i in range(1, 3):
             context = dash.callback_context
             triggered_value = context.triggered[0]['value']
             trigger = context.triggered[0]['prop_id']
+
+            # The outline points will also be in selected trigger values
+            if 'selectedData' in trigger:
+                plen = len(triggered_value['points'])
+                tv = triggered_value['points'][int(plen/2):]
+                triggered_value['points']  = tv
 
             # print out variables for developing
             print("key = " + json.dumps(key))
