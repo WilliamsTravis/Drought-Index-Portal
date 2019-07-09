@@ -274,8 +274,8 @@ for index in indices:
                     # Also create an alber's equal area projection
                     source_path = out_path
                     out_path_p = os.path.join(local_path, 'proj_temp.tif')
-                    if os.path.exists(out_path):
-                        os.remove(out_path)
+                    if os.path.exists(out_path_p):
+                        os.remove(out_path_p)
 
                     ds = gdal.Warp(out_path_p, source_path,
                                    dstSRS=proj)
