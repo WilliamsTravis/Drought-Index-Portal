@@ -921,7 +921,7 @@ def adjustDatePrint(year_range,year_range2, month_range, months, sync):
 
     # Year slider #2: If a single year do this
     if year_range2[0] == year_range2[1]:
-        string = str(year_range2[0])
+        string2 = str(year_range2[0])
         if mrs[0] == mrs[1]:
             string2 = mrs[0] + str(year_range2[0])
         else:
