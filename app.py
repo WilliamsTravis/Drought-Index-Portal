@@ -67,7 +67,7 @@ Created on April 15th 2019
 """
 
 # Functions and Libraries
-import netCDF4  # Leave this, without it there ave been problems in Linux
+import netCDF4  # Leave this, without it there have been problems in Linux
 import base64
 import copy
 from collections import OrderedDict
@@ -93,7 +93,6 @@ import urllib
 import warnings
 import xarray as xr
 
-
 # Import functions and classes
 from functions import Admin_Elements, Index_Maps, Location_Builder
 from functions import shapeReproject, unit_map, dirpath
@@ -103,7 +102,7 @@ os.chdir(dirpath)
 
 # Check if we are working in Windows or Linux to find the data
 if sys.platform == 'win32':
-    data_path = 'f:/'
+    data_path = ''
 elif 'travis' in os.getcwd():
     data_path = ''
 else:
@@ -125,7 +124,7 @@ source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
 default_function = 'omean'
 default_sample = 'spi1'
 default_1 = 'pdsi'
-default_2 = 'spei6'
+default_2 = 'spei1'
 default_date = '2000 - 2019'
 default_location = '[["all", "y", "x", "Contiguous United States", 0], 9]'
 default_years = [2000, 2019]
@@ -670,7 +669,13 @@ app.layout = html.Div([
                     children='Location Syncing: On',
                     title=('Sync/unsync the location ' +
                            'of the time series between each map.'),
-                    style={'display': 'none'})],
+                    style={'display': 'none'}),
+        html.Button(id="year_sync",
+                    children='Year Syncing: On',
+                    title=('Sync/unsync the years ' +
+                           'of the time series between each map.'),
+                    style={'display': 'none'}
+                    )],
         style={'margin-bottom': '30', 'text-align': 'center'}),
      # End Toggle Options
 
@@ -702,7 +707,18 @@ app.layout = html.Div([
                                     max=max_year,
                                     updatemode='drag',
                                     marks=yearmarks)],
-                    style={'margin-top': '0', 'margin-bottom': '80'})]),
+                    style={'margin-top': '0', 'margin-bottom': '80'}),
+                  html.Div(id='year_div2',
+                    children=[
+                      html.H3(id='date_range2', children='Date Range #2'),
+                      dcc.RangeSlider(id='year_slider2',
+                                      value=default_years,
+                                      min=min_year,
+                                      max=max_year,
+                                      updatemode='drag',
+                                      marks=yearmarks)],
+                    style={'display': 'none',
+                           'margin-top': '0', 'margin-bottom': '80'})]),
                 # End Year Slider
 
                 # Month Options
@@ -833,6 +849,8 @@ app.layout = html.Div([
        html.Div(id='signal', style={'display': 'none'}),
        html.Div(id='date_print', children=default_date,
                 style={'display': 'none'}),
+       html.Div(id='date_print2', children=default_date,
+                style={'display': 'none'}),
        html.Div(id='location_store_1', children=default_location,
                 style={'display': 'none'}),
        html.Div(id='location_store_2', children=default_location,
@@ -849,14 +867,26 @@ app.layout = html.Div([
 
 # In[]: App Callbacks
 @app.callback([Output('date_range', 'children'),
-               Output('date_print', 'children')],
+               Output('date_print', 'children'),
+               Output('date_range2', 'children'),
+               Output('date_print2', 'children')],
               [Input('year_slider', 'value'),
+               Input('year_slider2', 'value'),
                Input('month_slider', 'value'),
-               Input('month', 'values')])
-def adjustDatePrint(year_range, month_range, months):
+               Input('month', 'values'),
+               Input('year_sync', 'n_clicks')])
+def adjustDatePrint(year_range,year_range2, month_range, months, sync):
     '''
     If users select one year, only print it once
     '''
+    # If not syncing, these need numbers
+    if not sync:
+        sync = 0
+    if sync % 2 == 0:
+        number = ""
+    else:
+        number = " #1"
+
     # Don't print months start and end if Jan through Dec
     month_range = [int(month_range[0]), int(month_range[1])]
     month_range = [monthmarks[m] for m in month_range]
@@ -878,7 +908,7 @@ def adjustDatePrint(year_range, month_range, months):
         else:
             month_incl_print = ''
 
-    # If a single year do this
+    # Year slider #1: If a single year do this
     if year_range[0] == year_range[1]:
         string = str(year_range[0])
         if mrs[0] == mrs[1]:
@@ -889,11 +919,24 @@ def adjustDatePrint(year_range, month_range, months):
         string = (mrs[0] + str(year_range[0]) + ' - ' + mrs[1] +
                   str(year_range[1]))
 
+    # Year slider #2: If a single year do this
+    if year_range2[0] == year_range2[1]:
+        string = str(year_range2[0])
+        if mrs[0] == mrs[1]:
+            string2 = mrs[0] + str(year_range2[0])
+        else:
+            string2 = mrs[0] + mjoin + mrs[1] + str(year_range2[0])
+    else:
+        string2 = (mrs[0] + str(year_range2[0]) + ' - ' + mrs[1] +
+                  str(year_range2[1]))
+
     # And now add the month printouts
     string = string + month_incl_print
-    full = 'Date Range: ' + string
+    string2 = string2 + month_incl_print
+    full = 'Date Range' + number + ':  ' + string
+    full2 = 'Date Range #2:  ' + string2
 
-    return full, string  
+    return full, string, full2, string2  
 
 
 @app.callback([Output('options', 'style'),
@@ -921,10 +964,23 @@ def toggleOptions(click):
     return div_style, button_style, children
 
 
+@app.callback(Output('year_div2', 'style'),
+              [Input('year_sync', 'n_clicks')])
+def toggleYearSlider(click):
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        style = {'display': 'none', 'margin-top': '0', 'margin-bottom': '80'}
+    else:
+        style = {'margin-top': '0', 'margin-bottom': '80'}
+    print(style)
+    return style
+
+
 @app.callback(Output('month', 'values'),
               [Input('all_months', 'n_clicks'),
                Input('no_months', 'n_clicks')])
-def monthFilterToggle(all_months, no_months):
+def toggleMonthFilter(all_months, no_months):
     if not any([all_months, no_months]):
         raise PreventUpdate
 
@@ -942,7 +998,7 @@ def monthFilterToggle(all_months, no_months):
 @app.callback([Output('click_sync', 'style'),
                Output('click_sync', 'children')],
               [Input('click_sync', 'n_clicks')])
-def toggleSyncButton(click):
+def toggleLocationSyncButton(click):
     '''
     Change the color of on/off location syncing button  - for css
     '''
@@ -953,6 +1009,24 @@ def toggleSyncButton(click):
         style = on_button_style
     else:
         children = "Location Syncing: Off"
+        style = off_button_style
+    return style, children
+
+
+@app.callback([Output('year_sync', 'style'),
+               Output('year_sync', 'children')],
+              [Input('year_sync', 'n_clicks')])
+def toggleYearSyncButton(click):
+    '''
+    Change the color of on/off year syncing button  - for css
+    '''
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = "Year Syncing: On"
+        style = on_button_style
+    else:
+        children = "Year Syncing: Off"
         style = off_button_style
     return style, children
 
@@ -1004,6 +1078,7 @@ def retrieveData(signal, function, choice, location):
     This takes the user defined signal and uses the Index_Map class to filter'
     by the selected dates and return the singular map, the 3d timeseries array,
     and the colorscale.
+
     sample arguments:
         signal = [[[2000, 2017], [1, 12], [ 4, 5, 6, 7]], 'Viridis', 'no']
         choice = 'pdsi'
@@ -1051,10 +1126,11 @@ def choiceStore(choice1, choice2):
               [State('colors', 'value'),
                State('reverse', 'value'),
                State('year_slider', 'value'),
+               State('year_slider2', 'value'),
                State('month_slider', 'value'),
                State('month', 'values')])
-def submitSignal(click, colorscale, reverse, year_range, month_range,
-                 month_filter):
+def submitSignal(click, colorscale, reverse, year_range, year_range2,
+                 month_range, month_filter):
     '''
     Collect and hide the options signal in the hidden 'signal' div.
     '''
@@ -1066,7 +1142,7 @@ def submitSignal(click, colorscale, reverse, year_range, month_range,
     for i in [0, 1]:
         if month_range[i] > 12:
             month_range[i] = overflow[month_range[i]]
-    signal = [[year_range, month_range, month_filter], colorscale,
+    signal = [[year_range, year_range2, month_range, month_filter], colorscale,
               reverse]
     return json.dumps(signal)
 
@@ -1552,10 +1628,12 @@ for i in range(1, 3):
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
+                   State('year_sync', 'children'),
                    State('date_print', 'children'),
-                   State('map_{}'.format(i), 'relayoutData')])
+                   State('date_print2', 'children'),
+                   State('map_{}'.format(i), 'relayoutData'),])
     def makeMap(choice1, choice2, map_type, signal, location, function, key,
-                sync, date_print, map_extent):
+                sync, year_sync, date_print, date_print2, map_extent):
         '''
         This actually renders the map. I want to modularize, but am struggling
         on this.
@@ -1564,12 +1642,13 @@ for i in range(1, 3):
     
         location =  '[["all", "y", "x", "Contiguous United States", 0], 9]'
         key = '1'
-        signal = '[[[2000, 2017], [1, 12], [5, 6, 7, 8]], "Viridis", "no"]'
+        signal = '[[[2000, 2017], [1990, 2000], [1, 12], [5, 6, 7, 8]], "Viridis", "no"]'
         choice1 = 'pdsi'
         choice2 = 'spi4'
         function = 'omean'
         date_print = '2000 - 2019'
         '''
+        print("SIGNAL: " + signal)
         # Temporary, split location up
         location = json.loads(location)
         location, crds = location
@@ -1589,7 +1668,7 @@ for i in range(1, 3):
 
         if trig == 'location_store_{}.children'.format(key):
             if 'corr' not in function:
-                if 'grid' in location[0]: # or 'county' in location[0]:  # <--- Updates are only needed if the maps isn't going to change
+                if 'grid' in location[0]: # or 'county' in location[0]:  # <--- Updates are only needed if the map isn't going to change
                     raise PreventUpdate
 
             # Check which element the selection came from
@@ -1604,8 +1683,18 @@ for i in range(1, 3):
         signal = json.loads(signal)
 
         # Collect signal elements
-        [[year_range, [month1, month2], month_filter],
+        [[year_range, year_range2, [month1, month2], month_filter],
          colorscale, reverse] = signal
+
+        # If we are syncing times, pop the second year range
+        if 'On' in year_sync:
+            signal[0].pop(1)
+        else:
+            if key == 1:
+                signal[0].pop(1)
+            else:
+                signal[0].pop(0)
+                date_print = date_print2
 
         # DASH doesn't seem to like passing True/False as values
         verity = {'no': False, 'yes':True}
@@ -1789,10 +1878,11 @@ for i in range(1, 3):
                    Input('dsci_button_{}'.format(i), 'n_clicks')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
+                   State('year_sync', 'children'),
                    State('function_choice', 'value'),
                    State('area_store_{}'.format(i), 'children')])
     def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
-                   key, sync, function, area_store):
+                   key, sync, year_sync, function, area_store):
         '''
         This makes the time series graph below the map.
         Sample arguments:
@@ -1823,8 +1913,17 @@ for i in range(1, 3):
         signal = json.loads(signal)
 
         # Collect signals
-        [[year_range, [month1, month2],
+        [[year_range, year_range2, [month1, month2],
          month_filter], colorscale, reverse] = signal
+
+        # If we are syncing times, pop the second year range
+        if 'On' in year_sync:
+            signal[0].pop(1)
+        else:
+            if key == 1:
+                signal[0].pop(1)
+            else:
+                signal[0].pop(0)
 
         # DASH doesn't seem to like passing True/False as values
         verity = {'no': False, 'yes': True}

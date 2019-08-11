@@ -8,6 +8,9 @@ Created on Tue Jan 22 18:02:17 2019
 """
 
 # In[]: Environment
+# Start by ignoring the yml deprecation warning (annoying)
+import warnings
+warnings.filterwarnings("ignore")
 import datetime as dt
 from dash.exceptions import PreventUpdate
 import dask
@@ -40,13 +43,12 @@ dirpath = os.path.dirname(os.path.abspath(frame))
 
 # Check if windows or linux
 if sys.platform == 'win32':
-    data_path = 'f:/'
+    data_path = ''
 elif 'travis' in os.getcwd():
     data_path = ''
 else:
     data_path = '/root/Sync'
 
-warnings.filterwarnings("ignore")
 
 # In[]: Variables
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',

@@ -63,11 +63,11 @@ from urllib.error import HTTPError, URLError
 import urllib
 import xarray as xr
 
-# Check if we are working in Windows or Linux to find the data directory
+# I hadn't learned how to do this yet
 if sys.platform == 'win32':
-    sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
-    os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
-    data_path = 'f:/'
+    sys.path.insert(0, 'C:/Users/trwi0358/github/Ubuntu-Practice-Machine')
+    os.chdir('C:/Users/trwi0358/github/Ubuntu-Practice-Machine')
+    data_path = ''
 elif 'travis' in os.getcwd():
     sys.path.insert(0, '/home/travis/github/Ubuntu-Practice-Machine')
     os.chdir('/home/travis/github/Ubuntu-Practice-Machine')

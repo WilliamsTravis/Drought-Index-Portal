@@ -10,10 +10,12 @@ import sys
 from tqdm import tqdm
 import xarray as xr
 
+user = os.environ['USERNAME']
+
 # Check if we are working in Windows or Linux to find the data directory
 if sys.platform == 'win32':
-    os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
-    data_path = 'f:/'
+    os.chdir('C:/Users/' + user + '/github/Ubuntu-Practice-Machine')
+    data_path = ''
 elif 'travis' in os.getcwd():
     os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
     data_path = ''
@@ -30,7 +32,7 @@ local_indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7',
                  'eddi8', 'eddi9', 'eddi10', 'eddi11', 'eddi12', 'tmin',
                  'tmax', 'tdmean', 'tmean', 'ppt', 'vpdmax', 'vpdmin']
 index_paths = [os.path.join(data_path,'data/droughtindices/netcdfs',
-                            i  + '.nc') for i in local_indices]
+                                            i  + '.nc') for i in local_indices]
 
 maxes = {}
 mins = {}
