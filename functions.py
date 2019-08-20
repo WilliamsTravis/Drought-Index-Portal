@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Support functions for Ubunut-Practice-Machine
+Support functions for Ubuntu-Practice-Machine
 
 Created on Tue Jan 22 18:02:17 2019
 
@@ -54,8 +54,8 @@ else:
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'mdn1': 'Mean Temperature Departure  (1981 - 2010) - 1 month',
              'pdsi': 'Palmer Drought Severity Index',
-             'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
-             'pdsiz': 'Palmer Z-Index',
+             'scpdsi': 'Self-Calibrated Palmer Drought Severity Index',
+             'pzi': 'Palmer Z-Index',
              'spi1': 'Standardized Precipitation Index - 1 month',
              'spi2': 'Standardized Precipitation Index - 2 month',
              'spi3': 'Standardized Precipitation Index - 3 month',
@@ -579,7 +579,7 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
     As an expediency, if there isn't an nc file it defaults to reading dates
     from the file names.
 
-    I need to go back and parameterize the subtitle and other attributes to 
+    I need to go back and parameterize the subtitle and other attributes to
     reflect the actual dates used in each dataset.  # <------------------------ Not critical since we aren't sharing these files yet, but do this before we do
 
     Test parameters for toNetCDF2

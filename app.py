@@ -178,7 +178,6 @@ cache2.init_app(server)
 indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'PDSI-Self Calibrated', 'value': 'pdsisc'},
            {'label': 'Palmer Z Index', 'value': 'pdsiz'},
-           # {'label': 'MTD-1', 'value': 'mdn1'},  # <------------------------- I don't understand this product just yet
            {'label': 'SPI-1', 'value': 'spi1'},
            {'label': 'SPI-2', 'value': 'spi2'},
            {'label': 'SPI-3', 'value': 'spi3'},
@@ -362,7 +361,7 @@ max_month = pd.Timestamp(max_date).month
 # Get spatial dimensions from the sample data set above
 admin = Admin_Elements(resolution)
 [state_array, county_array, grid, mask,
- source, albers_source, crdict, admin_df] = admin.getElements()  # <----------- remove albers source here
+ source, albers_source, crdict, admin_df] = admin.getElements()  # <----------- remove albers source here (carefully)
 
 # Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
@@ -388,6 +387,7 @@ months_slanted = {i: {'label': monthmarks[i],
 for y in years:
     if y % 5 != 0:
         yearmarks[y] = ""
+
 
 # In[] Map Elements
 # Mapbox Access
@@ -520,7 +520,7 @@ def divMaker(id_num, index='noaa'):
                                       'textAlign': 'center',
                                       'margin': '2px',
                                       'padding': '2px'})])])],
-                            style={'width': '55%',
+                            style={'width': '60%',
                                    'float': 'left'}),
 
             html.Div([
@@ -528,7 +528,7 @@ def divMaker(id_num, index='noaa'):
                 id='reset_map_{}'.format(id_num),
                 children='Reset',
                 title=('Remove area filters.'),
-                style={'width': '20%',
+                style={'width': '15%',
                        'font-size': '10',
                        'height': '26px',
                        'line-height': '4px',
@@ -539,7 +539,7 @@ def divMaker(id_num, index='noaa'):
                 children='Update',
                 title=('Update the map and  graphs with location choices ' +
                        '(state selections do not update automatically).'),
-                style={'width': '20%',
+                style={'width': '15%',
                        'height': '34px',
                        'font-size': '10',
                        'line-height': '5px',
@@ -948,7 +948,7 @@ def toggleOptions(click):
     Toggle options on/off
     '''
     if not click:
-        click = 0
+        click = 1
     if click % 2 == 0:
         div_style = {}
         button_style = {'background-color': '#c7d4ea',

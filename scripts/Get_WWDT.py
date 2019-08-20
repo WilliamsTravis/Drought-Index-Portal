@@ -35,7 +35,7 @@
             2) insert (but with spaces at these line breaks):
               <30 01 02 * *
                /root/Sync/Ubuntu-Practice-Machine/env/bin/python3
-               /root/Sync/Ubuntu-Practice-Machine/scripts/Get_WWDT.py >> 
+               /root/Sync/Ubuntu-Practice-Machine/scripts/Get_WWDT.py >>
                cronlog.log>
 
             3) ctrl + x
@@ -104,7 +104,7 @@ if not os.path.exists(local_path2):
 if not os.path.exists(local_path3):
     os.mkdir(local_path3)
 
-# I came up with a slightly differentset of acroynms
+# I came up with a slightly different set of acroynms
 indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7', 'spi8',
            'spi9', 'spi10', 'spi11', 'spi12', 'spei1', 'spei2', 'spei3',
            'spei4', 'spei5', 'spei6', 'spei7', 'spei8', 'spei9', 'spei10',
