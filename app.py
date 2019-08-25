@@ -743,8 +743,7 @@ app.layout = html.Div([
                                 id='month',
                                 options=monthoptions,
                                 values=list(range(1, 13)),
-                                labelStyle={'display':
-                                            'inline-block'}),
+                                labelStyle={'display': 'inline-block'}),
                               html.Button(id='all_months', type='button',
                                           children='All',
                                           style={'height': '25px',

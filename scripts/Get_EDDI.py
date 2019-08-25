@@ -179,7 +179,7 @@ for index in indices:
         ftp_files = [f for f in ftp_files
                      if f[-17:-13] == "{:02d}mn".format(scale)]
         ftp_last = ftp_files[-1]
-        last_date = pd.to_datetime(ftp_last[-12:-4], format='%Y%m%d')
+        last_date = pd.to_datetime(ftp_last[-12: -4], format='%Y%m%d')
 
         # All dates available
         available_dates = pd.date_range(first_date, last_date, freq='M')
@@ -323,7 +323,7 @@ for index in indices:
                  month2=12, wmode='w', percentiles=False)
         toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None, savepath=nc_path_proj,
                        index=index, proj=proj, year1=1980, month1=1,
-                       year2=todays_date.year, month2=12, wmode='w',                 # I subtracted one to go back and check the update mode
+                       year2=todays_date.year, month2=12, wmode='w',
                        percentiles=False)
 
         # Now lets get the percentile values
