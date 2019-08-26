@@ -10,6 +10,7 @@ dependencies:
   - flask-caching==1.4.0
   - gdal
   - geopandas==0.4.1
+  - gevent
   - joblib==0.13.2
   - matplotlib==3.0.2
   - netcdf4==1.4.2
@@ -27,3 +28,4 @@ dependencies:
   - pip:
     - gunicorn==19.9.0
     - salem==0.2.3
+    #- dash_bootstrap_components==0.6.3
