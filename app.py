@@ -1766,15 +1766,33 @@ for i in range(1, 3):
 
         Sample arguments:
     
-        location =  '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
-        key = '1'
-        signal = '[[[2000, 2017], [1990, 2000], [1, 12], [5, 6, 7, 8]], "Viridis", "no"]'
+        map_type = 'dark'
+        key = '2'
+        signal = '[[[2000, 2019], [2000, 2019], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], "Default", "no"]'
+        l1 = '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
+        l2 = '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
         choice1 = 'pdsi'
-        choice2 = 'spi4'
-        function = 'omean'
+        choice2 = 'spei1'
+        function = 'pmean'
         date_print = '2000 - 2019'
-        year_sync
+        date_print2 = '2000 - 2019'
+        sync = 'Location Syncing: On'
+        year_sync = 'Year Syncing: On'
+        map_extent = 'None'
         '''
+        print("map_type = " + str(map_type))
+        print("key = " + str(key))
+        print("signal = " + str(signal))
+        print("l1 = " + str(l1))
+        print("l2 = " + str(l2))
+        print("choice1 = " + str(choice1))
+        print("choice2 = " + str(choice2))
+        print("function = " + str(function))
+        print("date_print = " + str(date_print))
+        print("date_print2 = " + str(date_print2))
+        print("sync = " + str(sync))
+        print("year_sync = " + str(year_sync))
+        print("map_extent = " + str(map_extent))
 
         # Identify element number
         key = int(key)
@@ -1792,14 +1810,10 @@ for i in range(1, 3):
         elif 'mapbox.center' not in map_extent.keys():
             map_extent = default_extent
 
-        # Prevent update from location unless it is a state or shape filter
+        # Prevent update if not syncing and not triggered
         trig = dash.callback_context.triggered[0]['prop_id']
+        print("trig = " + str(trig))
         if trig == 'location_store_{}.children'.format(key):
-#            if 'corr' not in function:
-#                if location[0] == 'grid':
-#                    raise PreventUpdate
-
-#           Check which element the selection came from
             triggered_element = location[-1]
             if 'On' not in sync:
                 if triggered_element != key:
@@ -1814,7 +1828,7 @@ for i in range(1, 3):
         [[year_range, year_range2, [month1, month2], month_filter],
          colorscale, reverse] = signal
 
-        # If we are syncing times, pop the second year range
+        # If we are syncing times, pop the second year range off
         if 'On' in year_sync:
             signal[0].pop(1)
         else:
@@ -1935,14 +1949,19 @@ for i in range(1, 3):
         df = df_flat[np.isfinite(df_flat['data'])]
         df['xy'] = df['gridx'].astype(str) + df['gridy'].astype(str)
 
+
+
+
         # Get Highlighted points
         print("LOCATION: " + str(location))
         if flag == 'all':
-            pointids = df.index.to_numpy()
+            pointids = df.index.to_numpy()  # <-------------------------------- This is inconsistent with threads? 
         elif pointids == 'None':
-            y, x = np.where(~np.isnan(data.mask))
+            y, x = np.where(~np.isnan(data.mask.data))
             xy = [str(x[i]) + str(y[i]) for i in range(len(x))]
             pointids = df.index[df['xy'].isin(xy)].to_numpy()
+
+
 
         data = [dict(type='scattermapbox',
                      lon=df['lonbin'],
