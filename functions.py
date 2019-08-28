@@ -1988,7 +1988,7 @@ class Index_Maps():
                      "pmean": self.getMean,
                      "pmin": self.getMin,
                      "pmax": self.getMax,
-                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now
+                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now (skipped,  performed in app for now)
                      "ocorr": self.getMean,
                      "pcorr": self.getMean}
         function = functions[function]

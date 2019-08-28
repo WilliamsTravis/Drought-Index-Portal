@@ -126,7 +126,7 @@ default_function = 'pmean'
 default_function_type = 'perc'
 default_sample = 'spi1'
 default_1 = 'pdsi'
-default_2 = 'spei1'
+default_2 = 'spi1'
 default_date = '2000 - 2019'
 default_basemap = 'dark'
 default_location = '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
@@ -150,13 +150,16 @@ ranges = pd.read_csv('data/tables/index_ranges.csv')
 app = dash.Dash(__name__)
 
 # Go to stylesheet, styled after a DASH example (how to serve locally?)  # <--- Check out criddyp's response about a third of the way down here <https://community.plot.ly/t/serve-locally-option-with-additional-scripts-and-style-sheets/6974/6>
-app.css.append_css({'external_url':
-                    'https://codepen.io/williamstravis/pen/maxwvK.css'})
+#app.css.append_css({'external_url':
+#                    'https://codepen.io/williamstravis/pen/maxwvK.css'})
+## For the Loading screen
+#app.css.append_css({"external_url":
+#                    "https://codepen.io/williamstravis/pen/EGrWde.css"})
 # app.scripts.config.serve_locally = True
 
-# For the Loading screen
-app.css.append_css({"external_url":
-                    "https://codepen.io/williamstravis/pen/EGrWde.css"})
+# Attempting local css
+app.css.append_css({"external_url":  "static/stylesheet.css"})
+app.scripts.config.serve_locally = True
 
 # Create Server Object
 server = app.server
@@ -330,33 +333,34 @@ ams = [{'label': 'PDSI: The Palmer Drought Severity Index (WWDT)', 'value': 0},
 acronym_text = ("""
 INDEX/INDICATOR ACRONYMS
 
-PDSI:                     Palmer Drought Severity Index
 
-PDSI-SC:                  Self-Calibrating Palmer Drought Severity Index
+PDSI:            Palmer Drought Severity Index
 
-Palmer Z Index:           Palmer Z Index
+PDSI-SC:         Self-Calibrating PDSI
 
-SPI:                      Standardized Precipitation Index (1-12 months)
+Palmer Z Index:  Palmer Z Index
 
-SPEI:                     Standardized Precipitation-Evapotranspiration Index (1-12 months)
+SPI:             Standardized Precipitation Index
 
-EDDI:                     Evaporative Demand Drought Index (1-12 months)
+SPEI:            Standardized Precip-ET Index
 
-LERI:                     Landscape Evaporative Response Index (1 & 3 months)
+EDDI:            Evaporative Demand Drought Index 
 
-TMIN:                     Average Daily Minimum Temperature (°C)
+LERI:            Landscape Evaporation Response Index
 
-TMAX:                     Average Daily Maximum Temperature (°C)
+TMIN:            Average Daily Minimum Temp (°C)
 
-TMEAN:                    Mean Temperature (°C)
+TMAX:            Average Daily Maximum Temp (°C)
 
-TDMEAN:                   Mean Dew Point Temperature (°C)
+TMEAN:           Mean Temperature (°C)
 
-PPT:                      Average Precipitation (mm)
+TDMEAN:          Mean Dew Point Temperature (°C)
 
-VPDMAX:                   Maximum Vapor Pressure Deficit (hPa)
+PPT:             Average Precipitation (mm)
 
-VPDMIN:                   Minimum Vapor Pressure Deficit (hPa)
+VPDMAX:          Max Vapor Pressure Deficit (hPa)
+
+VPDMIN:          Min Vapor Pressure Deficit (hPa)
 """)
 
 
@@ -657,8 +661,7 @@ navbar = html.Nav(
             html.Div([
               html.A(
                 html.Img(
-                  src=("https://github.com/WilliamsTravis/Pasture-Rangeland-" +
-                      "Forage/blob/master/data/earthlab.png?raw=true"),
+                  src=("/static/earthlab.png"),
                   className='one columns',
                   style={'height': '40',
                          'width': '130',
@@ -668,8 +671,7 @@ navbar = html.Nav(
                   target="_blank"),
               html.A(
                 html.Img(
-                  src=('https://github.com/WilliamsTravis/Pasture-Rangeland-' +
-                       'Forage/blob/master/data/wwa_logo2015.png?raw=true'),
+                  src=('/static/wwa_logo2015.png'),
                   className='one columns',
                   style={'height': '40',
                          'width': '130',
@@ -679,8 +681,7 @@ navbar = html.Nav(
                   target="_blank"),
               html.A(
                 html.Img(
-                  src=("https://github.com/WilliamsTravis/Pasture-Rangeland-" +
-                       "Forage/blob/master/data/nidis.png?raw=true"),
+                  src=("/static/nidis.png"),
                   className='one columns',
                   style={'height': '40',
                          'width': '170',
@@ -690,8 +691,7 @@ navbar = html.Nav(
                   target="_blank"),
               html.A(
                 html.Img(
-                  src=("https://github.com/WilliamsTravis/Pasture-Rangeland-" +
-                       "Forage/blob/master/data/cires.png?raw=true"),
+                  src=("/static/cires.png"),
                   className='one columns',
                   style={'height': '40',
                          'width': '80',
@@ -702,8 +702,7 @@ navbar = html.Nav(
                   target="_blank"),
               html.A(
                 html.Img(
-                  src=("https://github.com/WilliamsTravis/Ubuntu-Practice" + 
-                       "-Machine/blob/cu-theme/images/culogo.png?raw=true"),
+                   src=("/static/culogo.png"),
                   className='one columns',
                   style={'height': '40',
                          'width': '50',
@@ -1780,19 +1779,19 @@ for i in range(1, 3):
         year_sync = 'Year Syncing: On'
         map_extent = 'None'
         '''
-        print("map_type = " + str(map_type))
-        print("key = " + str(key))
-        print("signal = " + str(signal))
-        print("l1 = " + str(l1))
-        print("l2 = " + str(l2))
-        print("choice1 = " + str(choice1))
-        print("choice2 = " + str(choice2))
-        print("function = " + str(function))
-        print("date_print = " + str(date_print))
-        print("date_print2 = " + str(date_print2))
-        print("sync = " + str(sync))
-        print("year_sync = " + str(year_sync))
-        print("map_extent = " + str(map_extent))
+#        print("map_type = " + str(map_type))
+#        print("key = " + str(key))
+#        print("signal = " + str(signal))
+#        print("l1 = " + str(l1))
+#        print("l2 = " + str(l2))
+#        print("choice1 = " + str(choice1))
+#        print("choice2 = " + str(choice2))
+#        print("function = " + str(function))
+#        print("date_print = " + str(date_print))
+#        print("date_print2 = " + str(date_print2))
+#        print("sync = " + str(sync))
+#        print("year_sync = " + str(year_sync))
+#        print("map_extent = " + str(map_extent))
 
         # Identify element number
         key = int(key)
@@ -1923,7 +1922,7 @@ for i in range(1, 3):
             title_size = 20
 
         # Replace the source array with the data from above
-        source.data[0] = array * mask
+        source.data[0] = array #* mask
 
         # Create a data frame of coordinates, index values, labels, etc
         dfs = xr.DataArray(source, name="data")
@@ -1953,14 +1952,17 @@ for i in range(1, 3):
 
 
         # Get Highlighted points
-        print("LOCATION: " + str(location))
+        print("location = " + str(location))
+        print("pointids = " + str(pointids))
         if flag == 'all':
             pointids = df.index.to_numpy()  # <-------------------------------- This is inconsistent with threads? 
         elif pointids == 'None':
             y, x = np.where(~np.isnan(data.mask.data))
+#            y, x = json.loads(location[1]), json.loads(location[2])
+            if 'p' not in function:
+                x = np.array(x) - 6
             xy = [str(x[i]) + str(y[i]) for i in range(len(x))]
             pointids = df.index[df['xy'].isin(xy)].to_numpy()
-
 
 
         data = [dict(type='scattermapbox',
