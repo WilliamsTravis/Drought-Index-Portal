@@ -27,46 +27,97 @@ source env/bin/activate
 pip install -r requirements
 
 
-# I Couldn't get it to work in the virtual environment, as you can see. Will work on that.
-# After the installation above there are just a few steps needed to configure nginx to run the
-# app:
-# 1) rm /etc/nginx/sites-available/default
 
-# 2) nano /etc/nginc/site-available/flask_settings
-#     This step would take a lot to automate, but with the ip address and the project folder
-#     it should be doable. For now, use this site, it has the simplest template I could find:
-#            <https://edward.io/blog/flask-gunicorn-nginx.html>
-
-# 3) sudo nginx -t
-#       This is just a test. If it fails there's probably a typo in the flask_setting doc
-
-# 4) ln -s /etc/nginc/sites-available/flask_settings /etc/nginx/sites-enabled/flask_settings
-#        I had to fiddle with this...I've seen it explained that you do and dont
-#          need to specify the doc name in sites-enabled
-
-# 5) sudo service nginx reload
-#       Is it always reload? Could've sworn I saw restart in another tutorial
+# MANUAL INSTRUCTIONS
+# You may also wish to use conda
 
 
-# Establishing SSL certificates:
 
-# 6) Okay, now we should be able to visit the site using the public ip address, but what if
-#       we want a ssl certificates or to embed the app in an iframe? Each of these require a
-#       a domain and nginx configuration changes. First, go get a domain name and associate it
-#       with the public ip address.
-#  7) Then install lets encrypt and the certboth for nginx:
-#       1) sudo add-apt-repository ppa:certbot/certbot
-#       2) sudo apt-get update
-#       3) sudo apt-get install python-certbot-nginx
-#  8) Then change the server name in flask_settings to the domain name or names
-#  9) Check for errors
-#	1) sudo nginx -t
-#	2) sudo service nginx reload
-#  10) Allow https through firewall
-# 	1) check the firewall status: sudo ufw status
-#       2) Is https allowed? If Nginx HTTP is instead do this:
-#		sudo ufw all <Nginx Full>
-#		sudo ufw delete allow <Nginx HTTP>
-#  11) Get certificate
-#	1) sudo certbot --nginx -d <domain_name>
-#  12) If this works setup the automatic renewal process with crontab
+# Web server steps
+# 1) Set up ssl certificates so we can use a secure https connection
+   # a) First, go get a domain name and associate it with the public ip address.
+     # I've been using godaddy.com, but anywill do. You first purchase a domain
+     # name (www.something.com), then go the DNS management section. Here you'll 
+     # want to associate the domain with the ip address of whichever connection
+     # you're going to serve the application from. Here's an example DNS setup
+     # using mostly defaults with the critical part being the first one:
+    
+    #Type 	Name 	         Value                                         TTL 
+    #	a 	@ 	         157.245.191.181                               600 seconds 
+    # cname 	www 	         @                                             1 Hour 
+    # cname 	_domainconnect 	 _domainconnect.gd.domaincontrol.com           1 Hour 
+    # ns 	@ 	         ns53.domaincontrol.com 	               1 Hour 	
+    # ns 	@ 	         ns54.domaincontrol.com                        1 Hour 	
+    # soa 	@ 	         Primary nameserver: ns53.domaincontrol.com.   1 Hour
+    
+   # b) Then install certbot (and by association 'letsencrypt') for nginx:
+	# 1) sudo add-apt-repository ppa:certbot/certbot
+	# 2) sudo apt-get update
+	# 3) sudo apt-get install python-certbot-nginx
+
+   # c) Next, generate ssl certificates for the domain from above, take note of where the
+        # certificates are saved (likely in "/etc/letsencrypt/live/<domain>")
+        # 1)   certbot --nginx -d <domain-name>
+	
+   # d) Okay, so when you run the app it will be directed through a port on the local machine. 
+      # What we are going to do is tell the webserver (nginx) that it should take what ever
+      # is running in that port and send it to the domain we set up. To do this we need to
+      # reconfigure nginx site files.
+       # 1) rm /etc/nginx/sites-available/default
+       # 2) nano (vi, vim, etc...) /etc/nginx/sites-available/flask_settings:
+       	   # (copy the dictionaries below into the flask_settings file and replace <domain names> with
+	   # the one above, and uncomment everything):
+	   
+	   # upstream app_server {
+           # server 127.0.0.1:8000;
+           # }
+
+          # server {
+          #  listen 443 ssl;
+          #  server_name  www.reservoir-management-game.co;
+          #  ssl_certificate /etc/letsencrypt/live/www.reservoir-management-game.co/fullchain.pem;
+          #  ssl_certificate_key /etc/letsencrypt/live/www.reservoir-management-game.co/privkey.pem;
+
+          #  root /usr/share/nginx/html;
+          #  index index.html index.htm;
+
+          #  client_max_body_size 4G;
+          #  keepalive_timeout 5;
+
+          #  location / {
+          #  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          #  proxy_set_header Host $http_host; 
+          #  proxy_redirect off;
+	  #  proxy_pass http://app_server;
+          #  }
+          # }
+          # server {
+
+          #  listen 80;
+          #  server_name www.reservoir-management-game.co;
+          #  return 301 https://$host$request_uri;
+          # }
+
+       # 3) Now link the available site configuration file with an enabled file:
+	   # ln -s /etc/nginc/sites-available/flask_settings /etc/nginx/sites-enabled/flask_settings
+       # 4) Restart or reload nginx
+           # sudo service nginx reload
+       # 5) if there are problems there may be a typo in the settings file, the wrong ip address, perhaps
+           # you'll need to delete the default settings in sites-enabled (lot's of causes). Try testing
+	   # sudo nginx for clues:
+	   # sudo nginx -t
+  
+#  2) If this works setup the automatic renewal process with crontab. Instructions coming.
+#  3) Now, to run the actual application use a webserver gateway interface like green unicorn. The syntax
+      # is simple enough:
+      # gunicorn app:server
+	   
+#  4) To use more of the computing power add workers and threads:
+       # gunicorn -w 3 --threads 3 app:server
+   
+#  5) To run the application in the back ground so you can leave the computer use a daemon call:
+       # gunicorn -w 3 --threads 3 --daemon app:server
+   
+#  6) Cross fingers.
+#  7) Open url in a browser, hopefully it worked!
+     
