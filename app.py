@@ -93,20 +93,15 @@ import urllib
 import warnings
 import xarray as xr
 
+# This could be a CLI argument
+data_path = ''
+
 # Import functions and classes
 from functions import Admin_Elements, Index_Maps, Location_Builder
-from functions import shapeReproject, unit_map, dirpath
-
-# Set Working Directory
-os.chdir(dirpath)
+from functions import shapeReproject, unit_map
 
 # Check if we are working in Windows or Linux to find the data
-if sys.platform == 'win32':
-    data_path = ''
-elif 'travis' in os.getcwd():
-    data_path = ''
-else:
-    data_path = '/root/Sync/'
+data_path = ''
 
 # What to do with the mean of empty slice warning?
 warnings.filterwarnings("ignore")

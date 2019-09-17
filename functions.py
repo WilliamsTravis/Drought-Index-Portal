@@ -37,18 +37,8 @@ import sys
 import warnings
 import xarray as xr
 
-# Set Working Directory
-frame = getframeinfo(currentframe()).filename
-dirpath = os.path.dirname(os.path.abspath(frame))
-
-# Check if windows or linux
-if sys.platform == 'win32':
-    data_path = ''
-elif 'travis' in os.getcwd():
-    data_path = ''
-else:
-    data_path = '/root/Sync'
-
+# This could be a CLI argument
+data_path = ''
 
 # In[]: Variables
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
