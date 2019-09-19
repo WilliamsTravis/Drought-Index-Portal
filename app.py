@@ -776,7 +776,7 @@ body = html.Div([
 
       # Title
       html.Div([
-        html.H1('Drought Index Comparison Tool'),
+        html.H1('Drought Index Portal (DrIP)'),
           html.Hr()],
             className='twelve columns',
             style={'font-weight': 'bolder',
