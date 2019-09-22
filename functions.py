@@ -1978,7 +1978,7 @@ class Index_Maps():
                      "pmean": self.getMean,
                      "pmin": self.getMin,
                      "pmax": self.getMax,
-                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now
+                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now (skipped,  performed in app for now)
                      "ocorr": self.getMean,
                      "pcorr": self.getMean}
         function = functions[function]
@@ -2038,6 +2038,7 @@ class Location_Builder:
             y, x = np.where(county_array == trig_val)
             # crds = 
             location = ['county', str(list(y)), str(list(x)), county]
+            pointids = 'None'
 
         # 2: Selection is a single grid IDs
         elif 'clickData' in trig_id:
@@ -2051,6 +2052,7 @@ class Location_Builder:
             county = counties.unique()
             label = county[0] + ' (Grid ' + str(int(gridid)) + ')'
             location = ['grid', str(y), str(x), label]
+            pointids = 'None'
 
         # 3: Selection is a set of grid IDs
         elif 'selectedData' in trig_id:
@@ -2058,12 +2060,13 @@ class Location_Builder:
                 selections = trig_val['points']
                 lats = [d['lat'] for d in selections]
                 lons = [d['lon'] for d in selections]
+                pointids = [d['pointIndex'] for d in selections]
                 crds = [max(lats), min(lons), min(lats), max(lons)]
                 y = list([cd.latdict[d['lat']] for d in selections])
                 x = list([cd.londict[d['lon']] for d in selections])
                 try:
                     counties = np.array([d['text'][:d['text'].index(' (')] for
-                                     d in selections])
+                                        d in selections])
                 except:
                     counties = np.array([d['text'][:d['text'].index(':')] for
                                      d in selections])
@@ -2085,14 +2088,17 @@ class Location_Builder:
             # Selection is the default 'all'
             if type(trig_val) is str:
                 location = ['all',  'y', 'x', 'Contiguous United States']
+                pointids = 'None'
 
             # Empty list, default to CONUS
             elif len(trig_val) == 0:
                 location = ['all',  'y', 'x', 'Contiguous United States']
+                pointids = 'None'
 
             # A selection of 'all' within a list
             elif len(trig_val) == 1 and trig_val[0] == 'all':
                 location = ['all',  'y', 'x', 'Contiguous United States']
+                pointids = 'None'
 
             # Single or multiple, not 'all' or empty, state or list of states
             elif len(trig_val) >= 1:
@@ -2108,27 +2114,33 @@ class Location_Builder:
 
                 # And return the location information
                 location = ['state', str(list(y)), str(list(x)), states]
+                pointids = 'None'
+
 
         # 3: location is the basename of a shapefile saved as temp.shp
         elif 'shape' in trig_id:
             # We don't have the x,y values just yet
             try:
                 shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
-                shp[shp==-9999] = np.nan
-                y, x = np.where(~np.isnan(shp))
+#                shp[shp==-9999] = np.nan
+                y, x = np.where(shp>-9999)
                 # crds = 
                 location = ['shape', str(list(y)), str(list(x)), trig_val]
+
             except:
                 location = ['all', 'y', 'x', 'Contiguous United States']
+
+            # No highlights
+            pointids = 'None'
 
         # 4: A reset button was clicked
         elif 'reset_map' in trig_id:
             location = ['all', 'y', 'x', 'Contiguous United States']
-
+            pointids = 'None'
         # I am not done creating coord objects yet
         try:
             crds
         except:
             crds = "Coordinates not available yet"
 
-        return location, crds
+        return location, crds, pointids
