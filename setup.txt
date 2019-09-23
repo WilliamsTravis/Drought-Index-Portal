@@ -89,17 +89,21 @@ Installation Steps (Anaconda method)
 
 	    sudo nginx -t
 
- 6) If this works setup the automatic renewal process with crontab. Instructions coming.
+ 6) If this works setup the automatic data renewal process with crontab. Instructions coming.
  7) Now we need to either download and transform all of the data. There are many sources of data and, at the moment, each has
     its own script.
  7) Now, to run the actual application use a webserver gateway interface like green unicorn. The syntax
     is simple enough:
+
     gunicorn app:server
- 8) To use more of the computing power add workers and threads:
-        gunicorn -w 3 --threads 3 app:server
+
+ 8) To use more of the computing power with workers and threads:
+
+        gunicorn -w 3 --threads=3 app:server
 
  9) To run the application in the back ground so you can leave the computer use a daemon call:
-        gunicorn -w 3 --threads 3 --daemon app:server
+
+        gunicorn -w 3 --threads=3 --daemon app:server
 
  10) Cross fingers.
  11) Open suggested address in a browser, hopefully it worked!

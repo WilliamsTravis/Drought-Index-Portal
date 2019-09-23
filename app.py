@@ -45,8 +45,8 @@ Things to do:
                 with a GIS.
     5) Fully integrate DASK. It turns out that xarray already uses dask and
        was keeping much of the data on disk. This helps to avoid memory
-       errors, but does improve speed. With the area calculations it worsens
-       it significantly... Is this an inevitable tradeoff?
+       errors and improve speed. With the area calculations it worsens
+       it significantlym though... Is this an inevitable tradeoff?
     6) Describe new climate data sets:
         http://www.prism.oregonstate.edu/documents/PRISM_datasets_aug2013.pdf
     7) Consolidate all of the download scripts into one. Also, incorporate the
@@ -56,18 +56,17 @@ Things to do:
        does not allow us to access them.
     9) I would like to see the GRACE soil moisture models in here.
     10) There are no preset categories for severity in the climate variables.
-    11) An interesting new bug. I you select by state, then click on a point, 
-        it some times breaks and point selection won't return until you restart
-        the browser. Not easy to reproduce. Also, if you do select a point and
-        then change the settings it will reset the map. (the stored location
-        object changes).
+    11) There are a few sequences of button clicks that resets the map layout,
+        though it is rare to see so watch out for that and maybe we can figure
+        what does that.
+
 Created on April 15th 2019
 @author: Travis Williams - Earth Lab of the Universty of Colorado Boulder
          Travis.Williams@colorado.edu
 """
 
 # Functions and Libraries
-import netCDF4  # Leave this, without it there have been problems in Linux
+#import netCDF4  # For certain xarray issues, it helps to explicitly load this
 import base64
 import copy
 from collections import OrderedDict
@@ -88,24 +87,18 @@ import os
 from osgeo import gdal, osr
 import pandas as pd
 import psutil
-import sys
 import tempfile
 import urllib
 import warnings
 import xarray as xr
-
-# This could be a CLI argument
-data_path = ''
-
-# Import functions and classes
 from functions import Admin_Elements, Index_Maps, Location_Builder
 from functions import shapeReproject, unit_map
 
-# Check if we are working in Windows or Linux to find the data
-data_path = ''
-
 # What to do with the mean of empty slice warning?
 warnings.filterwarnings("ignore")
+
+# In case the data needs to be stored elsewhere
+data_path = ''
 
 # In[] Default Values
 # For testing
@@ -141,7 +134,7 @@ default_clicks = json.dumps(default_clicks)
 # For scaling
 ranges = pd.read_csv('data/tables/index_ranges.csv')
 
-############### The DASH application and server ###############################
+# In[] The DASH application and server
 app = dash.Dash(__name__)
 
 # Go to stylesheet, styled after a DASH example (how to serve locally?)  # <--- Check out criddyp's response about a third of the way down here <https://community.plot.ly/t/serve-locally-option-with-additional-scripts-and-style-sheets/6974/6>
@@ -284,7 +277,7 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'tmin': 'Average Daily Minimum Temperature (°C)',
               'tmax': 'Average Daily Maximum Temperature (°C)',
               'tmean': 'Mean Temperature (°C)',
-              'tdmean': 'Mean Dew Point Temperature (°C)', 
+              'tdmean': 'Mean Dew Point Temperature (°C)',
               'ppt': 'Average Precipitation (mm)',
               'vpdmax': 'Maximum Vapor Pressure Deficit (hPa)' ,
               'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)'}
@@ -311,19 +304,29 @@ function_names = {'pmean': 'Average Percentiles',
 
 # Acronym "options"
 ams = [{'label': 'PDSI: The Palmer Drought Severity Index (WWDT)', 'value': 0},
-       {'label': 'PDSI-Self Calibrated: The Self-Calibrating Palmer Drought Severity Index (WWDT)', 'value': 1},
+       {'label': 'PDSI-Self Calibrated: The Self-Calibrating Palmer Drought ' +
+                 'Severity Index (WWDT)', 'value': 1},
        {'label': 'Palmer Z Index: The Palmer Z Index (WWDT)', 'value': 2},
-       {'label': 'SPI: The Standardized Precipitation Index - 1 to 12 months (WWDT)', 'value': 3},
-       {'label': 'SPEI: The Standardized Precipitation-Evapotranspiration Index - 1 to 12 months (WWDT)', 'value': 4},
-       {'label': 'EDDI: The Evaporative Demand Drought Index - 1 to 12 months (PSD)', 'value': 5},
-       {'label': 'LERI: The Landscape Evaporative Response Index - 1 or 3 months (PSD)', 'value': 6},
-       {'label': 'TMIN: Average Daily Minimum Temperature (°C)(PRISM)', 'value': 7},
-       {'label': 'TMAX: Average Daily Maximum Temperature (°C)(PRISM)', 'value': 9},
+       {'label': 'SPI: The Standardized Precipitation Index - 1 to 12 ' +
+                 'months (WWDT)', 'value': 3},
+       {'label': 'SPEI: The Standardized Precipitation-Evapotranspiration ' +
+                 'Index - 1 to 12 months (WWDT)', 'value': 4},
+       {'label': 'EDDI: The Evaporative Demand Drought Index - 1 to 12 ' +
+                 'months (PSD)', 'value': 5},
+       {'label': 'LERI: The Landscape Evaporative Response Index - 1 or 3 ' +
+                 'months (PSD)', 'value': 6},
+       {'label': 'TMIN: Average Daily Minimum Temperature ' +
+                 '(°C)(PRISM)', 'value': 7},
+       {'label': 'TMAX: Average Daily Maximum Temperature ' +
+                 '(°C)(PRISM)', 'value': 9},
        {'label': 'TMEAN: Mean Temperature (°C)(PRISM)', 'value': 11},
-       {'label': 'TDMEAN: Mean Dew Point Temperature (°C)(PRISM)', 'value': 14},
+       {'label': 'TDMEAN: Mean Dew Point Temperature ' +
+                 '(°C)(PRISM)', 'value': 14},
        {'label': 'PPT: Average Precipitation (mm)(PRISM)', 'value': 15},
-       {'label': 'VPDMAX: Maximum Vapor Pressure Deficit (hPa)(PRISM)', 'value': 18},
-       {'label': 'VPDMIN: Minimum Vapor Pressure Deficit (hPa)(PRISM)', 'value': 20}]
+       {'label': 'VPDMAX: Maximum Vapor Pressure Deficit ' +
+                 '(hPa)(PRISM)', 'value': 18},
+       {'label': 'VPDMIN: Minimum Vapor Pressure Deficit ' +
+                 '(hPa)(PRISM)', 'value': 20}]
 
 acronym_text = ("""
 INDEX/INDICATOR ACRONYMS
@@ -339,7 +342,7 @@ SPI:             Standardized Precipitation Index
 
 SPEI:            Standardized Precip-ET Index
 
-EDDI:            Evaporative Demand Drought Index 
+EDDI:            Evaporative Demand Drought Index
 
 LERI:            Landscape Evaporation Response Index
 
@@ -369,7 +372,7 @@ label_pos = {county_options[i]['label']: i for i in range(len(county_options))}
 # State options
 states_df = pd.read_table('data/tables/state_fips.txt', sep='|')
 states_df = states_df.sort_values('STUSAB')
-nconus = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']  # <----------- I'm reading a book about how we ignore most of these D: ... In the future we'll have to include them.
+nconus = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']
 states_df = states_df[~states_df.STUSAB.isin(nconus)]
 rows = [r for idx, r in states_df.iterrows()]
 state_options = [{'label': r['STUSAB'], 'value': r['STATE']} for r in rows]
@@ -417,9 +420,9 @@ admin = Admin_Elements(resolution)
 # Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
 months = [int(m) for m in range(1, 13)]
-months2 = copy.copy(months)
+mnths2 = copy.copy(months)
 for m in months[:-1]:
-    months2.append(m + 12)
+    mnths2.append(m + 12)
 yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
              y in years}
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
@@ -432,8 +435,8 @@ monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',
                    10: 'October', 11: 'November', 12: 'December'}
 monthoptions = [{'label': monthmarks[i], 'value': i} for i in range(1, 13)]
 months_slanted = {i: {'label': monthmarks[i],
-                      'style': {"transform": "rotate(45deg)"}} for i in months2}
-                                    
+                      'style': {"transform": "rotate(45deg)"}} for i in mnths2}
+
 # Only display every 5 years for space
 for y in years:
     if y % 5 != 0:
@@ -458,8 +461,6 @@ layout = dict(
                    fontweight='bold'),
     margin=dict(l=55, r=35, b=65, t=90, pad=4),
     hovermode="closest",
-#    plot_bgcolor="#083C04",
-#    paper_bgcolor="#0D347C",
     plot_bgcolor="#083C04",
     paper_bgcolor="black",
     legend=dict(font=dict(size=10, fontweight='bold'), orientation='h'),
@@ -475,7 +476,7 @@ layout = dict(
 tab_height = '25px'
 tab_style = {'height': tab_height, 'padding': '0'}
 tablet_style = {'line-height': tab_height, 'padding': '0'}
-selected_style = {'color': 'black', 
+selected_style = {'color': 'black',
                   'box-shadow': '1px 1px 0px white',
                   'border-left': '1px solid lightgrey',
                   'border-right': '1px solid lightgrey',
@@ -649,10 +650,12 @@ def divMaker(id_num, index='noaa'):
 
     return div
 
-# Navigation bar?
+# Navigation bar
 navbar = html.Nav(
           className="top-bar fixed",
           children=[
+
+            # Sponser Logos
             html.Div([
               html.A(
                 html.Img(
@@ -716,10 +719,11 @@ navbar = html.Nav(
                      'border': '3px solid #cfb87c',
                      'border-radius': '5px'},
               className='row'),
+             # End Sponser Logos
 
         # Acronym Button
         html.Button(
-          children="ACRONYMS (HOVER)", 
+          children="ACRONYMS (HOVER)",
           type='button',
           title=acronym_text,
           style={'height': '45px',
@@ -731,6 +735,8 @@ navbar = html.Nav(
                  'margin-top': '-5px',
                  'float': 'left',
                  'margin-left': '-5px'}),
+          # End Acronym Button
+
 
           # Toggle Buttons
           html.Div([
@@ -758,13 +764,12 @@ navbar = html.Nav(
                         style={'display': 'none'})
                         ],
             style={'float': 'left',
-                   'margin-left': '15px'}),
-          ],
-
+                   'margin-left': '15px'})],
           style={'position': 'fixed','top': '0px', 'left': '0px',
                  'background-color': 'black', 'height': '50px',
                  'width': '100%', 'zIndex': '9999',
                  'border-bottom': '10px solid #cfb87c'})
+          # End Toggle Buttons
 
 # Static Elements
 body = html.Div([
@@ -779,7 +784,7 @@ body = html.Div([
                    'font-size': '50px',
                    'font-family': 'Times New Roman',
                    'margin-top': '100'}),
-      # End Title
+            # End Title
 
      # Description
      html.Div([
@@ -792,12 +797,12 @@ body = html.Div([
          style={'text-align':'center',
                 'margin': '0 auto',
                 'width': '100%'}),
-     # End Description
+         # End Description
 
      # Options
      html.Div(id='options',
               children=[
- 
+
                 # Year Slider
                 html.Div([
                   html.H3(id='date_range',
@@ -821,16 +826,17 @@ body = html.Div([
                                       marks=yearmarks)],
                     style={'display': 'none',
                            'margin-top': '0', 'margin-bottom': '80'})]),
-                # End Year Slider
+                    # End Year Slider
 
                 # Month Options
-                html.Div(children=[
-                           html.Div([
+                html.Div(
+                  children=[
+                          html.Div([
                              html.H5('Start and End Months'),
                              dcc.RangeSlider(id='month_slider',
                                              value=[1, 12],
                                              marks=months_slanted,
-                                             min=1, 
+                                             min=1,
                                              max=23,
                                              updatemode='drag')],
                              className='six columns',
@@ -858,7 +864,7 @@ body = html.Div([
                             title=('Choose which months of the year to ' +
                                    'be included.'))],
                         className='row'),
-                # End Month Options
+                        # End Month Options
 
                 # Rendering Options
                 html.Div(id='options_div',
@@ -871,7 +877,7 @@ body = html.Div([
                                           value=default_basemap,
                                           options=maptypes)],
                              className='two columns'),
-                            # End Maptype
+                             # End Maptype
 
                            # Functions
                            html.Div([
@@ -893,7 +899,7 @@ body = html.Div([
                                           options=function_options_perc,
                                           value=default_function)],
                              className='three columns'),
-                           # End Functions
+                             # End Functions
 
                            # Color Scales
                            html.Div([
@@ -916,16 +922,12 @@ body = html.Div([
                                           value='Default')],
                              className='three columns')],
                         # End Color Scales
+
                style={'margin-bottom': '50',
                       'margin-top': '50',
-                      'text-align': 'left'})], 
+                      'text-align': 'left'})],
                className='row'),
                # End Options
-
-       # Break
-#       html.Br(id='break_space',
-##               style={'line-height': '500%'}
-#               ),
 
        # Submission Button
        html.Div([
@@ -940,15 +942,15 @@ body = html.Div([
                             'margin-top': '100px',
                             'margin-bottom': '35px'})],
          style={'text-align': 'center'}),
-       # End Submission Button
+         # End Submission Button
 
        # Break line
        html.Hr(style={'margin-top': '1px'}),
 
-       # Two by two map layout
-       # Row 1
+       # The Map divs
        html.Div([divMaker(1, default_1), divMaker(2, default_2)],
                 className='row'),
+                # End Map Divs
 
        # Signals
        html.Div(id='signal', style={'display': 'none'}),
@@ -965,13 +967,15 @@ body = html.Div([
                 style={'display': 'none'}),
        html.Div(id='area_store_2', children='[0, 0]',
                 style={'display': 'none'})
-       ],
+                # End Signals
 
-    className='ten columns offset-by-one')  # The end!
+       ], className='ten columns offset-by-one')
+       # End Static Elements
 
 app.layout = html.Div([navbar, body])
 
 # In[]: App Callbacks
+# For singular elements
 @app.callback([Output('date_range', 'children'),
                Output('date_print', 'children'),
                Output('date_range2', 'children'),
@@ -993,7 +997,7 @@ def adjustDatePrint(year_range,year_range2, month_range, months, sync):
     else:
         number = " #1"
 
-    # Don't print months start and end if Jan through Dec
+    # Don't print start and end months if full year is chosen
     month_range = [int(month_range[0]), int(month_range[1])]
     month_range = [monthmarks[m] for m in month_range]
     if month_range[0] == 'Jan' and month_range[1] == 'Dec':
@@ -1003,7 +1007,7 @@ def adjustDatePrint(year_range,year_range2, month_range, months, sync):
         mrs = [month_range[0] + ' ', month_range[1] + ' ']
         mjoin = ' - '
 
-    # Don't print months included if all are
+    # Don't print months included if all are included
     if len(months) == 12:
         month_incl_print = ""
     else:
@@ -1042,99 +1046,21 @@ def adjustDatePrint(year_range,year_range2, month_range, months, sync):
     full = 'Date Range' + number + ':  ' + string
     full2 = 'Date Range #2:  ' + string2
 
-    return full, string, full2, string2  
+    return full, string, full2, string2
 
 
-@app.callback([Output('options', 'style'),
-               Output('toggle_options', 'style'),
-               Output('submit', 'style'),
-               Output('toggle_options', 'children')],
-              [Input('toggle_options', 'n_clicks')])
-def toggleOptions(click):
+@app.callback([Output('function_choice', 'options'),
+               Output('function_choice', 'value')],
+              [Input('function_type', 'value')])
+def optionsFunctions(function_type):
     '''
-    Toggle options on/off
+    Use the Percentile/Index tab to decide which functions options to
+    display.
     '''
-    if click % 2 == 0:
-        div_style = {}
-        button_style = on_button_style
-        submit_style = {'background-color': '#C7D4EA',
-                        'border-radius': '2px',
-                        'font-family': 'Times New Roman',
-                        'margin-top': '100px',
-                        'margin-bottom': '35px'}
-        children = "Display Options: On"
+    if function_type == 'perc':
+        return function_options_perc, 'pmean'
     else:
-        div_style = {'display': 'none'}
-        button_style = off_button_style
-        submit_style = {'display': 'none'}
-        children = "Display Options: Off"
-    return div_style, button_style, submit_style, children
-
-
-@app.callback(Output('year_div2', 'style'),
-              [Input('year_sync', 'n_clicks')])
-def toggleYearSlider(click):
-    if not click:
-        click = 0
-    if click % 2 == 0:
-        style = {'display': 'none', 'margin-top': '0', 'margin-bottom': '80'}
-    else:
-        style = {'margin-top': '0', 'margin-bottom': '80'}
-    return style
-
-
-@app.callback(Output('month', 'values'),
-              [Input('all_months', 'n_clicks'),
-               Input('no_months', 'n_clicks')])
-def toggleMonthFilter(all_months, no_months):
-    if not any([all_months, no_months]):
-        raise PreventUpdate
-
-    # Find which input triggered this callback
-    context = dash.callback_context
-    triggered_value = context.triggered[0]['value']
-    trigger = context.triggered[0]['prop_id']
-    if triggered_value:
-        if 'all' in trigger:
-            return list(range(1, 13))
-        else:
-            return [None]
-
-
-@app.callback([Output('click_sync', 'style'),
-               Output('click_sync', 'children')],
-              [Input('click_sync', 'n_clicks')])
-def toggleLocationSyncButton(click):
-    '''
-    Change the color of on/off location syncing button  - for css
-    '''
-    if not click:
-        click = 0
-    if click % 2 == 0:
-        children = "Location Syncing: On"
-        style = on_button_style
-    else:
-        children = "Location Syncing: Off"
-        style = off_button_style
-    return style, children
-
-
-@app.callback([Output('year_sync', 'style'),
-               Output('year_sync', 'children')],
-              [Input('year_sync', 'n_clicks')])
-def toggleYearSyncButton(click):
-    '''
-    Change the color of on/off year syncing button  - for css
-    '''
-    if not click:
-        click = 0
-    if click % 2 == 0:
-        children = "Year Syncing: On"
-        style = on_button_style
-    else:
-        children = "Year Syncing: Off"
-        style = off_button_style
-    return style, children
+        return function_options_orig, 'omean'
 
 
 @app.callback([Output('description', 'children'),
@@ -1158,20 +1084,6 @@ def toggleDescription(click):
         button_children = "Description: On"
 
     return desc_children, style, button_children
-
-
-@app.callback([Output('function_choice', 'options'),
-               Output('function_choice', 'value')],
-              [Input('function_type', 'value')])
-def functionOptions(function_type):
-    '''
-    Use the Percentile/Index tab to decide which functions options to
-    display.
-    '''
-    if function_type == 'perc':
-        return function_options_perc, 'pmean'
-    else:
-        return function_options_orig, 'omean'
 
 
 @cache.memoize()
@@ -1212,11 +1124,12 @@ def retrieveData(signal, function, choice, location):
 
     return data
 
+
 # Output list of all index choices for syncing
 @app.callback(Output('choice_store', 'children'),
               [Input('choice_1', 'value'),
                Input('choice_2', 'value')])
-def choiceStore(choice1, choice2):
+def storeIndexChoices(choice1, choice2):
     '''
     Collect and hide both data choices in the hidden 'choice_store' div
     '''
@@ -1236,8 +1149,7 @@ def submitSignal(click, colorscale, reverse, year_range, year_range2,
     '''
     Collect and hide the options signal in the hidden 'signal' div.
     '''
-    # This is necessary to translate the month range
-    
+    # This is to translate the inverse portion of the month range
     overflow = {13:11, 14:10, 15: 9, 16: 8, 17: 7, 18: 6, 19: 5, 20: 4, 21: 3,
                 22: 2, 23:1}
     for i in [0, 1]:
@@ -1248,7 +1160,106 @@ def submitSignal(click, colorscale, reverse, year_range, year_range2,
     return json.dumps(signal)
 
 
-# In[] Any callback with multiple instances goes here
+@app.callback([Output('options', 'style'),
+               Output('toggle_options', 'style'),
+               Output('submit', 'style'),
+               Output('toggle_options', 'children')],
+              [Input('toggle_options', 'n_clicks')])
+def toggleOptions(click):
+    '''
+    Toggle options on/off
+    '''
+    if click % 2 == 0:
+        div_style = {}
+        button_style = on_button_style
+        submit_style = {'background-color': '#C7D4EA',
+                        'border-radius': '2px',
+                        'font-family': 'Times New Roman',
+                        'margin-top': '100px',
+                        'margin-bottom': '35px'}
+        children = "Display Options: On"
+    else:
+        div_style = {'display': 'none'}
+        button_style = off_button_style
+        submit_style = {'display': 'none'}
+        children = "Display Options: Off"
+    return div_style, button_style, submit_style, children
+
+
+@app.callback([Output('click_sync', 'style'),
+               Output('click_sync', 'children')],
+              [Input('click_sync', 'n_clicks')])
+def toggleLocationSyncButton(click):
+    '''
+    Change the color of on/off location syncing button - for css
+    '''
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = "Location Syncing: On"
+        style = on_button_style
+    else:
+        children = "Location Syncing: Off"
+        style = off_button_style
+    return style, children
+
+
+@app.callback(Output('month', 'values'),
+              [Input('all_months', 'n_clicks'),
+               Input('no_months', 'n_clicks')])
+def toggleMonthFilter(all_months, no_months):
+    '''
+    This fills or empties the month filter boxes with/of checks
+    '''
+    # If no clicks yet, prevent update
+    if not any([all_months, no_months]):
+        raise PreventUpdate
+
+    # Find which input triggered this callback
+    context = dash.callback_context
+    triggered_value = context.triggered[0]['value']
+    trigger = context.triggered[0]['prop_id']
+    if triggered_value:
+        if 'all' in trigger:
+            return list(range(1, 13))
+        else:
+            return [None]
+
+
+@app.callback(Output('year_div2', 'style'),
+              [Input('year_sync', 'n_clicks')])
+def toggleYearSlider(click):
+    '''
+    When syncing years, there should only be one time slider
+    '''
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        style = {'display': 'none', 'margin-top': '0', 'margin-bottom': '80'}
+    else:
+        style = {'margin-top': '0', 'margin-bottom': '80'}
+    return style
+
+
+@app.callback([Output('year_sync', 'style'),
+               Output('year_sync', 'children')],
+              [Input('year_sync', 'n_clicks')])
+def toggleYearSyncButton(click):
+    '''
+    Change the color of on/off year syncing button - for css
+    '''
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = "Year Syncing: On"
+        style = on_button_style
+    else:
+        children = "Year Syncing: Off"
+        style = off_button_style
+    return style, children
+
+# In[] App callbacks
+# For multiple instances
 for i in range(1, 3):
     @app.callback(Output('location_store_{}'.format(i), 'children'),
                   [Input('map_1', 'clickData'),
@@ -1271,25 +1282,20 @@ for i in range(1, 3):
                        shape1, shape2, update1, update2, reset1, reset2,
                        state1, state2, sync, key):
             '''
+            This coordinates map selections between the two maps. I apologize
+            for this, it can be rather confusing.
+
             The new context method allows us to select which input was most
             recently changed. However, it is still necessary to have an
             independent callback that identifies the most recent selection.
             Because there are many types of buttons and clicks that could
             trigger a graph update we have to work through each input to check
-            if it is a   location. It's still much nicer than setting up a
-            dozen hidden divs, timing callbacks, and writing long lines of
-            logic to determine which was most recently updated.
-            
-            I need to incorporate the reset button here, it does not currently
-            persistent...     
+            if it is a location selector to begin with.
 
+            Sample Arguments:
 
             key = 1
-            
-            
             sync = "Location Syncing: On"
-            
-            
             locations = [{'points': [{'curveNumber': 0, 'pointNumber': 3485, 'pointIndex': 3485, 'lon': -116.5, 'lat': 43.5, 'text': 'Ada County, ID (grid: 28145)<br>     41.571', 'marker.color': 41.57119369506836}]}, None, None, None, 24098, 24098, None, None, None, None, None, None]
             updates = [None, None]
             triggered_value = {'points': [{'curveNumber': 0, 'pointNumber': 3485, 'pointIndex': 3485, 'lon': -116.5, 'lat': 43.5, 'text': 'Ada County, ID (grid: 28145)<br>     41.571', 'marker.color': 41.57119369506836}]}
@@ -1299,7 +1305,7 @@ for i in range(1, 3):
             locations = [{'points': [{'curveNumber': 0, 'pointNumber': 3485, 'pointIndex': 3485, 'lon': -116.5, 'lat': 43.5, 'text': 'Ada County, ID (grid: 28145)<br>     41.571', 'marker.color': 41.57119369506836}]}, None, None, None, 24098, 24098, None, None, None, None, None, None]
             updates = [None, None]
             triggered_value = {'points': [{'curveNumber': 0, 'pointNumber': 3485, 'pointIndex': 3485, 'lon': -116.5, 'lat': 43.5, 'text': 'Ada County, ID (grid: 28145)<br>     41.571', 'marker.color': 41.57119369506836}]}
-            trigger = "map_1.clickData" 
+            trigger = "map_1.clickData"
            '''
             # Figure out which element we are working with
             key = int(key) - 1
@@ -1331,9 +1337,9 @@ for i in range(1, 3):
 #            print("trigger = " + json.dumps(trigger))
 #            print('\n')
 
-            # Two cases, if syncing return a copy, if not split
+            # Two cases: 1) if syncing return a copy, 2) if not split
             if 'On' in sync:
-                # The update graph button activates US state selections
+                # If the update graph button activates US state selections
                 if 'update_graph' in trigger:
                     if triggered_value is None:
                         triggered_value = 'all'
@@ -1355,7 +1361,7 @@ for i in range(1, 3):
                 selector = Location_Builder(trigger, triggered_value, crdict,
                                             admin_df, state_array,
                                             county_array)
-        
+
                 # Now retrieve information for the most recently updated element
                 location, crds, pointids = selector.chooseRecent()
 
@@ -1393,22 +1399,22 @@ for i in range(1, 3):
                 selector = Location_Builder(trigger, triggered_value,
                                             crdict, admin_df, state_array,
                                             county_array)
-        
+
                 # Retrieve information for the most recently updated element
                 location, crds, pointids = selector.chooseRecent()
-        
+
                 # What is this about?
                 if 'shape' in location[0] and location[3] is None:
                     location =  ['all', 'y', 'x', 'Contiguous United States']
-   
+
                 # Add the triggering element key to prevent updates later
                 try:
                     location.append(triggering_element)
                 except:
-                    raise PreventUpdate    
-    
+                    raise PreventUpdate
+
             return json.dumps([location, crds, pointids])
-    
+
     @app.callback([Output('county_div_{}'.format(i), 'style'),
                    Output('state_div_{}'.format(i), 'style'),
                    Output('shape_div_{}'.format(i), 'style')],
@@ -1440,7 +1446,7 @@ for i in range(1, 3):
 
 
     @app.callback(Output('shape_store_{}'.format(i), 'children'),
-                  [Input('shape_{}'.format(i), 'contents')],  # <-------------- Somehow this is being triggered and causing problems unless there is an existing temporary file
+                  [Input('shape_{}'.format(i), 'contents')],
                   [State('shape_{}'.format(i), 'filename'),
                    State('shape_{}'.format(i), 'last_modified')])
     def parseShape(contents, filenames, last_modified):
@@ -1616,6 +1622,7 @@ for i in range(1, 3):
 
         return children
 
+
     @app.callback([Output('dsci_button_{}'.format(i), 'style'),
                    Output('dsci_button_{}'.format(i), 'children')],
                   [Input('submit', 'n_clicks'),
@@ -1750,16 +1757,14 @@ for i in range(1, 3):
                    State('date_print', 'children'),
                    State('date_print2', 'children'),
                    State('map_{}'.format(i), 'relayoutData')])
-    def makeMap(choice1, choice2, map_type, signal, 
-                l1, l2, 
-                function, key, sync, year_sync, date_print, date_print2,
-                map_extent):
+    def makeMap(choice1, choice2, map_type, signal,
+                l1, l2, function, key, sync, year_sync, date_print,
+                date_print2, map_extent):
         '''
-        This actually renders the map. I want to modularize, but am struggling
-        on this.
+        This renders the map.
 
         Sample arguments:
-    
+
         map_type = 'dark'
         key = '2'
         signal = '[[[2000, 2019], [2000, 2019], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], "Default", "no"]'
@@ -1881,6 +1886,8 @@ for i in range(1, 3):
         # Get highlight locs
         # Create the scattermapbox object
         flag, y, x, label, idx = location
+
+        # We have a new problem, the index values aren't being masked properly. Maybe this old bit could help
 #        if flag == 'state' or flag == 'county':
 #            array = array * data.mask
 #        elif flag == 'shape':
@@ -1943,14 +1950,11 @@ for i in range(1, 3):
         df = df_flat[np.isfinite(df_flat['data'])]
         df['xy'] = df['gridx'].astype(str) + df['gridy'].astype(str)
 
-
-
-
         # Get Highlighted points
         print("location = " + str(location))
         print("pointids = " + str(pointids))
         if flag == 'all':
-            pointids = df.index.to_numpy()  # <-------------------------------- This is inconsistent with threads? 
+            pointids = df.index.to_numpy()
         elif pointids == 'None':
             y, x = np.where(~np.isnan(data.mask.data))
 #            y, x = json.loads(location[1]), json.loads(location[2])
@@ -1959,7 +1963,7 @@ for i in range(1, 3):
             xy = [str(x[i]) + str(y[i]) for i in range(len(x))]
             pointids = df.index[df['xy'].isin(xy)].to_numpy()
 
-
+        # Build the list of plotly data dictionaries
         data = [dict(type='scattermapbox',
                      lon=df['lonbin'],
                      lat=df['latbin'],

@@ -150,7 +150,7 @@ unit_map = {'noaa': '%',
             'tmin': '°C',
             'tmax': '°C',
             'tmean': '°C',
-            'tdmean': '°C', 
+            'tdmean': '°C',
             'ppt': 'mm',
             'vpdmax': 'hPa' ,
             'vpdmin': 'hPa'}
@@ -328,16 +328,15 @@ def readRasters(files, navalue=-9999):
     files = list of files to read in
     navalue = a number (float) for nan values if we forgot 
                 to translate the file with one originally
-    
+
     This converts monthly rasters into numpy arrays and them as a list in another
             list. The other parts are the spatial features needed to write
             any results to a raster file. The list order is:
-                
+
       [[name_date (string),arraylist (numpy)], spatial geometry (gdal object),
        coordinate reference system (gdal object)]
-    
-    The file naming convention required is: "INDEXNAME_YYYYMM.tif"
 
+    The file naming convention required is: "INDEXNAME_YYYYMM.tif"
     """
     print("Converting raster to numpy array...")
     files = [f for f in files if os.path.isfile(f)]
@@ -1949,7 +1948,7 @@ class Index_Maps():
             pcts = ratios.compute().data * 100
             return pcts
 
-        # Calculate non-inclusive percentages # <------------------------------ parallelizing with delayed speeds it up but takes more memory
+        # Calculate non-inclusive percentages # <------------------------------ parallelizing with delayed speeds it up but takes just a bit too much memory for the virtual machine to handle the full time series
         pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
         pnincs = np.array(dask.compute(*pnincs))
 #        pnincs =  np.array([catFilter(arrays, cats[i]) for i in range(5)])
@@ -2036,7 +2035,6 @@ class Location_Builder:
         if 'county' in trig_id:
             county = admin_df['place'][admin_df.fips == trig_val].unique()[0]
             y, x = np.where(county_array == trig_val)
-            # crds = 
             location = ['county', str(list(y)), str(list(x)), county]
             pointids = 'None'
 
@@ -2122,9 +2120,7 @@ class Location_Builder:
             # We don't have the x,y values just yet
             try:
                 shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
-#                shp[shp==-9999] = np.nan
                 y, x = np.where(shp>-9999)
-                # crds = 
                 location = ['shape', str(list(y)), str(list(x)), trig_val]
 
             except:
