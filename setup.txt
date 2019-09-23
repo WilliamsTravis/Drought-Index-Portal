@@ -2,9 +2,10 @@ Installation Steps (Anaconda method)
 
 1) Clone repository
 2) Get Anaconda
-3) Create virtual conda environment from the yaml file
+3) Create and activate virtual conda environment from the yaml file
 
    conda env create -f requirements.yaml
+   conda activate dict
 
 4) Install nginx (Should probably just add this to the requirements file)
 
@@ -13,11 +14,13 @@ Installation Steps (Anaconda method)
 5) Get SSL certificates and configure the webserver
 
    a) First, go get a domain name and associate it with the public ip address.
-      I've been using godaddy.com, but anywill do. You first purchase a domain
+      I've been using godaddy.com, but any will do. You first purchase a domain
       name (www.something.com), then go the DNS management section. Here you'll
       want to associate the domain with the ip address of whichever connection
-      you're going to serve the application from. Here's an example DNS setup
-      using mostly defaults with the critical part being the first one:
+      you're going to serve the application from. Also, TTL means "Time To Live",
+      which is "live" as in "alive", and indicates how long you need to wait
+      before changes take hold. Here's an example DNS setup using mostly defaults
+      with the critical part being the first one:
 
     #> Type 	Name 	         Value                                         TTL 
     #>	a 	@ 	         157.245.191.181                               600 seconds 
@@ -106,4 +109,4 @@ Installation Steps (Anaconda method)
         gunicorn -w 3 --threads=3 --daemon app:server
 
  10) Cross fingers.
- 11) Open suggested address in a browser, hopefully it worked!
+ 11) Open suggested address in a browser or use the domain name, hopefully it worked!
