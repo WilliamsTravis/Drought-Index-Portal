@@ -1799,7 +1799,6 @@ for i in range(1, 3):
         location = locations[key-1]
         location = json.loads(location)
         location, crds, pointids = location
-        print(str(location))
 
         # To save zoom levels and extent between map options (funny how this works)
         if not map_extent:
@@ -1809,7 +1808,6 @@ for i in range(1, 3):
 
         # Prevent update if not syncing and not triggered
         trig = dash.callback_context.triggered[0]['prop_id']
-        print("trig = " + str(trig))
         if trig == 'location_store_{}.children'.format(key):
             triggered_element = location[-1]
             if 'On' not in sync:
@@ -1948,13 +1946,10 @@ for i in range(1, 3):
         df['xy'] = df['gridx'].astype(str) + df['gridy'].astype(str)
 
         # Get Highlighted points
-        print("location = " + str(location))
-        print("pointids = " + str(pointids))
         if flag == 'all':
             pointids = df.index.to_numpy()
         elif pointids == 'None':
             y, x = np.where(~np.isnan(data.mask.data))
-#            y, x = json.loads(location[1]), json.loads(location[2])
             xy = [str(x[i]) + str(y[i]) for i in range(len(x))]
             pointids = df.index[df['xy'].isin(xy)].to_numpy()
 
