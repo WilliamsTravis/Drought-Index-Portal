@@ -18,7 +18,6 @@ import dask.array as da
 from dateutil.relativedelta import relativedelta
 import gc
 from glob import glob
-from inspect import currentframe, getframeinfo
 import json
 from collections import OrderedDict
 import os
@@ -2114,7 +2113,6 @@ class Location_Builder:
                 location = ['state', str(list(y)), str(list(x)), states]
                 pointids = 'None'
 
-
         # 3: location is the basename of a shapefile saved as temp.shp
         elif 'shape' in trig_id:
             # We don't have the x,y values just yet
@@ -2133,6 +2131,7 @@ class Location_Builder:
         elif 'reset_map' in trig_id:
             location = ['all', 'y', 'x', 'Contiguous United States']
             pointids = 'None'
+
         # I am not done creating coord objects yet
         try:
             crds

@@ -1944,8 +1944,7 @@ for i in range(1, 3):
         pdf['printdata'] = (pdf['place'] + " (grid: " +
                             pdf['grid'].apply(int).apply(str) + ")<br>     " +
                             pdf['data'].round(3).apply(str))
-        df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
-        df = df_flat[np.isfinite(df_flat['data'])]
+        df = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df['xy'] = df['gridx'].astype(str) + df['gridy'].astype(str)
 
         # Get Highlighted points
@@ -1956,8 +1955,6 @@ for i in range(1, 3):
         elif pointids == 'None':
             y, x = np.where(~np.isnan(data.mask.data))
 #            y, x = json.loads(location[1]), json.loads(location[2])
-            if 'p' not in function:
-                x = np.array(x) - 6
             xy = [str(x[i]) + str(y[i]) for i in range(len(x))]
             pointids = df.index[df['xy'].isin(xy)].to_numpy()
 
