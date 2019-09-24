@@ -35,6 +35,7 @@ from tqdm import tqdm
 import sys
 import warnings
 import xarray as xr
+warnings.filterwarnings("ignore")
 
 # This could be a CLI argument
 data_path = ''

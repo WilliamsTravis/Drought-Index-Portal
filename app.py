@@ -1310,7 +1310,7 @@ for i in range(1, 3):
 
             # package all the selections for indexing
             if click1 is not None:
-                print("CLICK1: " + str(click1))
+                print("\nCLICK1: " + str(click1) + "\n")
             locations = [click1, click2, select1, select2, county1, county2,
                          shape1, shape2, reset1, reset2, state1, state2]
             updates = [update1, update2]

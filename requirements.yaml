@@ -4,7 +4,7 @@ channels:
 dependencies:
   - beautifulsoup4==4.7.1
   - dash==0.39.0
-  - dask==1.1.3
+  - dask==2.4.0
   - descartes==1.1.0
   - fiona==1.8.6
   - flask-caching==1.4.0
