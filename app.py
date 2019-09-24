@@ -64,7 +64,6 @@ Created on April 15th 2019
 @author: Travis Williams - Earth Lab of the Universty of Colorado Boulder
          Travis.Williams@colorado.edu
 """
-
 # Functions and Libraries
 #import netCDF4  # For certain xarray issues, it helps to explicitly load this
 import base64
@@ -360,7 +359,6 @@ VPDMAX:          Max Vapor Pressure Deficit (hPa)
 
 VPDMIN:          Min Vapor Pressure Deficit (hPa)
 """)
-
 
 # County data frame and options
 counties_df = pd.read_csv('data/tables/unique_counties.csv')
