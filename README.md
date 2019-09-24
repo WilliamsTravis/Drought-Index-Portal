@@ -1,2 +1,3 @@
-# Ubuntu-Practice-Machine
-I am using this specifically to learn PostgreSQL from a tutorial, but also to practice Linux command prompts and to store random visualization apps. 
+# Drought-Index-Portal
+
+A web portal that displays a collection of different drought indices and indicators for quick comparison and exploration.
