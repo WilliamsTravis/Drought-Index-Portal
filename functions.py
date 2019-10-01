@@ -102,7 +102,8 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'tdmean': 'Mean Dew Point Temperature (PRISM)', 
              'ppt': 'Total Precipitation (PRISM)',
              'vpdmax': 'Maximum Vapor Pressure Deficit (PRISM)' ,
-             'vpdmin': 'Minimum Vapor Pressure Deficit (PRISM)'}
+             'vpdmin': 'Minimum Vapor Pressure Deficit (PRISM)',
+             'vpdmean': 'Mean Vapor Pressure Deficit (PRISM)'}
 
 unit_map = {'noaa': '%',
             'mdn1': '°C',
@@ -153,7 +154,8 @@ unit_map = {'noaa': '%',
             'tdmean': '°C',
             'ppt': 'mm',
             'vpdmax': 'hPa' ,
-            'vpdmin': 'hPa'}
+            'vpdmin': 'hPa',
+            'vpdmean': 'hPa'}
 
 
 # In[]: Functions
@@ -1650,7 +1652,7 @@ class Index_Maps():
 
             # For index values we want them to be centered on zero
             nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
-                          'vpdmin']
+                          'vpdmin', 'vpdmean']
             if self.choice not in nonindices:
                 limits = [abs(minimum), abs(maximum)]
                 self.data_max = max(limits)
@@ -1800,7 +1802,7 @@ class Index_Maps():
         '''
         choice = self.choice
         reversals = ['eddi', 'tmin', 'tmax', 'tmean', 'tdmean', 'vpdmax',
-                     'vpdmin']
+                     'vpdmin', 'vpdmean']
         if any(r in choice for r in reversals):
             self.reverse = True
         else:

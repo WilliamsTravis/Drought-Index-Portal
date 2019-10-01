@@ -215,7 +215,8 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'TDMEAN', 'value': 'tdmean'},
            {'label': 'PPT', 'value': 'ppt'},
            {'label': 'VPDMAX', 'value': 'vpdmax'},
-           {'label': 'VPDMIN', 'value': 'vpdmin'}]
+           {'label': 'VPDMIN', 'value': 'vpdmin'},
+           {'label': 'VPDMEAN', 'value': 'vpdmean'}]
 
 # Index dropdown labels
 indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
@@ -279,7 +280,8 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'tdmean': 'Mean Dew Point Temperature (°C)',
               'ppt': 'Average Precipitation (mm)',
               'vpdmax': 'Maximum Vapor Pressure Deficit (hPa)' ,
-              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)'}
+              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)',
+              'vpdmean': 'Mean Vapor Pressure Deficit (hPa)'}
 
 # Function options
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
@@ -1768,8 +1770,8 @@ for i in range(1, 3):
         signal = '[[[2000, 2019], [2000, 2019], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], "Default", "no"]'
         l1 = '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
         l2 = '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
-        choice1 = 'pdsi'
-        choice2 = 'spei1'
+        choice1 = 'vpdmean'
+        choice2 = 'vpdmean'
         function = 'pmean'
         date_print = '2000 - 2019'
         date_print2 = '2000 - 2019'
@@ -1858,7 +1860,9 @@ for i in range(1, 3):
 
         # Now, we want to use the same value range for colors for both maps
         nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
-                      'vpdmin']
+                      'vpdmin', 'vpdmean']
+        print(choice in nonindices)
+        print(amin)
         if function == 'pmean':
             # Get the data for the other panel for its value range
             data2 = retrieveData(signal, function, choice2, location)
@@ -2082,7 +2086,7 @@ for i in range(1, 3):
         # If the function is oarea, we plot five overlapping timeseries
         label = location[3]
         nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
-                      'vpdmin']
+                      'vpdmin', 'vpdmean']
         if function != 'oarea' or choice in nonindices:
             # Get the time series from the data object
             timeseries = data.getSeries(location, crdict)
