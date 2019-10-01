@@ -34,7 +34,8 @@ else:
     os.chdir('/root/Sync/Ubuntu-Practice-Machine')
     data_path = '/root/Sync'
 
-from functions import isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
+from functions import isInt, meanNC, toNetCDF, toNetCDFAlbers
+from functions import toNetCDFPercentile
 
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
@@ -217,15 +218,25 @@ for variable in variables:
         # Original
         toNetCDF(tfiles=tfiles, ncfiles=None, savepath=original_path,
                  index=variable, proj=4326, year1=1895, month1=1,
-                 year2=todays_date.year - 2,  month2=12, wmode='w',
+                 year2=todays_date.year,  month2=12, wmode='w',
                  percentiles=False)
         toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None,
                        savepath=albers_path, index=variable, proj=proj,
-                       year1=1895, month1=1, year2=todays_date.year - 2,
-                       month2=12, wmode='w', percentiles=False)           # I subtracted 2 to go back and check the update mode
+                       year1=1895, month1=1, year2=todays_date.year,
+                       month2=12, wmode='w', percentiles=False)
         toNetCDFPercentile(original_path, percentile_path)
 
         # Empty tif folder
         for t in glob(os.path.join(tif_folder, '*')):
             os.remove(t)
-                
+
+# One last thing, we only have min and max vapor pressure deficit
+meanNC(minsrc='data/droughtindices/netcdfs/albers/vpdmin.nc',
+       maxsrc='data/droughtindices/netcdfs/albers/vpdmax.nc',
+       dst='data/droughtindices/netcdfs/albers/vpdmean.nc')
+meanNC(minsrc='data/droughtindices/netcdfs/percentiles/vpdmin.nc',
+       maxsrc='data/droughtindices/netcdfs/percentiles/vpdmax.nc',
+       dst='data/droughtindices/netcdfs/percentiles/vpdmean.nc')
+meanNC(minsrc='data/droughtindices/netcdfs/vpdmin.nc',
+       maxsrc='data/droughtindices/netcdfs/vpdmax.nc',
+       dst='data/droughtindices/netcdfs/vpdmean.nc')

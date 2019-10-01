@@ -7,38 +7,6 @@ Click [here](https://github.com/WilliamsTravis/Ubuntu-Practice-Machine/raw/maste
 
 &nbsp;
 
-**Index Acronymns**
-
-**PDSI**: &emsp;  The Palmer Drought Severity Index (WWDT)
-
-**PDSI-Self Calibrated**: &emsp;  The Self-Calibrating Palmer Drought Severity Index (WWDT)
-
-**Palmer Z Index**: &emsp; The Palmer Z Index (WWDT)
-
-**SPI**: &emsp; The Standardized Precipitation Index - 1 to 12 months (WWDT)
-
-**SPEI**: &emsp; The Standardized Precipitation-Evapotranspiration Index - 1 to 12 months (WWDT)
-
-**EDDI**: &emsp; The Evaporative Demand Drought Index - 1 to 12 months (PSD)
-
-**LERI**: &emsp; The Landscape Evaporative Response Index - 1 or 3 months (PSD)
-
-**TMIN**: &emsp; Average Daily Minimum Temperature (&deg;C) (PRISM)
-
-**TMAX**: &emsp; Average Daily Maximum Temperature (&deg;C) (PRISM)
-
-**TMEAN**: &emsp; Mean Temperature (&deg;C) (PRISM)
-
-**TDMEAN**: &emsp; Mean Dew Point Temperature (&deg;C) (PRISM)
-
-**PPT**: &emsp; Average Precipitation (mm) (PRISM)
-
-**VPDMAX**: &emsp; Maximum Vapor Pressure Deficit (hPa) (PRISM)
-
-**VPDMIN**: &emsp; Minimum Vapor Pressure Deficit (hPa) (PRISM)
-
-&nbsp;
-
 **Author**: Travis Williams
 
 **Email**: Travis.Williams@colorado.edu

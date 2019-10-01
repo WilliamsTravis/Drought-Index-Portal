@@ -153,7 +153,8 @@ unit_map = {'noaa': '%',
             'tdmean': '°C', 
             'ppt': 'mm',
             'vpdmax': 'hPa' ,
-            'vpdmin': 'hPa'}
+            'vpdmin': 'hPa',
+            'vpdmean': 'hPa'}
 
 
 # In[]: Functions
@@ -271,6 +272,16 @@ def movie(array, titles=None, axis=0, na=-9999):
     anim = FuncAnimation(fig, animate, init_func=init, blit=False, repeat=True)
 
     return anim
+
+
+def meanNC(minsrc='data/droughtindices/netcdfs/vpdmin.nc',
+           maxsrc='data/droughtindices/netcdfs/vpdmax.nc',
+           dst='data/droughtindices/netcdfs/vpdmean.nc'):
+    ncmax = xr.open_dataset(maxsrc)
+    ncmin = xr.open_dataset(minsrc)
+    ncmean = ncmin.copy()
+    ncmean['value'] = (ncmax.value + ncmin.value) / 2
+    ncmean.to_netcdf(dst)
 
 
 # For making outlines...move to css, maybe
@@ -1651,7 +1662,7 @@ class Index_Maps():
 
             # For index values we want them to be centered on zero
             nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
-                          'vpdmin']
+                          'vpdmin', 'vpdmean']
             if self.choice not in nonindices:
                 limits = [abs(minimum), abs(maximum)]
                 self.data_max = max(limits)
@@ -1801,7 +1812,7 @@ class Index_Maps():
         '''
         choice = self.choice
         reversals = ['eddi', 'tmin', 'tmax', 'tmean', 'tdmean', 'vpdmax',
-                     'vpdmin']
+                     'vpdmin', 'vpdmean']
         if any(r in choice for r in reversals):
             self.reverse = True
         else:

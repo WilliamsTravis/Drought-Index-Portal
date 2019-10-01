@@ -88,7 +88,6 @@ import os
 from osgeo import gdal, osr
 import pandas as pd
 import psutil
-import sys
 import urllib
 import warnings
 import xarray as xr
@@ -217,7 +216,8 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'TDMEAN', 'value': 'tdmean'},
            {'label': 'PPT', 'value': 'ppt'},
            {'label': 'VPDMAX', 'value': 'vpdmax'},
-           {'label': 'VPDMIN', 'value': 'vpdmin'}]
+           {'label': 'VPDMIN', 'value': 'vpdmin'},
+           {'label': 'VPDMEAN', 'value': 'vpdmean'}]
 
 # Index dropdown labels
 indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
@@ -281,7 +281,8 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'tdmean': 'Mean Dew Point Temperature (°C)', 
               'ppt': 'Average Precipitation (mm)',
               'vpdmax': 'Maximum Vapor Pressure Deficit (hPa)' ,
-              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)'}
+              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)',
+              'vpdmean': 'Mean Vapor Pressure Deficit (hPa)'}
 
 # Function options
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
@@ -1715,7 +1716,7 @@ for i in range(1, 3):
 
         # Now, we want to use the same value range for colors for both maps
         nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
-                      'vpdmin']
+                      'vpdmin', 'vpdmean']
         if function == 'pmean':
             # Get the data for the other panel for its value range
             data2 = retrieveData(signal, function, choice2, location)
