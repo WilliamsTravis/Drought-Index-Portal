@@ -6,9 +6,10 @@ Generate the Forest Drought Severity Index.
 For now this will return the average vapor pressure deficit from the min and
 max so we can use an NCL script, but eventually:
     
-FDSI = 0.44[zscore(ln(PPT_cold_season))] * 0.56[zscore(Tmax_warm_season)]
+FDSI = 0.44[zscore(ln(PPT_cold_season))] * 0.56[zscore((VPD_warm_season1 + VPD_warm_season2)/2)]
 cold-season: November – March
-warm-season: May – July & previous August – October  
+warm-season1: May – July
+warm-season2: previous August – October  
 
 
 Created on Tue Oct  1 10:18:07 2019
