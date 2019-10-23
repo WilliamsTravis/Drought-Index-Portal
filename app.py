@@ -115,7 +115,7 @@ default_1 = 'pdsi'
 default_2 = 'spi1'
 default_date = '2000 - 2019'
 default_basemap = 'dark'
-default_location = ('[["all", "y", "x", "Contiguous United States", 0], 9,' +
+default_location = ('[["all", "y", "x", "Contiguous United States", 0], ' +
                     '"None"]')
 default_years = [2000, 2019]
 default_extent = {'mapbox.center': {'lon': -92, 'lat': 40},
@@ -1281,33 +1281,29 @@ for i in range(1, 3):
                        shape1, shape2, update1, update2, reset1, reset2,
                        state1, state2, sync, key):
             '''
-            This coordinates map selections between the two maps. I apologize
-            for this, it can be rather confusing.
-
             The new context method allows us to select which input was most
             recently changed. However, it is still necessary to have an
             independent callback that identifies the most recent selection.
             Because there are many types of buttons and clicks that could
             trigger a graph update we have to work through each input to check
-            if it is a location selector to begin with.
-
-            Sample Arguments:
-
-            key = 1
-            sync = "Location Syncing: On"
-            locations = [{'points': [{'curveNumber': 0, 'pointNumber': 3485, 'pointIndex': 3485, 'lon': -116.5, 'lat': 43.5, 'text': 'Ada County, ID (grid: 28145)<br>     41.571', 'marker.color': 41.57119369506836}]}, None, None, None, 24098, 24098, None, None, None, None, None, None]
-            updates = [None, None]
-            triggered_value = {'points': [{'curveNumber': 0, 'pointNumber': 3485, 'pointIndex': 3485, 'lon': -116.5, 'lat': 43.5, 'text': 'Ada County, ID (grid: 28145)<br>     41.571', 'marker.color': 41.57119369506836}]}
-            trigger = "map_1.clickData"
-            key = 0
-            sync = "Location Syncing: On"
-            locations = [{'points': [{'curveNumber': 0, 'pointNumber': 3485, 'pointIndex': 3485, 'lon': -116.5, 'lat': 43.5, 'text': 'Ada County, ID (grid: 28145)<br>     41.571', 'marker.color': 41.57119369506836}]}, None, None, None, 24098, 24098, None, None, None, None, None, None]
-            updates = [None, None]
-            triggered_value = {'points': [{'curveNumber': 0, 'pointNumber': 3485, 'pointIndex': 3485, 'lon': -116.5, 'lat': 43.5, 'text': 'Ada County, ID (grid: 28145)<br>     41.571', 'marker.color': 41.57119369506836}]}
-            trigger = "map_1.clickData"
-           '''
+            if it is a   location. It's still much nicer than setting up a
+            dozen hidden divs, timing callbacks, and writing long lines of
+            logic to determine which was most recently updated.
+            
+            I need to incorporate the reset button here, it does not currently
+            persistent...       
+            
+            '''
             # Figure out which element we are working with
             key = int(key) - 1
+
+            # With the outline we have twice the points, half of which are real
+            if select1:
+                plen = len(select1['points'])
+                select1['points'] = select1['points'][int(plen/2):]
+            if select2:
+                plen = len(select2['points'])
+                select2['points'] = select2['points'][int(plen/2):]
 
             # package all the selections for indexing
             locations = [click1, click2, select1, select2, county1, county2,
@@ -1319,24 +1315,23 @@ for i in range(1, 3):
             triggered_value = context.triggered[0]['value']
             trigger = context.triggered[0]['prop_id']
 
-            # print out variables for developing
-#            print('\n')
-#            print("key = " + json.dumps(key))
-#            print('\n')
-#            print("sync = " + json.dumps(sync))
-#            print('\n')
-#            print("locations = " + str(locations))
-#            print('\n')
-#            print("updates = " + str(updates))
-#            print('\n')
-#            print("triggered_value = " + str(triggered_value))
-#            print('\n')
-#            print("trigger = " + json.dumps(trigger))
-#            print('\n')
+            # The outline points will also be in selected trigger values
+            if 'selectedData' in trigger:
+                plen = len(triggered_value['points'])
+                tv = triggered_value['points'][int(plen/2):]
+                triggered_value['points']  = tv
 
-            # Two cases: 1) if syncing return a copy, 2) if not split
+            # print out variables for developing
+#            print("key = " + json.dumps(key))
+#            print("sync = " + json.dumps(sync))
+#            print("locations = " + str(locations))
+#            print("updates = " + str(updates))
+#            print("triggered_value = " + str(triggered_value))
+#            print("trigger = " + json.dumps(trigger))
+
+            # Two cases, if syncing return a copy, if not split
             if 'On' in sync:
-                # If the update graph button activates US state selections
+                # The update graph button activates US state selections
                 if 'update_graph' in trigger:
                     if triggered_value is None:
                         triggered_value = 'all'
@@ -1358,10 +1353,10 @@ for i in range(1, 3):
                 selector = Location_Builder(trigger, triggered_value, crdict,
                                             admin_df, state_array,
                                             county_array)
-
+        
                 # Now retrieve information for the most recently updated element
-                location, crds, pointids = selector.chooseRecent()
-
+                location, crds = selector.chooseRecent()
+        
                 # What is this about?
                 if 'shape' in location[0] and location[3] is None:
                     location =  ['all', 'y', 'x', 'Contiguous United States']
@@ -1394,24 +1389,23 @@ for i in range(1, 3):
 
                 # Use the triggered_value to create the selector object
                 selector = Location_Builder(trigger, triggered_value,
-                                            crdict, admin_df, state_array,
-                                            county_array)
-
+                                                  crdict, admin_df, state_array,
+                                                  county_array)
+        
                 # Retrieve information for the most recently updated element
-                location, crds, pointids = selector.chooseRecent()
-
+                location, crds = selector.chooseRecent()
+        
                 # What is this about?
                 if 'shape' in location[0] and location[3] is None:
                     location =  ['all', 'y', 'x', 'Contiguous United States']
-
+   
                 # Add the triggering element key to prevent updates later
                 try:
                     location.append(triggering_element)
                 except:
-                    raise PreventUpdate
-
-            return json.dumps([location, crds, pointids])
-
+                    raise PreventUpdate    
+    
+            return json.dumps([location, crds])
 
     @app.callback([Output('county_div_{}'.format(i), 'style'),
                    Output('state_div_{}'.format(i), 'style'),
@@ -1741,7 +1735,7 @@ for i in range(1, 3):
     #         raise PreventUpdate
 
 
-    @app.callback(Output('map_{}'.format(i), 'figure'),
+    @app.callback(Output("map_{}".format(i), 'figure'),
                   [Input('choice_1', 'value'),
                    Input('choice_2', 'value'),
                    Input('map_type', 'value'),
@@ -1753,65 +1747,52 @@ for i in range(1, 3):
                    State('year_sync', 'children'),
                    State('date_print', 'children'),
                    State('date_print2', 'children'),
-                   State('map_{}'.format(i), 'relayoutData')])
+                   State('map_{}'.format(i), 'relayoutData'),])
     def makeMap(choice1, choice2, map_type, signal, location, function, key,
                 sync, year_sync, date_print, date_print2, map_extent):
         '''
-        This renders the map.
-
+        This actually renders the map. I want to modularize, but am struggling
+        on this.
         Sample arguments:
-
-        map_type = 'dark'
-        key = '2'
-        signal = '[[[2000, 2019], [2000, 2019], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], "Default", "no"]'
-        l1 = '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
-        l2 = '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
-        choice1 = 'vpdmean'
-        choice2 = 'vpdmean'
-        function = 'pmean'
+    
+        location =  '[["all", "y", "x", "Contiguous United States", 0], 9]'
+        key = '1'
+        signal = '[[[2000, 2017], [1990, 2000], [1, 12], [5, 6, 7, 8]], "Viridis", "no"]'
+        choice1 = 'pdsi'
+        choice2 = 'spi4'
+        function = 'omean'
         date_print = '2000 - 2019'
-        date_print2 = '2000 - 2019'
-        sync = 'Location Syncing: On'
-        year_sync = 'Year Syncing: On'
-        map_extent = 'None'
         '''
-#        print("map_type = " + str(map_type))
-#        print("key = " + str(key))
-#        print("signal = " + str(signal))
-#        print("l1 = " + str(l1))
-#        print("l2 = " + str(l2))
-#        print("choice1 = " + str(choice1))
-#        print("choice2 = " + str(choice2))
-#        print("function = " + str(function))
-#        print("date_print = " + str(date_print))
-#        print("date_print2 = " + str(date_print2))
-#        print("sync = " + str(sync))
-#        print("year_sync = " + str(year_sync))
-#        print("map_extent = " + str(map_extent))
-
-        # Identify element number
-        key = int(key)
-
+        print("SIGNAL: " + signal)
         # Temporary, split location up
         location = json.loads(location)
-        location, crds, pointids = location
+        location, crds = location
 
-        if key == 1:
-            print("\nMAP_EXTENT " + str(key) + ": " + str(map_extent) + "\n")
-
-        # To save zoom levels and extent between map options
+        # To save zoom levels and extent between map options (funny how this works)
         if not map_extent:
             map_extent = default_extent
         elif 'mapbox.center' not in map_extent.keys():
             map_extent = default_extent
+        print(str(map_extent))
 
-        # Prevent update if not syncing and not triggered
+        # Identify element number
+        key = int(key)
+
+        # Prevent update from location unless it is a state or shape filter
         trig = dash.callback_context.triggered[0]['prop_id']
+
         if trig == 'location_store_{}.children'.format(key):
+            if 'corr' not in function:
+                if 'grid' in location[0]: # or 'county' in location[0]:  # <--- Updates are only needed if the map isn't going to change
+                    raise PreventUpdate
+
+            # Check which element the selection came from
             triggered_element = location[-1]
             if 'On' not in sync:
                 if triggered_element != key:
                     raise PreventUpdate
+
+        print("Rendering Map #{}".format(key))
 
         # Create signal for the global_store
         signal = json.loads(signal)
@@ -1820,7 +1801,7 @@ for i in range(1, 3):
         [[year_range, year_range2, [month1, month2], month_filter],
          colorscale, reverse] = signal
 
-        # If we are syncing times, pop the second year range off
+        # If we are syncing times, pop the second year range
         if 'On' in year_sync:
             signal[0].pop(1)
         else:
@@ -1876,8 +1857,16 @@ for i in range(1, 3):
             amax = limit
             amin = limit * -1
 
-        # Get highlight locs
+        # Filter for state filters
         flag, y, x, label, idx = location
+        print('FLAG:' + flag)
+        if flag == 'state' or flag == 'county':
+            array = array * data.mask
+        elif flag == 'shape':
+            y = np.array(json.loads(y))
+            x = np.array(json.loads(x))
+            gridids = grid[y, x]
+            array[~np.isin(grid, gridids)] = np.nan
 
         # If it is a correlation recreate the map array
         if 'corr' in function and flag != 'all':
@@ -1907,7 +1896,7 @@ for i in range(1, 3):
             title_size = 20
 
         # Replace the source array with the data from above
-        source.data[0] = array
+        source.data[0] = array * mask
 
         # Create a data frame of coordinates, index values, labels, etc
         dfs = xr.DataArray(source, name="data")
@@ -1929,38 +1918,42 @@ for i in range(1, 3):
         pdf['printdata'] = (pdf['place'] + " (grid: " +
                             pdf['grid'].apply(int).apply(str) + ")<br>     " +
                             pdf['data'].round(3).apply(str))
-        df = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
-        df['xy'] = df['gridx'].astype(str) + df['gridy'].astype(str)
+        df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
+        df = df_flat[np.isfinite(df_flat['data'])]
 
-        # Get Highlighted points
-        if flag == 'all':
-            pointids = df.index.to_numpy()
-        elif pointids == 'None':
-            y, x = np.where(~np.isnan(data.mask.data))
-            xy = [str(x[i]) + str(y[i]) for i in range(len(x))]
-            pointids = df.index[df['xy'].isin(xy)].to_numpy()
+        # Create the scattermapbox object
+        d1 = dict(type='scattermapbox',
+                  lon=df['lonbin'],
+                  lat=df['latbin'],
+                  text=df['printdata'],
+                  mode='markers',
+                  hoverinfo='text',
+                  hovermode='closest',
+                  showlegend=False,
+                  marker=dict(colorscale=data.color_scale,
+                              reversescale=reverse,
+                              color=df['data'],
+                              cmax=amax,
+                              cmin=amin,
+                              opacity=1.0,
+                              size=source.res[0] * 20,
+                              colorbar=dict(textposition="auto",
+                                            orientation="h",
+                                            font=dict(size=15,
+                                                      fontweight='bold'))))
 
-        # Build the list of plotly data dictionaries
-        data = [dict(type='scattermapbox',
-                     lon=df['lonbin'],
-                     lat=df['latbin'],
-                     text=df['printdata'],
-                     mode='markers',
-                     hoverinfo='text',
-                     hovermode='closest',
-                     showlegend=False,
-                     selectedpoints=pointids,
-                     marker=dict(colorscale=data.color_scale,
-                                 reversescale=reverse,
-                                 color=df['data'],
-                                 cmax=amax,
-                                 cmin=amin,
-                                 opacity=1.0,
-                                 size=source.res[0] * 20,
-                                 colorbar=dict(textposition="auto",
-                                               orientation="h",
-                                               font=dict(size=15,
-                                                         fontweight='bold'))))]
+        # Add an outline to help see when zoomed in
+        d2 = dict(type='scattermapbox',
+                  lon=df['lonbin'],
+                  lat=df['latbin'],
+                  mode='markers',
+                  hovermode='closest',
+                  showlegend=False,
+                  marker=dict(color='#000000',
+                              size=source.res[0] * 20 + .5))
+
+        # package these in a list
+        data = [d2, d1]
 
         # Set up layout
         layout_copy = copy.deepcopy(layout)
@@ -2016,7 +2009,7 @@ for i in range(1, 3):
 
         # Temporary, split location up
         location = json.loads(location)
-        location, crds, pointids = location
+        location, crds = location
 
         # Identify element number
         key = int(key)
