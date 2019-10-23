@@ -1763,6 +1763,7 @@ for i in range(1, 3):
         choice2 = 'spi4'
         function = 'omean'
         date_print = '2000 - 2019'
+        year_sync = 'On'
         '''
         print("SIGNAL: " + signal)
         # Temporary, split location up
@@ -1903,8 +1904,7 @@ for i in range(1, 3):
         dfs = xr.DataArray(source, name="data")
         pdf = dfs.to_dataframe()
         step = crdict.res
-        def to_bin(x):
-            return np.floor(x / step) * step
+        to_bin = lambda x: np.floor(x / step) * step
         pdf["latbin"] = pdf.index.get_level_values('y').map(to_bin)
         pdf["lonbin"] = pdf.index.get_level_values('x').map(to_bin)
         pdf['gridx'] = pdf['lonbin'].map(crdict.londict)
@@ -1916,9 +1916,7 @@ for i in range(1, 3):
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, admin_df, how='inner')
         pdf['data'] = pdf['data'].astype(float)
-        pdf['printdata'] = (pdf['place'] + " (grid: " +
-                            pdf['grid'].apply(int).apply(str) + ")<br>     " +
-                            pdf['data'].round(3).apply(str))
+        pdf['printdata'] = (pdf['place'] + "<br>  lat/lon: " + pdf['latbin'].apply(str) + ", " + pdf['lonbin'].astype(str) + "<br>     <b>" + pdf['data'].round(3).apply(str) + "</b>")
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
 
