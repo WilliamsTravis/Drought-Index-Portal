@@ -1,4 +1,4 @@
-name: dict
+name: drip
 channels:
   - conda-forge
 dependencies:

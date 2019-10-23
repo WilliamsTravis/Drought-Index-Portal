@@ -29,12 +29,12 @@ Things to do:
        are, however, just now learning of non-linear dependence...this might be
        a future addition.
     4) Long-term goal. Retrieve data from a data base. Learning to do this with
-       PostgreSQL was actually the main reason why I created the
-       "Ubuntu-Practice-Machine" to begin with. I'd had trouble storing NetCDF
-       files initially and decided it would be more useful to make something
-       that works as quickly as possible. I am new to this sort of thing, but
-       I think that this would be useful in many ways beyond learning how to
-       manage geographic data in a data base.
+       PostgreSQL was actually the main reason why I created the original
+       "Ubuntu-Practice-Machine" (old project name) to begin with. I'd had
+       trouble storing NetCDF files initially and decided it would be more
+       useful to make something that works as quickly as possible. I am new to
+       this sort of thing, but I think that this would be useful in many ways
+       beyond learning how to manage geographic data in a data base.
              a) Spinning up a new instance would not require downloading the
                 data a new each time? How would connecting remotely work? At
                 the very least, it would not require all of the
@@ -45,8 +45,8 @@ Things to do:
                 with a GIS.
     5) Fully integrate DASK. It turns out that xarray already uses dask and
        was keeping much of the data on disk. This helps to avoid memory
-       errors and improve speed. With the area calculations it worsens
-       it significantlym though... Is this an inevitable tradeoff?
+       errors and improve speed. With the area calculations it worsens it
+       significantly though... is this an inevitable tradeoff?
     6) Describe new climate data sets:
         http://www.prism.oregonstate.edu/documents/PRISM_datasets_aug2013.pdf
     7) Consolidate all of the download scripts into one. Also, incorporate the
@@ -65,7 +65,6 @@ Created on April 15th 2019
          Travis.Williams@colorado.edu
 """
 # Functions and Libraries
-#import netCDF4  # For certain xarray issues, it helps to explicitly load this
 import base64
 import copy
 from collections import OrderedDict
@@ -116,7 +115,8 @@ default_1 = 'pdsi'
 default_2 = 'spi1'
 default_date = '2000 - 2019'
 default_basemap = 'dark'
-default_location = '[["all", "y", "x", "Contiguous United States", 0], 9, "None"]'
+default_location = ('[["all", "y", "x", "Contiguous United States", 0], 9,' +
+                    '"None"]')
 default_years = [2000, 2019]
 default_extent = {'mapbox.center': {'lon': -92, 'lat': 40},
                   'mapbox.zoom': 2.2, 'mapbox.bearing': 0, 'mapbox.pitch': 20}
@@ -735,7 +735,7 @@ navbar = html.Nav(
                  'margin-top': '-5px',
                  'float': 'left',
                  'margin-left': '-5px'}),
-          # End Acronym Button
+                 # End Acronym Button
 
 
           # Toggle Buttons
@@ -769,7 +769,7 @@ navbar = html.Nav(
                  'background-color': 'black', 'height': '50px',
                  'width': '100%', 'zIndex': '9999',
                  'border-bottom': '10px solid #cfb87c'})
-          # End Toggle Buttons
+                 # End Toggle Buttons
 
 # Static Elements
 body = html.Div([
@@ -784,7 +784,7 @@ body = html.Div([
                    'font-size': '50px',
                    'font-family': 'Times New Roman',
                    'margin-top': '100'}),
-            # End Title
+                   # End Title
 
      # Description
      html.Div([
@@ -797,7 +797,7 @@ body = html.Div([
          style={'text-align':'center',
                 'margin': '0 auto',
                 'width': '100%'}),
-         # End Description
+                # End Description
 
      # Options
      html.Div(id='options',
@@ -824,9 +824,9 @@ body = html.Div([
                                       max=max_year,
                                       updatemode='drag',
                                       marks=yearmarks)],
-                    style={'display': 'none',
-                           'margin-top': '0', 'margin-bottom': '80'})]),
-                    # End Year Slider
+                    style={'display': 'none', 'margin-top': '0',
+                           'margin-bottom': '80'})]),
+                           # End Year Slider
 
                 # Month Options
                 html.Div(
@@ -921,7 +921,7 @@ body = html.Div([
                                           options=color_options,
                                           value='Default')],
                              className='three columns')],
-                        # End Color Scales
+                             # End Color Scales
 
                style={'margin-bottom': '50',
                       'margin-top': '50',
@@ -966,6 +966,10 @@ body = html.Div([
        html.Div(id='area_store_1', children='[0, 0]',
                 style={'display': 'none'}),
        html.Div(id='area_store_2', children='[0, 0]',
+                style={'display': 'none'}),
+       html.Div(id='map_extent_store_1', children=default_extent,
+                style={'display': 'none'}),
+       html.Div(id='map_extent_store_2', children=default_extent,
                 style={'display': 'none'})
                 # End Signals
 
@@ -1415,6 +1419,7 @@ for i in range(1, 3):
 
             return json.dumps([location, crds, pointids])
 
+
     @app.callback([Output('county_div_{}'.format(i), 'style'),
                    Output('state_div_{}'.format(i), 'style'),
                    Output('shape_div_{}'.format(i), 'style')],
@@ -1743,7 +1748,8 @@ for i in range(1, 3):
     #         raise PreventUpdate
 
 
-    @app.callback(Output("map_{}".format(i), 'figure'),
+    @app.callback([Output('map_{}'.format(i), 'figure'),
+                   Output('map_extent_store_{}'.format(i), 'children')], # Lasso resets relayout, output to div?
                   [Input('choice_1', 'value'),
                    Input('choice_2', 'value'),
                    Input('map_type', 'value'),
@@ -1756,10 +1762,12 @@ for i in range(1, 3):
                    State('year_sync', 'children'),
                    State('date_print', 'children'),
                    State('date_print2', 'children'),
-                   State('map_{}'.format(i), 'relayoutData')])
-    def makeMap(choice1, choice2, map_type, signal,
-                l1, l2, function, key, sync, year_sync, date_print,
-                date_print2, map_extent):
+                   State('map_{}'.format(i), 'relayoutData'),
+                   State('map_extent_store_{}'.format(i), 'children') # Lasso resets relayout, input from div?
+                   ])
+    def makeMap(choice1, choice2, map_type, signal, l1, l2, function, key,
+                sync, year_sync, date_print, date_print2, map_extent_state,
+                map_extent_store):
         '''
         This renders the map.
 
@@ -1802,11 +1810,12 @@ for i in range(1, 3):
         location = json.loads(location)
         location, crds, pointids = location
 
-        # To save zoom levels and extent between map options (funny how this works)
-        if not map_extent:
-            map_extent = default_extent
-        elif 'mapbox.center' not in map_extent.keys():
-            map_extent = default_extent
+        # To save zoom levels and extent between map options
+#        if not map_extent:
+#            map_extent = default_extent
+#        elif 'mapbox.center' not in map_extent.keys():
+#            print("\nMAP_EXTENT " + str(key) + ": " + str(map_extent) + "\n")
+#            map_extent = default_extent
 
         # Prevent update if not syncing and not triggered
         trig = dash.callback_context.triggered[0]['prop_id']
@@ -1861,8 +1870,6 @@ for i in range(1, 3):
         # Now, we want to use the same value range for colors for both maps
         nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
                       'vpdmin', 'vpdmean']
-        print(choice in nonindices)
-        print(amin)
         if function == 'pmean':
             # Get the data for the other panel for its value range
             data2 = retrieveData(signal, function, choice2, location)
@@ -1884,17 +1891,7 @@ for i in range(1, 3):
             amin = limit * -1
 
         # Get highlight locs
-        # Create the scattermapbox object
         flag, y, x, label, idx = location
-
-        # We have a new problem, the index values aren't being masked properly. Maybe this old bit could help
-#        if flag == 'state' or flag == 'county':
-#            array = array * data.mask
-#        elif flag == 'shape':
-#            y = np.array(json.loads(y))
-#            x = np.array(json.loads(x))
-#            gridids = grid[y, x]
-#            array[~np.isin(grid, gridids)] = np.nan
 
         # If it is a correlation recreate the map array
         if 'corr' in function and flag != 'all':
@@ -1924,7 +1921,7 @@ for i in range(1, 3):
             title_size = 20
 
         # Replace the source array with the data from above
-        source.data[0] = array #* mask
+        source.data[0] = array
 
         # Create a data frame of coordinates, index values, labels, etc
         dfs = xr.DataArray(source, name="data")
@@ -1986,10 +1983,10 @@ for i in range(1, 3):
             style=map_type,
             center=dict(lon=-95.7, lat=37.1),
             zoom=2)
-        layout_copy['mapbox']['center'] = map_extent['mapbox.center']
-        layout_copy['mapbox']['zoom'] = map_extent['mapbox.zoom']
-        layout_copy['mapbox']['bearing'] = map_extent['mapbox.bearing']
-        layout_copy['mapbox']['pitch'] = map_extent['mapbox.pitch']
+        layout_copy['mapbox']['center'] = map_extent_store['mapbox.center']
+        layout_copy['mapbox']['zoom'] = map_extent_store['mapbox.zoom']
+        layout_copy['mapbox']['bearing'] = map_extent_store['mapbox.bearing']
+        layout_copy['mapbox']['pitch'] = map_extent_store['mapbox.pitch']
         layout_copy['titlefont']=dict(color='#CCCCCC', size=title_size,
                                       family='Time New Roman',
                                       fontweight='bold')
@@ -2003,7 +2000,7 @@ for i in range(1, 3):
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                         psutil.virtual_memory().percent))
 
-        return figure
+        return figure, map_extent_state
 
 
     @app.callback([Output('series_{}'.format(i), 'figure'),
