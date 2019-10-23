@@ -451,7 +451,6 @@ mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
 # Mapbox initial layout
 # Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
 layout = dict(
-    autosize=True,
     height=500,
     font=dict(color='#CCCCCC',
               fontweight='bold'),
@@ -966,10 +965,6 @@ body = html.Div([
        html.Div(id='area_store_1', children='[0, 0]',
                 style={'display': 'none'}),
        html.Div(id='area_store_2', children='[0, 0]',
-                style={'display': 'none'}),
-       html.Div(id='map_extent_store_1', children=default_extent,
-                style={'display': 'none'}),
-       html.Div(id='map_extent_store_2', children=default_extent,
                 style={'display': 'none'})
                 # End Signals
 
@@ -1315,8 +1310,6 @@ for i in range(1, 3):
             key = int(key) - 1
 
             # package all the selections for indexing
-            if click1 is not None:
-                print("\nCLICK1: " + str(click1) + "\n")
             locations = [click1, click2, select1, select2, county1, county2,
                          shape1, shape2, reset1, reset2, state1, state2]
             updates = [update1, update2]
@@ -1748,26 +1741,21 @@ for i in range(1, 3):
     #         raise PreventUpdate
 
 
-    @app.callback([Output('map_{}'.format(i), 'figure'),
-                   Output('map_extent_store_{}'.format(i), 'children')], # Lasso resets relayout, output to div?
+    @app.callback(Output('map_{}'.format(i), 'figure'),
                   [Input('choice_1', 'value'),
                    Input('choice_2', 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
-                   Input('location_store_1'.format(i), 'children'),
-                   Input('location_store_2'.format(i), 'children')],
+                   Input('location_store_{}'.format(i), 'children')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
                    State('year_sync', 'children'),
                    State('date_print', 'children'),
                    State('date_print2', 'children'),
-                   State('map_{}'.format(i), 'relayoutData'),
-                   State('map_extent_store_{}'.format(i), 'children') # Lasso resets relayout, input from div?
-                   ])
-    def makeMap(choice1, choice2, map_type, signal, l1, l2, function, key,
-                sync, year_sync, date_print, date_print2, map_extent_state,
-                map_extent_store):
+                   State('map_{}'.format(i), 'relayoutData')])
+    def makeMap(choice1, choice2, map_type, signal, location, function, key,
+                sync, year_sync, date_print, date_print2, map_extent):
         '''
         This renders the map.
 
@@ -1805,17 +1793,17 @@ for i in range(1, 3):
         key = int(key)
 
         # Temporary, split location up
-        locations = [l1, l2]
-        location = locations[key-1]
         location = json.loads(location)
         location, crds, pointids = location
 
+        if key == 1:
+            print("\nMAP_EXTENT " + str(key) + ": " + str(map_extent) + "\n")
+
         # To save zoom levels and extent between map options
-#        if not map_extent:
-#            map_extent = default_extent
-#        elif 'mapbox.center' not in map_extent.keys():
-#            print("\nMAP_EXTENT " + str(key) + ": " + str(map_extent) + "\n")
-#            map_extent = default_extent
+        if not map_extent:
+            map_extent = default_extent
+        elif 'mapbox.center' not in map_extent.keys():
+            map_extent = default_extent
 
         # Prevent update if not syncing and not triggered
         trig = dash.callback_context.triggered[0]['prop_id']
@@ -1824,8 +1812,6 @@ for i in range(1, 3):
             if 'On' not in sync:
                 if triggered_element != key:
                     raise PreventUpdate
-
-        print("Rendering Map #{}".format(key))
 
         # Create signal for the global_store
         signal = json.loads(signal)
@@ -1983,10 +1969,10 @@ for i in range(1, 3):
             style=map_type,
             center=dict(lon=-95.7, lat=37.1),
             zoom=2)
-        layout_copy['mapbox']['center'] = map_extent_store['mapbox.center']
-        layout_copy['mapbox']['zoom'] = map_extent_store['mapbox.zoom']
-        layout_copy['mapbox']['bearing'] = map_extent_store['mapbox.bearing']
-        layout_copy['mapbox']['pitch'] = map_extent_store['mapbox.pitch']
+        layout_copy['mapbox']['center'] = map_extent['mapbox.center']
+        layout_copy['mapbox']['zoom'] = map_extent['mapbox.zoom']
+        layout_copy['mapbox']['bearing'] = map_extent['mapbox.bearing']
+        layout_copy['mapbox']['pitch'] = map_extent['mapbox.pitch']
         layout_copy['titlefont']=dict(color='#CCCCCC', size=title_size,
                                       family='Time New Roman',
                                       fontweight='bold')
@@ -2000,7 +1986,7 @@ for i in range(1, 3):
         print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
                                         psutil.virtual_memory().percent))
 
-        return figure, map_extent_state
+        return figure
 
 
     @app.callback([Output('series_{}'.format(i), 'figure'),
