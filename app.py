@@ -830,7 +830,7 @@ body = html.Div([
                                         max=12,
                                         updatemode='drag',
                                         included=False,)],
-                             className='two columns',
+                             className='three columns',
                              title=('Choose the first month of the first ' +
                                     'year of the study period.')),
                           html.Div([
@@ -842,7 +842,7 @@ body = html.Div([
                                         max=12,
                                         updatemode='drag',
                                         included=False)],
-                             className='two columns',
+                             className='three columns',
                              title=('Choose the last month of the last year ' +
                                     'of the study period.')),
                           html.Div(
@@ -862,7 +862,7 @@ body = html.Div([
                                           children='None',
                                           style={'height': '25px',
                                                  'line-height': '25px'})],
-                            className='five columns',
+                            className='six columns',
                             title=('Choose which months of the year to ' +
                                    'be included.'))],
                         className='row'),
@@ -925,9 +925,10 @@ body = html.Div([
                              className='three columns')],
                              # End Color Scales
 
-               style={'margin-bottom': '50',
-                      'margin-top': '50',
-                      'text-align': 'left'})],
+                   style={'margin-bottom': '50',
+                          'margin-top': '50',
+                          'text-align': 'center'})],
+               style={'text-align': 'center'}   ,                 
                className='row'),
                # End Options
 
