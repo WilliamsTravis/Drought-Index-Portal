@@ -2059,11 +2059,7 @@ class Location_Builder:
                 crds = [max(lats), min(lons), min(lats), max(lons)]
                 y = list([cd.latdict[d['lat']] for d in selections])
                 x = list([cd.londict[d['lon']] for d in selections])
-                try:
-                    counties = np.array([d['text'][:d['text'].index(' (')] for
-                                     d in selections])
-                except:
-                    counties = np.array([d['text'][:d['text'].index(':')] for
+                counties = np.array([d['text'][:d['text'].index('<')] for
                                      d in selections])
                 local_df = admin_df[admin_df['place'].isin(
                                     list(np.unique(counties)))]

@@ -1323,12 +1323,12 @@ for i in range(1, 3):
                 triggered_value['points']  = tv
 
             # print out variables for developing
-#            print("key = " + json.dumps(key))
-#            print("sync = " + json.dumps(sync))
-#            print("locations = " + str(locations))
-#            print("updates = " + str(updates))
-#            print("triggered_value = " + str(triggered_value))
-#            print("trigger = " + json.dumps(trigger))
+            print("key = " + json.dumps(key))
+            print("sync = " + json.dumps(sync))
+            print("locations = " + str(locations))
+            print("updates = " + str(updates))
+            print("triggered_value = " + str(triggered_value))
+            print("trigger = " + json.dumps(trigger))
 
             # Two cases, if syncing return a copy, if not split
             if 'On' in sync:
