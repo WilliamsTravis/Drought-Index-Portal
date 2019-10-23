@@ -420,22 +420,13 @@ admin = Admin_Elements(resolution)
 # Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
 months = [int(m) for m in range(1, 13)]
-mnths2 = copy.copy(months)
-for m in months[:-1]:
-    mnths2.append(m + 12)
 yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
              y in years}
 monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-              7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec',
-              13: 'Nov ', 14: 'Oct ', 15: 'Sep ', 16: 'Aug ', 17: 'Jul ',
-              18: 'Jun ', 19: 'May ', 20: 'Apr ', 21: 'Mar ', 22: 'Feb ',
-              23: 'Jan '}
-monthmarks_full = {1: 'January', 2: 'February', 3: 'March', 4: 'April',
-                   5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September',
-                   10: 'October', 11: 'November', 12: 'December'}
+              7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
 monthoptions = [{'label': monthmarks[i], 'value': i} for i in range(1, 13)]
 months_slanted = {i: {'label': monthmarks[i],
-                      'style': {"transform": "rotate(45deg)"}} for i in mnths2}
+                      'style': {"transform": "rotate(45deg)"}} for i in months}
 
 # Only display every 5 years for space
 for y in years:
@@ -831,16 +822,28 @@ body = html.Div([
                 html.Div(
                   children=[
                           html.Div([
-                             html.H5('Start and End Months'),
-                             dcc.RangeSlider(id='month_slider',
-                                             value=[1, 12],
-                                             marks=months_slanted,
-                                             min=1,
-                                             max=23,
-                                             updatemode='drag')],
-                             className='six columns',
+                             html.H5('Start Month'),
+                             dcc.Slider(id='month_slider_1',
+                                        value=1,
+                                        marks=months_slanted,
+                                        min=1,
+                                        max=12,
+                                        updatemode='drag',
+                                        included=False,)],
+                             className='two columns',
                              title=('Choose the first month of the first ' +
-                                    'year and last month of the last year ' +
+                                    'year of the study period.')),
+                          html.Div([
+                             html.H5('End Month'),
+                             dcc.Slider(id='month_slider_2',
+                                        value=12,
+                                        marks=months_slanted,
+                                        min=1,
+                                        max=12,
+                                        updatemode='drag',
+                                        included=False)],
+                             className='two columns',
+                             title=('Choose the last month of the last year ' +
                                     'of the study period.')),
                           html.Div(
                             children=[
@@ -981,10 +984,11 @@ app.layout = html.Div([navbar, body])
                Output('date_print2', 'children')],
               [Input('year_slider', 'value'),
                Input('year_slider2', 'value'),
-               Input('month_slider', 'value'),
+               Input('month_slider_1', 'value'),
+               Input('month_slider_2', 'value'),
                Input('month', 'values'),
                Input('year_sync', 'n_clicks')])
-def adjustDatePrint(year_range,year_range2, month_range, months, sync):
+def adjustDatePrint(year_range,year_range2, month_1,  month_2, months, sync):
     '''
     If users select one year, only print it once
     '''
@@ -997,13 +1001,13 @@ def adjustDatePrint(year_range,year_range2, month_range, months, sync):
         number = " #1"
 
     # Don't print start and end months if full year is chosen
-    month_range = [int(month_range[0]), int(month_range[1])]
-    month_range = [monthmarks[m] for m in month_range]
-    if month_range[0] == 'Jan' and month_range[1] == 'Dec':
+    month_1 = monthmarks[month_1]
+    month_2 = monthmarks[month_2]
+    if month_1 == 'Jan' and month_2 == 'Dec':
         mrs = ['', '']
         mjoin = ''
     else:
-        mrs = [month_range[0] + ' ', month_range[1] + ' ']
+        mrs = [month_1 + ' ', month_2 + ' ']
         mjoin = ' - '
 
     # Don't print months included if all are included
@@ -1141,19 +1145,16 @@ def storeIndexChoices(choice1, choice2):
                State('reverse', 'value'),
                State('year_slider', 'value'),
                State('year_slider2', 'value'),
-               State('month_slider', 'value'),
+               State('month_slider_1', 'value'),
+               State('month_slider_2', 'value'),
                State('month', 'values')])
 def submitSignal(click, colorscale, reverse, year_range, year_range2,
-                 month_range, month_filter):
+                 month_1, month_2, month_filter):
     '''
     Collect and hide the options signal in the hidden 'signal' div.
     '''
     # This is to translate the inverse portion of the month range
-    overflow = {13:11, 14:10, 15: 9, 16: 8, 17: 7, 18: 6, 19: 5, 20: 4, 21: 3,
-                22: 2, 23:1}
-    for i in [0, 1]:
-        if month_range[i] > 12:
-            month_range[i] = overflow[month_range[i]]
+    month_range = [month_1, month_2]
     signal = [[year_range, year_range2, month_range, month_filter], colorscale,
               reverse]
     return json.dumps(signal)
