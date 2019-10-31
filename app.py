@@ -702,24 +702,6 @@ navbar = html.Nav(
               className='row'),
              # End Sponser Logos
 
-          # Acknowledgment button?
-          html.Div(
-            children=html.Button(
-              id='ack_button',
-              children='ACKNOWLEDGEMENTS',
-              type='button',
-              title='Click to display acknowledgments',
-              style={'height': '45px',
-                     'padding': '9px',
-                     'background-color': '#cfb87c',
-                     'border-radius': '4px',
-                     'font-family': 'Times New Roman',
-                     'font-size': '12px',
-                     'margin-top': '-5px',
-                     'float': 'left',
-                     'margin-left': '-5px'}
-              )),
-
         # Acronym Button
         html.Button(
           children="ACRONYMS (HOVER)",
