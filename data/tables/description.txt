@@ -5,11 +5,26 @@ For each panel, you may select a function to apply to the index, adjust the time
 
 Click [here](https://github.com/WilliamsTravis/Drought-Index-Portal/raw/master/Drought%20Index%20Comparison%20Portal%20Guide.pdf) to download a more detailed user's guide.
 
+
+Acknowledgements:
+
+Work on DrIP is supported in part by grants and resources from the National Integrated Drought Information System (NIDIS), the Western Water Assessment (WWA), Earth Lab, and the North Central Climate Adaptation Science Center (NC CASC). 
+
+
+
+
 &nbsp;
 
-**Author**: Travis Williams
+About us:
 
+**Author**: Travis Williams -
 **Email**: Travis.Williams@colorado.edu
 
-**Date**: 01-22-2019
+**Advisors**:
+William R. Travis (william.travis@colorado.edu), 
+Imtiaz Rangwala (imtiaz.rangwala@colorado.edu),
+Brian Johnson (brjo7959@colorado.edu ),
+Gabriel Senay (senay@usgs.gov),
+Mike Hobbins (mike.hobbins@noaa.gov)
+
 

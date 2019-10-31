@@ -136,14 +136,6 @@ ranges = pd.read_csv('data/tables/index_ranges.csv')
 # In[] The DASH application and server
 app = dash.Dash(__name__)
 
-# Go to stylesheet, styled after a DASH example (how to serve locally?)  # <--- Check out criddyp's response about a third of the way down here <https://community.plot.ly/t/serve-locally-option-with-additional-scripts-and-style-sheets/6974/6>
-#app.css.append_css({'external_url':
-#                    'https://codepen.io/williamstravis/pen/maxwvK.css'})
-## For the Loading screen
-#app.css.append_css({"external_url":
-#                    "https://codepen.io/williamstravis/pen/EGrWde.css"})
-# app.scripts.config.serve_locally = True
-
 # Attempting local css
 app.css.append_css({"external_url":  "static/stylesheet.css"})
 app.scripts.config.serve_locally = True
@@ -280,8 +272,7 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'tdmean': 'Mean Dew Point Temperature (°C)',
               'ppt': 'Average Precipitation (mm)',
               'vpdmax': 'Maximum Vapor Pressure Deficit (hPa)' ,
-              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)',
-              'vpdmean': 'Mean Vapor Pressure Deficit (hPa)'}
+              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)'}
 
 # Function options
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
@@ -669,7 +660,7 @@ navbar = html.Nav(
                   target="_blank"),
               html.A(
                 html.Img(
-                  src=("/static/nidis.png"),
+                  src=("/static/nccasc_logo.png"),
                   className='one columns',
                   style={'height': '40',
                          'width': '170',
@@ -710,6 +701,24 @@ navbar = html.Nav(
                      'border-radius': '5px'},
               className='row'),
              # End Sponser Logos
+
+          # Acknowledgment button?
+          html.Div(
+            children=html.Button(
+              id='ack_button',
+              children='ACKNOWLEDGEMENTS',
+              type='button',
+              title='Click to display acknowledgments',
+              style={'height': '45px',
+                     'padding': '9px',
+                     'background-color': '#cfb87c',
+                     'border-radius': '4px',
+                     'font-family': 'Times New Roman',
+                     'font-size': '12px',
+                     'margin-top': '-5px',
+                     'float': 'left',
+                     'margin-left': '-5px'}
+              )),
 
         # Acronym Button
         html.Button(
@@ -767,6 +776,9 @@ body = html.Div([
       # Title
       html.Div([
         html.H1('Drought Index Portal (DrIP)'),
+        html.H4('A tool to display, compare, and extract time series for ' +
+                'various indicators of drought in the Contiguous United ' +
+                'States'),
           html.Hr()],
             className='twelve columns',
             style={'font-weight': 'bolder',
@@ -1786,7 +1798,7 @@ for i in range(1, 3):
 
         if trig == 'location_store_{}.children'.format(key):
             if 'corr' not in function:
-                if 'grid' in location[0]: # or 'county' in location[0]:  # <--- Updates are only needed if the map isn't going to change
+                if 'grid' in location[0]:
                     raise PreventUpdate
 
             # Check which element the selection came from
@@ -1876,7 +1888,7 @@ for i in range(1, 3):
             y = np.array(json.loads(y))
             x = np.array(json.loads(x))
             gridid = grid[y, x]
-            amin = 0
+            amin = -1
             amax = 1
             if type(gridid) is np.ndarray:
                 grids = [np.nanmin(gridid), np.nanmax(gridid)]
