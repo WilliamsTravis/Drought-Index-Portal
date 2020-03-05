@@ -23,7 +23,7 @@ Work on DrIP is supported in part by grants and resources from the National Inte
 #### **About us:**
 
 **Author**: Travis Williams -
-**Email**: Travis.Williams@colorado.edu
+**Email**: Travissius@gmail.com
 
 **Advisors**:
 William R. Travis (william.travis@colorado.edu), 
@@ -31,5 +31,3 @@ Imtiaz Rangwala (imtiaz.rangwala@colorado.edu),
 Brian Johnson (brjo7959@colorado.edu ),
 Gabriel Senay (senay@usgs.gov),
 Mike Hobbins (mike.hobbins@noaa.gov)
-
-
