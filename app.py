@@ -108,7 +108,7 @@ source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
                    'Aroostook County, ME to Aroostook County, ME', 2]
 
 # Initializing Values
-default_function = 'pmean'
+default_function = 'omean'
 default_function_type = 'index'
 default_sample = 'spi1'
 default_1 = 'pdsi'
