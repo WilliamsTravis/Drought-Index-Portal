@@ -6,11 +6,12 @@ dependencies:
   - dash==0.39.0
   - dask==2.4.0
   - descartes==1.1.0
+  - distributed
   - fiona==1.8.4
   - flask-caching==1.4.0
   - gdal
   - geopandas==0.4.1
-  - gevent
+  #  - gevent
   - gunicorn
   - joblib==0.13.2
   - matplotlib==3.0.2

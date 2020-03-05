@@ -10,18 +10,15 @@ import numpy as np
 import os
 from osgeo import gdal
 import pandas as pd
+import pathlib
 import sys
 from tqdm import tqdm
 import xarray as xr
 
-if sys.platform == 'win32':
-    sys.path.insert(0, 'C:/Users/User/github/Ubuntu-Practice-Machine')
-    os.chdir('C:/Users/User/github/Ubuntu-Practice-Machine')
-    data_path = 'f:/'
-else:
-    sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
-    os.chdir('/root/Sync/Ubuntu-Practice-Machine')
-    data_path = '/root/Sync'
+# Refactor all of this
+pwd = str(pathlib.Path(__file__).parent.absolute())
+data_path = os.path.join(pwd, "..")
+sys.path.insert(0, data_path)
 
 from functions import toNetCDFPercentile
 

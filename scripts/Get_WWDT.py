@@ -46,6 +46,7 @@ Created on Fri Feb  10 14:33:38 2019
 
 @author: user
 """
+
 from bs4 import BeautifulSoup
 from glob import glob
 import datetime as dt
@@ -55,6 +56,7 @@ import numpy as np
 import os
 from osgeo import gdal
 import pandas as pd
+import pathlib
 import requests
 from socket import timeout
 import sys
@@ -63,20 +65,12 @@ from urllib.error import HTTPError, URLError
 import urllib
 import xarray as xr
 
-# I hadn't learned how to do this yet
-if sys.platform == 'win32':
-    sys.path.insert(0, 'C:/Users/trwi0358/github/Ubuntu-Practice-Machine')
-    os.chdir('C:/Users/trwi0358/github/Ubuntu-Practice-Machine')
-    data_path = ''
-elif 'travis' in os.getcwd():
-    sys.path.insert(0, '/home/travis/github/Ubuntu-Practice-Machine')
-    os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
-    data_path = ''
-else:
-    sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
-    os.chdir('/root/Sync/Ubuntu-Practice-Machine')
-    data_path = '/root/Sync'
+# Refactor all of this
+pwd = str(pathlib.Path(__file__).parent.absolute())
+data_path = os.path.join(pwd, "..")
+sys.path.insert(0, data_path)
 
+# Create a package out of functions
 from functions import toNetCDF, toNetCDFAlbers, toNetCDFPercentile
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
@@ -95,14 +89,13 @@ local_path2 = os.path.join(data_path,
                            'data/droughtindices/netcdfs/percentiles')
 local_path3 = os.path.join(data_path,
                            'data/droughtindices/netcdfs/albers')
-local_path = os.path.join(data_path, 'data/droughtindices/netcdfs/wwdt')
+local_path = os.path.join(data_path,
+                          'data/droughtindices/netcdfs/wwdt')
 
-if not os.path.exists(local_path):
-    os.makedirs(local_path1)
-if not os.path.exists(local_path2):
-    os.makedirs(local_path2)
-if not os.path.exists(local_path3):
-    os.mkdir(local_path3)
+os.makedirs(local_path, exist_ok=True)
+os.makedirs(local_path1, exist_ok=True)
+os.makedirs(local_path2, exist_ok=True)
+os.makedirs(local_path3, exist_ok=True)
 
 # I came up with a slightly different set of acroynms
 indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7', 'spi8',
@@ -115,6 +108,7 @@ local_indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7',
                  'spei10', 'spei11', 'spei12', 'pdsi', 'pdsisc', 'pdsiz',
                  'mdn1']
 
+# Their naming convention is slighty different from the app's
 index_map = {indices[i]: local_indices[i] for i in range(len(indices))}
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'mdn1': 'Mean Temperature Departure  (1981 - 2010) - 1 month',
@@ -180,6 +174,7 @@ print(str(today) + '\n')
 
 ############ Get and Build Data Sets ########################################
 for index in indices:
+
     # We need the key 'value' to point to local data
     nc_path = os.path.join(data_path,
                            'data/droughtindices/netcdfs/',
@@ -192,7 +187,7 @@ for index in indices:
     if os.path.exists(nc_path):  # Create a netcdf and append to file
         print(nc_path + " exists, checking for missing data...")
 
-        ############## If we only need to add a few dates ###################
+        # If we only need to add a few dates
         with xr.open_dataset(nc_path) as data:
             dates = pd.DatetimeIndex(data.time.data)
             data.close()

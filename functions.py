@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Support functions for Ubuntu-Practice-Machine
+Support functions for Drought-Index-Portal
 
 Created on Tue Jan 22 18:02:17 2019
 

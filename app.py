@@ -109,7 +109,7 @@ source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
 
 # Initializing Values
 default_function = 'pmean'
-default_function_type = 'perc'
+default_function_type = 'index'
 default_sample = 'spi1'
 default_1 = 'pdsi'
 default_2 = 'spi1'
@@ -162,7 +162,7 @@ cache2.init_app(server)
 # Drought Index Options
 indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'PDSI-SC', 'value': 'pdsisc'},
-           {'label': 'Palmer Z Index', 'value': 'pdsiz'},
+           # {'label': 'Palmer Z Index', 'value': 'pdsiz'},
            {'label': 'SPI-1', 'value': 'spi1'},
            {'label': 'SPI-2', 'value': 'spi2'},
            {'label': 'SPI-3', 'value': 'spi3'},
@@ -199,16 +199,17 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'EDDI-10', 'value': 'eddi10'},
            {'label': 'EDDI-11', 'value': 'eddi11'},
            {'label': 'EDDI-12', 'value': 'eddi12'},
-           {'label': 'LERI-1', 'value': 'leri1'},
-           {'label': 'LERI-3', 'value': 'leri3'},
+           # {'label': 'LERI-1', 'value': 'leri1'},
+           # {'label': 'LERI-3', 'value': 'leri3'},
            {'label': 'TMIN', 'value': 'tmin'},
            {'label': 'TMAX', 'value': 'tmax'},
            {'label': 'TMEAN', 'value': 'tmean'},
            {'label': 'TDMEAN', 'value': 'tdmean'},
            {'label': 'PPT', 'value': 'ppt'},
            {'label': 'VPDMAX', 'value': 'vpdmax'},
-           {'label': 'VPDMIN', 'value': 'vpdmin'},
-           {'label': 'VPDMEAN', 'value': 'vpdmean'}]
+           {'label': 'VPDMIN', 'value': 'vpdmin'}
+           # {'label': 'VPDMEAN', 'value': 'vpdmean'}
+           ]
 
 # Index dropdown labels
 indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
@@ -321,37 +322,37 @@ ams = [{'label': 'PDSI: The Palmer Drought Severity Index (WWDT)', 'value': 0},
                  '(hPa)(PRISM)', 'value': 20}]
 
 acronym_text = ("""
-INDEX/INDICATOR ACRONYMS
-
-
-PDSI:            Palmer Drought Severity Index
-
-PDSI-SC:         Self-Calibrating PDSI
-
-Palmer Z Index:  Palmer Z Index
-
-SPI:             Standardized Precipitation Index
-
-SPEI:            Standardized Precip-ET Index
-
-EDDI:            Evaporative Demand Drought Index
-
-LERI:            Landscape Evaporation Response Index
-
-TMIN:            Average Daily Minimum Temp (°C)
-
-TMAX:            Average Daily Maximum Temp (°C)
-
-TMEAN:           Mean Temperature (°C)
-
-TDMEAN:          Mean Dew Point Temperature (°C)
-
-PPT:             Average Precipitation (mm)
-
-VPDMAX:          Max Vapor Pressure Deficit (hPa)
-
-VPDMIN:          Min Vapor Pressure Deficit (hPa)
-""")
+    INDEX/INDICATOR ACRONYMS
+    
+    
+    PDSI:            Palmer Drought Severity Index
+    
+    PDSI-SC:         Self-Calibrating PDSI
+    
+    Palmer Z Index:  Palmer Z Index
+    
+    SPI:             Standardized Precipitation Index
+    
+    SPEI:            Standardized Precip-ET Index
+    
+    EDDI:            Evaporative Demand Drought Index
+    
+    LERI:            Landscape Evaporation Response Index
+    
+    TMIN:            Average Daily Minimum Temp (°C)
+    
+    TMAX:            Average Daily Maximum Temp (°C)
+    
+    TMEAN:           Mean Temperature (°C)
+    
+    TDMEAN:          Mean Dew Point Temperature (°C)
+    
+    PPT:             Average Precipitation (mm)
+    
+    VPDMAX:          Max Vapor Pressure Deficit (hPa)
+    
+    VPDMIN:          Min Vapor Pressure Deficit (hPa)
+    """)
 
 # County data frame and options
 counties_df = pd.read_csv('data/tables/unique_counties.csv')
@@ -1165,6 +1166,11 @@ def toggleOptions(click):
     Toggle options on/off
     '''
     if click % 2 == 0:
+        div_style = {'display': 'none'}
+        button_style = off_button_style
+        submit_style = {'display': 'none'}
+        children = "Display Options: Off"
+    else:
         div_style = {}
         button_style = on_button_style
         submit_style = {'background-color': '#C7D4EA',
@@ -1173,11 +1179,6 @@ def toggleOptions(click):
                         'margin-top': '100px',
                         'margin-bottom': '35px'}
         children = "Display Options: On"
-    else:
-        div_style = {'display': 'none'}
-        button_style = off_button_style
-        submit_style = {'display': 'none'}
-        children = "Display Options: Off"
     return div_style, button_style, submit_style, children
 
 
@@ -1911,7 +1912,10 @@ for i in range(1, 3):
         pdf['grid'] = grid2[pdf['gridy'], pdf['gridx']]
         pdf = pd.merge(pdf, admin_df, how='inner')
         pdf['data'] = pdf['data'].astype(float)
-        pdf['printdata'] = (pdf['place'] + "<br>  lat/lon: " + pdf['latbin'].apply(str) + ", " + pdf['lonbin'].astype(str) + "<br>     <b>" + pdf['data'].round(3).apply(str) + "</b>")
+        pdf['printdata'] = (pdf['place'] + "<br>  lat/lon: "
+                            + pdf['latbin'].apply(str) + ", "
+                            + pdf['lonbin'].astype(str) + "<br>     <b>"
+                            + pdf['data'].round(3).apply(str) + "</b>")
         df_flat = pdf.drop_duplicates(subset=['latbin', 'lonbin'])
         df = df_flat[np.isfinite(df_flat['data'])]
 
