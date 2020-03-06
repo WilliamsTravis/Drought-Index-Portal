@@ -97,42 +97,6 @@ warnings.filterwarnings("ignore")
 
 # In case the data needs to be stored elsewhere
 data_path = ''
-
-# In[] Default Values
-# For testing
-source_signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
-source_choice = 'pdsi'
-source_function = 'pmean'
-source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
-                   '[243, 242, 243, 244, 241, 242, 243, 244]',
-                   'Aroostook County, ME to Aroostook County, ME', 2]
-
-# Initializing Values
-default_function = 'omean'
-default_function_type = 'index'
-default_sample = 'spi1'
-default_1 = 'pdsi'
-default_2 = 'spi1'
-default_date = '2000 - 2019'
-default_basemap = 'dark'
-default_location = ('[["all", "y", "x", "Contiguous United States", 0], ' +
-                    '"None"]')
-default_years = [2000, 2019]
-default_extent = {'mapbox.center': {'lon': -92, 'lat': 40},
-                  'mapbox.zoom': 2.2, 'mapbox.bearing': 0, 'mapbox.pitch': 20}
-
-# Default click before the first click for any map (might not be necessary)
-default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
-                             'marker.color': 0, 'pointIndex': 0,
-                             'pointNumber': 0, 'text': 'Boulder County, CO'}]}
-
-# Default for click store (includes an index for most recent click)
-default_clicks = [list(np.repeat(default_click.copy(), 4)), 0]
-default_clicks = json.dumps(default_clicks)
-
-# For scaling
-ranges = pd.read_csv('data/tables/index_ranges.csv')
-
 # In[] The DASH application and server
 app = dash.Dash(__name__)
 
@@ -158,11 +122,57 @@ cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
 cache.init_app(server)
 cache2.init_app(server)
 
+# In[] Default Values
+# For testing
+source_signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
+source_choice = 'pdsi'
+source_function = 'pmean'
+source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
+                   '[243, 242, 243, 244, 241, 242, 243, 244]',
+                   'Aroostook County, ME to Aroostook County, ME', 2]
+
+# Get time dimensions from the first data set, assuming netcdfs are uniform
+sample_path = os.path.join(data_path, 'data/droughtindices/netcdfs/spi1.nc')
+with xr.open_dataset(sample_path) as data:
+    min_date = data.time.data[0]
+    max_date = data.time.data[-1]
+    resolution = data.crs.GeoTransform[1]
+max_year = pd.Timestamp(max_date).year
+min_year = pd.Timestamp(min_date).year + 5
+max_month = pd.Timestamp(max_date).month
+
+# Initializing Values
+default_function = 'omean'
+default_function_type = 'index'
+default_sample = 'spi1'
+default_1 = 'pdsi'
+default_2 = 'spi1'
+default_date = '1980 - {}'.format(max_year)
+default_basemap = 'dark'
+default_location = ('[["all", "y", "x", "Contiguous United States", 0], ' +
+                    '"None"]')
+default_years = [1980, max_year]
+default_extent = {'mapbox.center': {'lon': -92, 'lat': 40},
+                  'mapbox.zoom': 2.2, 'mapbox.bearing': 0, 'mapbox.pitch': 20}
+
+# Default click before the first click for any map (might not be necessary)
+default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
+                             'marker.color': 0, 'pointIndex': 0,
+                             'pointNumber': 0, 'text': 'Boulder County, CO'}]}
+
+# Default for click store (includes an index for most recent click)
+default_clicks = [list(np.repeat(default_click.copy(), 4)), 0]
+default_clicks = json.dumps(default_clicks)
+
+# For scaling
+ranges = pd.read_csv('data/tables/index_ranges.csv')
+
+
 # In[] Interface Options
 # Drought Index Options
 indices = [{'label': 'PDSI', 'value': 'pdsi'},
            {'label': 'PDSI-SC', 'value': 'pdsisc'},
-           # {'label': 'Palmer Z Index', 'value': 'pdsiz'},
+           {'label': 'Palmer Z Index', 'value': 'pdsiz'},
            {'label': 'SPI-1', 'value': 'spi1'},
            {'label': 'SPI-2', 'value': 'spi2'},
            {'label': 'SPI-3', 'value': 'spi3'},
@@ -392,17 +402,6 @@ RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
           [0.55, 'rgb(255, 255, 255)'], [0.60, 'rgb(143, 238, 252)'],
           [0.70, 'rgb(12,164,235)'], [0.80, 'rgb(0,125,255)'],
           [0.90, 'rgb(10,55,166)'], [1.00, 'rgb(5,16,110)']]
-
-# Get time dimensions from the first data set, assuming netcdfs are uniform
-with xr.open_dataset(
-        os.path.join(data_path,
-             'data/droughtindices/netcdfs/' + default_sample + '.nc')) as data:
-    min_date = data.time.data[0]
-    max_date = data.time.data[-1]
-    resolution = data.crs.GeoTransform[1]
-max_year = pd.Timestamp(max_date).year
-min_year = pd.Timestamp(min_date).year + 5
-max_month = pd.Timestamp(max_date).month
 
 # Get spatial dimensions from the sample data set above
 admin = Admin_Elements(resolution)
