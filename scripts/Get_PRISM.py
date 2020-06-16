@@ -213,7 +213,7 @@ for variable in variables:
         toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None,
                        savepath=albers_path, index=variable, proj=proj,
                        year1=1895, month1=1, year2=todays_date.year,
-                       month2=12, wmode='w', percentiles=False)           # I subtracted 2 to go back and check the update mode
+                       month2=12, wmode='w', percentiles=False) 
         toNetCDFPercentile(original_path, percentile_path)
 
         # Empty tif folder
