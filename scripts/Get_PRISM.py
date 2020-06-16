@@ -208,11 +208,11 @@ for variable in variables:
         # Original
         toNetCDF(tfiles=tfiles, ncfiles=None, savepath=original_path,
                  index=variable, proj=4326, year1=1895, month1=1,
-                 year2=todays_date.year - 2,  month2=12, wmode='w',
+                 year2=todays_date.year,  month2=12, wmode='w',
                  percentiles=False)
         toNetCDFAlbers(tfiles=tfiles_proj, ncfiles=None,
                        savepath=albers_path, index=variable, proj=proj,
-                       year1=1895, month1=1, year2=todays_date.year - 2,
+                       year1=1895, month1=1, year2=todays_date.year,
                        month2=12, wmode='w', percentiles=False)           # I subtracted 2 to go back and check the update mode
         toNetCDFPercentile(original_path, percentile_path)
 
