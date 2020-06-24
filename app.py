@@ -64,39 +64,45 @@ Created on April 15th 2019
 @author: Travis Williams - Earth Lab of the Universty of Colorado Boulder
          Travis.Williams@colorado.edu
 """
-# Functions and Libraries
+
 import base64
 import copy
-from collections import OrderedDict
-import dash
-from dash.dependencies import Input, Output, State
-from dash.exceptions import PreventUpdate
-import dash_core_components as dcc
-import dash_html_components as html
-import dash_table
 import datetime as dt
-import fiona
-from flask_caching import Cache
 import gc
-import geopandas as gpd
 import json
-import numpy as np
 import os
-from osgeo import gdal, osr
-import pandas as pd
 import psutil
 import tempfile
 import urllib
 import warnings
+
+from collections import OrderedDict
+
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import dash_table
+import fiona
+import geopandas as gpd
+import numpy as np
+import pandas as pd
 import xarray as xr
+
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
+from flask_caching import Cache
+from osgeo import gdal, osr
+
 from functions import Admin_Elements, Index_Maps, Location_Builder
 from functions import shapeReproject, unit_map
 
 # What to do with the mean of empty slice warning?
 warnings.filterwarnings("ignore")
 
+
 # In case the data needs to be stored elsewhere
-data_path = ''
+DATA_PATH = ''
+
 # In[] The DASH application and server
 app = dash.Dash(__name__)
 
@@ -124,7 +130,10 @@ cache2.init_app(server)
 
 # In[] Default Values
 # For testing
-source_signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
+source_signal = [
+    [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no'],
+    [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
+]
 source_choice = 'pdsi'
 source_function = 'pmean'
 source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
@@ -132,7 +141,7 @@ source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
                    'Aroostook County, ME to Aroostook County, ME', 2]
 
 # Get time dimensions from the first data set, assuming netcdfs are uniform
-sample_path = os.path.join(data_path, 'data/droughtindices/netcdfs/spi1.nc')
+sample_path = os.path.join(DATA_PATH, 'data/droughtindices/netcdfs/spi1.nc')
 with xr.open_dataset(sample_path) as data:
     min_date = data.time.data[0]
     max_date = data.time.data[-1]
@@ -450,7 +459,8 @@ layout = dict(
         accesstoken=mapbox_access_token,
         style="satellite-streets",
         center=dict(lon=-95.7, lat=37.1),
-        zoom=2))
+        zoom=2)
+)
 
 
 # In[] Temporary CSS Items
@@ -738,7 +748,7 @@ navbar = html.Nav(
                         title=('Sync/unsync the location ' +
                                'of the time series between each map.'),
                         style={'display': 'none'}),
-            html.Button(id="year_sync",
+            html.Button(id="date_sync",
                         children='Year Syncing: On',
                         title=('Sync/unsync the years ' +
                                'of the time series between each map.'),
@@ -767,8 +777,9 @@ body = html.Div([
                    'text-align': 'center',
                    'font-size': '50px',
                    'font-family': 'Times New Roman',
-                   'margin-top': '100'}),
-                   # End Title
+                   'margin-top': '100'}
+            ),
+            # End Title
 
      # Description
      html.Div([
@@ -780,29 +791,31 @@ body = html.Div([
          html.Hr(style={'margin-bottom': '1px'})],
          style={'text-align':'center',
                 'margin': '0 auto',
-                'width': '100%'}),
-                # End Description
+                'width': '100%'}
+         ),
+         # End Description
 
      # Options
      html.Div(id='options',
               children=[
 
-                # Year Slider
+                # Year Sliders
                 html.Div([
-                  html.H3(id='date_range',
+                  html.H3(id='date_range_1',
                           children=['Date Range']),
                   html.Div([
-                    dcc.RangeSlider(id='year_slider',
+                    dcc.RangeSlider(id='year_slider_1',
                                     value=default_years,
                                     min=min_year,
                                     max=max_year,
                                     updatemode='drag',
                                     marks=yearmarks)],
                     style={'margin-top': '0', 'margin-bottom': '80'}),
+
                   html.Div(id='year_div2',
                     children=[
-                      html.H3(id='date_range2', children='Date Range #2'),
-                      dcc.RangeSlider(id='year_slider2',
+                      html.H3(id='date_range_2', children='Date Range #2'),
+                      dcc.RangeSlider(id='year_slider_2',
                                       value=default_years,
                                       min=min_year,
                                       max=max_year,
@@ -812,12 +825,15 @@ body = html.Div([
                            'margin-bottom': '80'})]),
                            # End Year Slider
 
-                # Month Options
+                # Month Options #1
                 html.Div(
                   children=[
                           html.Div([
-                             html.H5('Start Month'),
-                             dcc.Slider(id='month_slider_1',
+                             html.H5(
+                                 id='month_start_print_1',
+                                 children='Start Month'
+                             ),
+                             dcc.Slider(id='month_slider_1a',
                                         value=1,
                                         marks=months_slanted,
                                         min=1,
@@ -828,8 +844,11 @@ body = html.Div([
                              title=('Choose the first month of the first ' +
                                     'year of the study period.')),
                           html.Div([
-                             html.H5('End Month'),
-                             dcc.Slider(id='month_slider_2',
+                             html.H5(
+                                 id="month_end_print_1",
+                                 children='End Month'
+                             ),
+                             dcc.Slider(id='month_slider_1b',
                                         value=12,
                                         marks=months_slanted,
                                         min=1,
@@ -841,18 +860,21 @@ body = html.Div([
                                     'of the study period.')),
                           html.Div(
                             children=[
-                              html.H5('Included Months'),
+                              html.H5(
+                                  id="month_filter_print_1",
+                                  children='Included Months'
+                              ),
                               dcc.Checklist(
                                 className='check_blue',
-                                id='month',
+                                id='month_check_1',
                                 options=monthoptions,
                                 values=list(range(1, 13)),
                                 labelStyle={'display': 'inline-block'}),
-                              html.Button(id='all_months', type='button',
+                              html.Button(id='all_months_1', type='button',
                                           children='All',
                                           style={'height': '25px',
                                                  'line-height': '25px'}),
-                              html.Button(id='no_months', type='button',
+                              html.Button(id='no_months_1', type='button',
                                           children='None',
                                           style={'height': '25px',
                                                  'line-height': '25px'})],
@@ -861,6 +883,60 @@ body = html.Div([
                                    'be included.'))],
                         className='row'),
                         # End Month Options
+
+               # Month Options  #2
+                html.Div(
+                  id="month_div2",
+                  children=[
+                          html.Div([
+                             html.H5('Start Month #2'),
+                             dcc.Slider(id='month_slider_2a',
+                                        value=1,
+                                        marks=months_slanted,
+                                        min=1,
+                                        max=12,
+                                        updatemode='drag',
+                                        included=False,)],
+                             className='three columns',
+                             title=('Choose the first month of the first ' +
+                                    'year of the study period.')),
+                          html.Div([
+                             html.H5('End Month #2'),
+                             dcc.Slider(id='month_slider_2b',
+                                        value=12,
+                                        marks=months_slanted,
+                                        min=1,
+                                        max=12,
+                                        updatemode='drag',
+                                        included=False)],
+                             className='three columns',
+                             title=('Choose the last month of the last year ' +
+                                    'of the study period.')),
+                          html.Div(
+                            children=[
+                              html.H5('Included Months #2'),
+                              dcc.Checklist(
+                                className='check_blue',
+                                id='month_check_2',
+                                options=monthoptions,
+                                values=list(range(1, 13)),
+                                labelStyle={'display': 'inline-block'}),
+                              html.Button(id='all_months_2', type='button',
+                                          children='All',
+                                          style={'height': '25px',
+                                                 'line-height': '25px'}),
+                              html.Button(id='no_months_2', type='button',
+                                          children='None',
+                                          style={'height': '25px',
+                                                 'line-height': '25px'})],
+                            className='six columns',
+                            title=('Choose which months of the year to ' +
+                                   'be included.'))],
+                        style = {'display': 'none', 'margin-top': '30',
+                                 'margin-bottom': '30'},
+                        className='row'),
+                        # End Month Options
+
 
                 # Rendering Options
                 html.Div(id='options_div',
@@ -922,7 +998,7 @@ body = html.Div([
                    style={'margin-bottom': '50',
                           'margin-top': '50',
                           'text-align': 'center'})],
-               style={'text-align': 'center'}   ,                 
+               style={'text-align': 'center'},                 
                className='row'),
                # End Options
 
@@ -951,9 +1027,9 @@ body = html.Div([
 
        # Signals
        html.Div(id='signal', style={'display': 'none'}),
-       html.Div(id='date_print', children=default_date,
+       html.Div(id='date_print_1', children=default_date,
                 style={'display': 'none'}),
-       html.Div(id='date_print2', children=default_date,
+       html.Div(id='date_print_2', children=default_date,
                 style={'display': 'none'}),
        html.Div(id='location_store_1', children=default_location,
                 style={'display': 'none'}),
@@ -973,20 +1049,15 @@ app.layout = html.Div([navbar, body])
 
 # In[]: App Callbacks
 # For singular elements
-@app.callback([Output('date_range', 'children'),
-               Output('date_print', 'children'),
-               Output('date_range2', 'children'),
-               Output('date_print2', 'children')],
-              [Input('year_slider', 'value'),
-               Input('year_slider2', 'value'),
-               Input('month_slider_1', 'value'),
-               Input('month_slider_2', 'value'),
-               Input('month', 'values'),
-               Input('year_sync', 'n_clicks')])
-def adjustDatePrint(year_range,year_range2, month_1,  month_2, months, sync):
-    '''
-    If users select one year, only print it once
-    '''
+@app.callback([Output('date_range_1', 'children'),
+               Output('date_print_1', 'children')],
+              [Input('year_slider_1', 'value'),
+               Input('month_slider_1a', 'value'),
+               Input('month_slider_1b', 'value'),
+               Input('month_check_1', 'values'),
+               Input('date_sync', 'n_clicks')])
+def adjustDatePrint1(year_range, month_a,  month_b, month_check, sync):
+    '''If users select one year, only print it once.'''
     # If not syncing, these need numbers
     if not sync:
         sync = 0
@@ -996,22 +1067,26 @@ def adjustDatePrint(year_range,year_range2, month_1,  month_2, months, sync):
         number = " #1"
 
     # Don't print start and end months if full year is chosen
-    month_1 = monthmarks[month_1]
-    month_2 = monthmarks[month_2]
-    if month_1 == 'Jan' and month_2 == 'Dec':
+    month_a = monthmarks[month_a]
+    month_b = monthmarks[month_b]
+    if month_a == 'Jan' and month_b == 'Dec':
         mrs = ['', '']
         mjoin = ''
     else:
-        mrs = [month_1 + ' ', month_2 + ' ']
+        mrs = [month_a + ' ', month_b + ' ']
         mjoin = ' - '
 
     # Don't print months included if all are included
-    if len(months) == 12:
+    if not month_check[0]:
+        month_check = month_check[1:]
+    
+    if len(month_check) == 12 or len(month_check) == 0:
         month_incl_print = ""
     else:
+        month_check.sort()
         if months[0]:
             month_incl_print = "".join([monthmarks[a][0].upper() for
-                                        a in months])
+                                        a in month_check])
             month_incl_print = ' (' + month_incl_print + ')'
         else:
             month_incl_print = ''
@@ -1027,24 +1102,99 @@ def adjustDatePrint(year_range,year_range2, month_1,  month_2, months, sync):
         string = (mrs[0] + str(year_range[0]) + ' - ' + mrs[1] +
                   str(year_range[1]))
 
-    # Year slider #2: If a single year do this
-    if year_range2[0] == year_range2[1]:
-        string2 = str(year_range2[0])
-        if mrs[0] == mrs[1]:
-            string2 = mrs[0] + str(year_range2[0])
-        else:
-            string2 = mrs[0] + mjoin + mrs[1] + str(year_range2[0])
+    # And now add the month printouts
+    string = string + month_incl_print
+    full = 'Date Range' + number + ':  ' + string
+
+    return full, string
+
+
+@app.callback([Output('date_range_2', 'children'),
+               Output('date_print_2', 'children')],
+              [Input('year_slider_2', 'value'),
+               Input('month_slider_2a', 'value'),
+               Input('month_slider_2b', 'value'),
+               Input('month_check_2', 'values'),
+               Input('date_sync', 'n_clicks')])
+def adjustDatePrint2(year_range, month_a,  month_b, month_check, sync):
+    '''If users select one year, only print it once.'''
+    # If not syncing, these need numbers
+    if not sync:
+        sync = 0
+    if sync % 2 == 0:
+        number = ""
     else:
-        string2 = (mrs[0] + str(year_range2[0]) + ' - ' + mrs[1] +
-                  str(year_range2[1]))
+        number = " #2"
+
+    # Don't print start and end months if full year is chosen
+    month_a = monthmarks[month_a]
+    month_b = monthmarks[month_b]
+    if month_a == 'Jan' and month_b == 'Dec':
+        mrs = ['', '']
+        mjoin = ''
+    else:
+        mrs = [month_a + ' ', month_b + ' ']
+        mjoin = ' - '
+
+    # Don't print months included if all are included
+    if not month_check[0]:
+        month_check = month_check[1:]
+    
+    if len(month_check) == 12 or len(month_check) == 0:
+        month_incl_print = ""
+    else:
+        month_check.sort()
+        if months[0]:
+            month_incl_print = "".join([monthmarks[a][0].upper() for
+                                        a in month_check])
+            month_incl_print = ' (' + month_incl_print + ')'
+        else:
+            month_incl_print = ''
+
+    # Year slider #1: If a single year do this
+    if year_range[0] == year_range[1]:
+        string = str(year_range[0])
+        if mrs[0] == mrs[1]:
+            string = mrs[0] + str(year_range[0])
+        else:
+            string = mrs[0] + mjoin + mrs[1] + str(year_range[0])
+    else:
+        string = (mrs[0] + str(year_range[0]) + ' - ' + mrs[1] +
+                  str(year_range[1]))
 
     # And now add the month printouts
     string = string + month_incl_print
-    string2 = string2 + month_incl_print
     full = 'Date Range' + number + ':  ' + string
-    full2 = 'Date Range #2:  ' + string2
 
-    return full, string, full2, string2
+    return full, string
+
+
+@app.callback([Output('month_start_print_1', 'children'),
+               Output('month_end_print_1', 'children'),
+               Output('month_filter_print_1', 'children')],
+              [Input('date_sync', 'n_clicks')])
+def adjustMonthPrint1(sync):
+    '''If users turn date syncing off, print #1 after each month element.'''
+    
+    start = "Start Month"
+    end = "End Month"
+    filters = "Included Months"
+
+    # If not syncing, these need numbers
+    if not sync:
+        sync = 0
+    if sync % 2 == 0:
+        number = ""
+    else:
+        number = " #1"
+
+    start = start + number
+    end = end + number
+    filters = filters + number
+
+    return start, end, filters
+
+
 
 
 @app.callback([Output('function_choice', 'options'),
@@ -1128,9 +1278,7 @@ def retrieveData(signal, function, choice, location):
               [Input('choice_1', 'value'),
                Input('choice_2', 'value')])
 def storeIndexChoices(choice1, choice2):
-    '''
-    Collect and hide both data choices in the hidden 'choice_store' div
-    '''
+    ''' Collect and hide both data choices in the hidden 'choice_store' div.'''
     return (json.dumps([choice1, choice2]))
 
 
@@ -1138,32 +1286,38 @@ def storeIndexChoices(choice1, choice2):
               [Input('submit', 'n_clicks')],
               [State('colors', 'value'),
                State('reverse', 'value'),
-               State('year_slider', 'value'),
-               State('year_slider2', 'value'),
-               State('month_slider_1', 'value'),
-               State('month_slider_2', 'value'),
-               State('month', 'values')])
-def submitSignal(click, colorscale, reverse, year_range, year_range2,
-                 month_1, month_2, month_filter):
-    '''
-    Collect and hide the options signal in the hidden 'signal' div.
-    '''
+               State('year_slider_1', 'value'),
+               State('month_slider_1a', 'value'),
+               State('month_slider_1b', 'value'),
+               State('month_check_1', 'values'),
+               State('year_slider_2', 'value'),
+               State('month_slider_2a', 'value'),
+               State('month_slider_2b', 'value'),
+               State('month_check_2', 'values')])
+def submitSignal(click, colorscale, reverse, year_range_1, month_1a, month_1b,
+                 month_check_1, year_range_2, month_2a, month_2b,
+                 month_check_2):
+    '''Collect and hide the options signal in the hidden 'signal' div.'''
+
     # This is to translate the inverse portion of the month range
-    month_range = [month_1, month_2]
-    signal = [[year_range, year_range2, month_range, month_filter], colorscale,
-              reverse]
+    month_range_1 = [month_1a, month_1b]
+    month_range_2 = [month_2a, month_2b]
+    signal_1 = [[year_range_1, month_range_1, month_check_1],
+                 colorscale, reverse]
+    signal_2 = [[year_range_2, month_range_2, month_check_2],
+                 colorscale, reverse]
+    signal = [signal_1, signal_2]
+    # print("SIGNAL = " + signal)
     return json.dumps(signal)
 
-
+                       
 @app.callback([Output('options', 'style'),
                Output('toggle_options', 'style'),
                Output('submit', 'style'),
                Output('toggle_options', 'children')],
               [Input('toggle_options', 'n_clicks')])
 def toggleOptions(click):
-    '''
-    Toggle options on/off
-    '''
+    '''Toggle options on/off'''
     if click % 2 == 0:
         div_style = {'display': 'none'}
         button_style = off_button_style
@@ -1185,9 +1339,7 @@ def toggleOptions(click):
                Output('click_sync', 'children')],
               [Input('click_sync', 'n_clicks')])
 def toggleLocationSyncButton(click):
-    '''
-    Change the color of on/off location syncing button - for css
-    '''
+    '''Change the color of on/off location syncing button - for css'''
     if not click:
         click = 0
     if click % 2 == 0:
@@ -1199,13 +1351,31 @@ def toggleLocationSyncButton(click):
     return style, children
 
 
-@app.callback(Output('month', 'values'),
-              [Input('all_months', 'n_clicks'),
-               Input('no_months', 'n_clicks')])
-def toggleMonthFilter(all_months, no_months):
-    '''
-    This fills or empties the month filter boxes with/of checks
-    '''
+@app.callback(Output('month_check_1', 'values'),
+              [Input('all_months_1', 'n_clicks'),
+               Input('no_months_1', 'n_clicks')])
+def toggleMonthFilter1(all_months, no_months):
+    '''This fills or empties the month filter boxes with/of checks'''
+    # If no clicks yet, prevent update
+    if not any([all_months, no_months]):
+        raise PreventUpdate
+
+    # Find which input triggered this callback
+    context = dash.callback_context
+    triggered_value = context.triggered[0]['value']
+    trigger = context.triggered[0]['prop_id']
+    if triggered_value:
+        if 'all' in trigger:
+            return list(range(1, 13))
+        else:
+            return [None]
+
+
+@app.callback(Output('month_check_2', 'values'),
+              [Input('all_months_2', 'n_clicks'),
+               Input('no_months_2', 'n_clicks')])
+def toggleMonthFilter1(all_months, no_months):
+    '''This fills or empties the month filter boxes with/of checks'''
     # If no clicks yet, prevent update
     if not any([all_months, no_months]):
         raise PreventUpdate
@@ -1222,8 +1392,8 @@ def toggleMonthFilter(all_months, no_months):
 
 
 @app.callback(Output('year_div2', 'style'),
-              [Input('year_sync', 'n_clicks')])
-def toggleYearSlider(click):
+              [Input('date_sync', 'n_clicks')])
+def toggleYears2(click):
     '''
     When syncing years, there should only be one time slider
     '''
@@ -1236,22 +1406,38 @@ def toggleYearSlider(click):
     return style
 
 
-@app.callback([Output('year_sync', 'style'),
-               Output('year_sync', 'children')],
-              [Input('year_sync', 'n_clicks')])
-def toggleYearSyncButton(click):
+@app.callback(Output('month_div2', 'style'),
+              [Input('date_sync', 'n_clicks')])
+def toggleMonths2(click):
     '''
-    Change the color of on/off year syncing button - for css
+    When syncing years, there should only be one time slider
     '''
     if not click:
         click = 0
     if click % 2 == 0:
-        children = "Year Syncing: On"
+        style = {'display': 'none', 'margin-top': '0', 'margin-bottom': '80'}
+    else:
+        style = {'margin-top': '30', 'margin-bottom': '30'}
+    return style
+
+
+@app.callback([Output('date_sync', 'style'),
+               Output('date_sync', 'children')],
+              [Input('date_sync', 'n_clicks')])
+def toggleYearSyncButton(click):
+    '''
+    Change the color of on/off date syncing button - for css
+    '''
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        children = "Date Syncing: On"
         style = on_button_style
     else:
-        children = "Year Syncing: Off"
+        children = "Date Syncing: Off"
         style = off_button_style
     return style, children
+
 
 # In[] App callbacks
 # For multiple instances
@@ -1740,12 +1926,12 @@ for i in range(1, 3):
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
-                   State('year_sync', 'children'),
-                   State('date_print', 'children'),
-                   State('date_print2', 'children'),
+                   State('date_sync', 'children'),
+                   State('date_print_1', 'children'),
+                   State('date_print_2', 'children'),
                    State('map_{}'.format(i), 'relayoutData'),])
     def makeMap(choice1, choice2, map_type, signal, location, function, key,
-                sync, year_sync, date_print, date_print2, map_extent):
+                sync, date_sync, date_print_1, date_print_2, map_extent):
         '''
         This actually renders the map. I want to modularize, but am struggling
         on this.
@@ -1757,15 +1943,15 @@ for i in range(1, 3):
         choice1 = 'pdsi'
         choice2 = 'spi4'
         function = 'omean'
-        date_print = '2000 - 2019'
-        year_sync = 'On'
+        date_print_1 = '2000 - 2019'
+        date_sync = 'On'
         '''
         print("SIGNAL: " + signal)
         # Temporary, split location up
         location = json.loads(location)
         location, crds = location
 
-        # To save zoom levels and extent between map options (funny how this works)
+        # To save zoom levels and extent between map options
         if not map_extent:
             map_extent = default_extent
         elif 'mapbox.center' not in map_extent.keys():
@@ -1794,19 +1980,20 @@ for i in range(1, 3):
         # Create signal for the global_store
         signal = json.loads(signal)
 
-        # Collect signal elements
-        [[year_range, year_range2, [month1, month2], month_filter],
-         colorscale, reverse] = signal
-
-        # If we are syncing times, pop the second year range
-        if 'On' in year_sync:
-            signal[0].pop(1)
+        # If we are syncing times, use the key to find the right signal
+        if 'On' in date_sync:
+            signal = signal[0]
         else:
-            if key == 1:
-                signal[0].pop(1)
-            else:
-                signal[0].pop(0)
-                date_print = date_print2
+            signal = signal[key - 1]
+
+        # Collect signals
+        [year_range, [month1, month2], month_filter] = signal[0]
+        [colorscale, reverse] = signal[1:]
+
+        if key == 1:
+            date_print = date_print_1
+        else:
+            date_print = date_print_2
 
         # DASH doesn't seem to like passing True/False as values
         verity = {'no': False, 'yes':True}
@@ -1990,11 +2177,11 @@ for i in range(1, 3):
                    Input('dsci_button_{}'.format(i), 'n_clicks')],
                   [State('key_{}'.format(i), 'children'),
                    State('click_sync', 'children'),
-                   State('year_sync', 'children'),
+                   State('date_sync', 'children'),
                    State('function_choice', 'value'),
                    State('area_store_{}'.format(i), 'children')])
     def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
-                   key, sync, year_sync, function, area_store):
+                   key, sync, date_sync, function, area_store):
         '''
         This makes the time series graph below the map.
         Sample arguments:
@@ -2023,20 +2210,18 @@ for i in range(1, 3):
 
         # Create signal for the global_store
         choice_store = json.loads(choice_store)
+        print("SIGNAL = " + signal)
         signal = json.loads(signal)
 
-        # Collect signals
-        [[year_range, year_range2, [month1, month2],
-         month_filter], colorscale, reverse] = signal
-
-        # If we are syncing times, pop the second year range
-        if 'On' in year_sync:
-            signal[0].pop(1)
+        # If we are syncing times, use the key to find the right signal
+        if 'On' in date_sync:
+            signal = signal[0]
         else:
-            if key == 1:
-                signal[0].pop(1)
-            else:
-                signal[0].pop(0)
+            signal = signal[key - 1]
+
+        # Collect signals
+        [year_range, [month1, month2], month_filter] = signal[0]
+        [colorscale, reverse] = signal[1:]
 
         # DASH doesn't seem to like passing True/False as values
         verity = {'no': False, 'yes': True}
@@ -2122,9 +2307,9 @@ for i in range(1, 3):
                 sd = data.dataset_interval.where(xmask == 1).std()
                 sd = float(sd.compute().value) # Sheesh
                 if 'eddi' in choice:
-                    sd = sd*-1
-                dmin = 3*sd
-                dmax = 3*sd*-1
+                    sd = sd * -1
+                dmin = 3 * sd
+                dmax = 3 * sd * -1
 
         # A few pieces to incorporate in to Index_Maps later
         if 'corr' in function:
