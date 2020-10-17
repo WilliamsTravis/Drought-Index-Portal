@@ -47,23 +47,26 @@ Created on Fri Feb  10 14:33:38 2019
 @author: user
 """
 
-from bs4 import BeautifulSoup
-from glob import glob
 import datetime as dt
 import logging
-from netCDF4 import Dataset
-import numpy as np
 import os
-from osgeo import gdal
-import pandas as pd
 import pathlib
 import requests
-from socket import timeout
 import sys
-from tqdm import tqdm
-from urllib.error import HTTPError, URLError
 import urllib
+
+from glob import glob
+from socket import timeout
+from urllib.error import HTTPError, URLError
+
+import numpy as np
+import pandas as pd
 import xarray as xr
+
+from bs4 import BeautifulSoup
+from netCDF4 import Dataset
+from osgeo import gdal
+from tqdm import tqdm
 
 # Refactor all of this
 pwd = str(pathlib.Path(__file__).parent.absolute())

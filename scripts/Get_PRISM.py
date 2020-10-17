@@ -8,17 +8,18 @@ Created on Sun May 12 09:36:50 2019
 """
 
 import datetime as dt
+import ftplib
 import os
 import pathlib
 import sys
 import zipfile
 
-import ftplib
+from glob import glob
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from glob import glob
 from osgeo import gdal
 from netCDF4 import Dataset
 from tqdm import tqdm

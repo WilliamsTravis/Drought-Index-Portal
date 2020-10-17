@@ -46,7 +46,7 @@ Things to do:
     5) Fully integrate DASK. It turns out that xarray already uses dask and
        was keeping much of the data on disk. This helps to avoid memory
        errors and improve speed. With the area calculations it worsens it
-       significantly though... is this an inevitable tradeoff?
+       significantly though...is this an inevitable tradeoff?
     6) Describe new climate data sets:
         http://www.prism.oregonstate.edu/documents/PRISM_datasets_aug2013.pdf
     7) Consolidate all of the download scripts into one. Also, incorporate the
@@ -69,6 +69,7 @@ import base64
 import copy
 import datetime as dt
 import gc
+import io
 import json
 import os
 import psutil
@@ -91,10 +92,11 @@ import xarray as xr
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from flask_caching import Cache
+from flask import send_file
 from osgeo import gdal, osr
-
-from functions import Admin_Elements, Index_Maps, Location_Builder
-from functions import shapeReproject, unit_map
+from tqdm import tqdm
+from functions import (Admin_Elements, Index_Maps, Location_Builder,
+                       print_args, shapeReproject, unit_map)
 
 # What to do with the mean of empty slice warning?
 warnings.filterwarnings("ignore")
@@ -102,6 +104,7 @@ warnings.filterwarnings("ignore")
 
 # In case the data needs to be stored elsewhere
 DATA_PATH = ''
+
 
 # In[] The DASH application and server
 app = dash.Dash(__name__)
@@ -131,11 +134,13 @@ cache2.init_app(server)
 # In[] Default Values
 # For testing
 source_signal = [
-    [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no'],
-    [[[2000, 2017], [1, 12], [5, 6, 7, 8]], 'Viridis', 'no']
+    [[[1980, 2020], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 
+     'Default', 'no'],
+    [[[2000, 2020], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 
+     'Default', 'no']
 ]
-source_choice = 'pdsi'
-source_function = 'pmean'
+source_choice = 'spi1'
+source_function = 'omean'
 source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
                    '[243, 242, 243, 244, 241, 242, 243, 244]',
                    'Aroostook County, ME to Aroostook County, ME', 2]
@@ -153,9 +158,9 @@ max_month = pd.Timestamp(max_date).month
 # Initializing Values
 default_function = 'omean'
 default_function_type = 'index'
-default_sample = 'spi1'
-default_1 = 'pdsi'
-default_2 = 'spi1'
+default_sample = 'spi3'
+default_1 = 'spi11'
+default_2 = 'spi3'
 default_date = '1980 - {}'.format(max_year)
 default_basemap = 'dark'
 default_location = ('[["all", "y", "x", "Contiguous United States", 0], ' +
@@ -231,9 +236,7 @@ indices = [{'label': 'PDSI', 'value': 'pdsi'},
            ]
 
 # Index dropdown labels
-indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
-              'mdn1': 'Mean Temperature Departure  (1981 - 2010) - 1 month',
-              'pdsi': 'Palmer Drought Severity Index',
+indexnames = {'pdsi': 'Palmer Drought Severity Index',
               'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
               'pdsiz': 'Palmer Z-Index',
               'spi1': 'Standardized Precipitation Index - 1 month',
@@ -284,8 +287,8 @@ indexnames = {'noaa': 'NOAA CPC-Derived Rainfall Index',
               'eddi10': 'Evaporative Demand Drought Index - 10 month',
               'eddi11': 'Evaporative Demand Drought Index - 11 month',
               'eddi12': 'Evaporative Demand Drought Index - 12 month',
-              'leri1': 'Landscape Evaporative Response Index - 1 month',
-              'leri3': 'Landscape Evaporative Response Index - 3 month',
+              # 'leri1': 'Landscape Evaporative Response Index - 1 month',
+              # 'leri3': 'Landscape Evaporative Response Index - 3 month',
               'tmin': 'Average Daily Minimum Temperature (°C)',
               'tmax': 'Average Daily Maximum Temperature (°C)',
               'tmean': 'Mean Temperature (°C)',
@@ -307,10 +310,10 @@ function_options_orig = [{'label': 'Mean', 'value': 'omean'},
 function_names = {'pmean': 'Average Percentiles',
                   'pmax': 'Maxmium Percentiles',
                   'pmin': 'Minimum Percentiles',
-                  'omean': 'Average Index Values',
-                  'omax': 'Maximum Index Values',
-                  'omin': 'Minimum Index Values',
-                  'oarea': 'Average Index Values',
+                  'omean': 'Average Values',
+                  'omax': 'Maximum Values',
+                  'omin': 'Minimum Values',
+                  'oarea': 'Average Values',
                   'pcorr': "Pearson's Correlation ",
                   'ocorr': "Pearson's Correlation "}
 
@@ -604,7 +607,30 @@ def divMaker(id_num, index='noaa'):
 
             html.Div([
               dcc.Graph(id='map_{}'.format(id_num),
-                        config={'showSendToCloud': True})]),
+                        config={'showSendToCloud': True}),
+              html.Div([
+                   html.P("Point Size:",
+                           className="two columns",
+                           style={"margin-top": 3.5, "padding": 0, "float": "left",
+                                  "font-size": "120%"}),
+                  dcc.Input(id="point_size_{}".format(id_num),
+                            type="number",
+                            value=4,
+                            className="one column",
+                            style={'background-color': 'white',
+                                   "border-wdith": 0,
+                                   'font-family': 'Times New Roman',
+                                   "margin": 0,
+                                   "padding": 0,
+                                   "float": "left",
+                                   'border-left': '0px',
+                                   'border-right': '0px',
+                                   'border-top': '0px',
+                                   'border-bottom': '0px',
+                                   "jutifyContent": "center"}
+                        )
+                  ], className="row"),
+              ]),
             html.Div([
               dcc.Graph(id='series_{}'.format(id_num),
                         config={'showSendToCloud': True})]),
@@ -623,13 +649,25 @@ def divMaker(id_num, index='noaa'):
               n_clicks=2,
               children=['Show DSCI: Off']),
             html.Hr(),
-            html.A('Download Timeseries Data',
+            html.A('Download Selected Data',
                    id='download_link_{}'.format(id_num),
                    download='timeseries_{}.csv'.format(id_num),
                    title=
-                     ('This csv includes information for only this element ' +
-                      'and is titled "timeseries_{}.csv"'.format(id_num)),
+                    ('This csv includes data resulting from the selections '
+                     + ' made for the element above and is titled '
+                     + '"timeseries_{}.csv"'.format(id_num)),
                    href="", target='_blank'),
+            html.A('Download Selected Data (All Indicators)', 
+                   id="download_all_link_{}".format(id_num),
+                   download='timeseries_all_{}.csv'.format(id_num),
+                   title=
+                     ('This csv includes data for all available indices/'
+                      + 'indicators given the selections made for the '
+                      + ' element above and is titled '
+                      + '"timeseries_all_{}.csv"'.format(id_num)),
+                   href="/download", target='_blank',
+                   style={"margin-left": "15px"}),
+            dcc.Store(id='download_store_{}'.format(id_num)),
             html.Div(id='key_{}'.format(id_num),
                      children='{}'.format(id_num),
                      style={'display': 'none'}),
@@ -1026,7 +1064,8 @@ body = html.Div([
                 # End Map Divs
 
        # Signals
-       html.Div(id='signal', style={'display': 'none'}),
+       html.Div(id='signal', children=json.dumps(source_signal),
+                style={'display': 'none'}),
        html.Div(id='date_print_1', children=default_date,
                 style={'display': 'none'}),
        html.Div(id='date_print_2', children=default_date,
@@ -1211,29 +1250,6 @@ def optionsFunctions(function_type):
         return function_options_orig, 'omean'
 
 
-@app.callback([Output('description', 'children'),
-               Output('desc_button', 'style'),
-               Output('desc_button', 'children')],
-              [Input('desc_button', 'n_clicks')])
-def toggleDescription(click):
-    '''
-    Toggle description on/off
-    '''
-    if not click:
-        click = 0
-    if click % 2 == 0:
-        desc_children = ""
-        style = off_button_style
-        button_children = "Description: Off"
-
-    else:
-        desc_children = open('data/tables/description.txt').read()  # <-------- It makes no sense that the description doc is in the tables folder
-        style = on_button_style
-        button_children = "Description: On"
-
-    return desc_children, style, button_children
-
-
 @cache.memoize()
 def retrieveData(signal, function, choice, location):
     '''
@@ -1297,8 +1313,7 @@ def storeIndexChoices(choice1, choice2):
 def submitSignal(click, colorscale, reverse, year_range_1, month_1a, month_1b,
                  month_check_1, year_range_2, month_2a, month_2b,
                  month_check_2):
-    '''Collect and hide the options signal in the hidden 'signal' div.'''
-
+    """"Collect and hide the options signal in the hidden 'signal' div."""
     # This is to translate the inverse portion of the month range
     month_range_1 = [month_1a, month_1b]
     month_range_2 = [month_2a, month_2b]
@@ -1307,10 +1322,30 @@ def submitSignal(click, colorscale, reverse, year_range_1, month_1a, month_1b,
     signal_2 = [[year_range_2, month_range_2, month_check_2],
                  colorscale, reverse]
     signal = [signal_1, signal_2]
-    # print("SIGNAL = " + signal)
     return json.dumps(signal)
 
-                       
+
+@app.callback([Output('description', 'children'),
+               Output('desc_button', 'style'),
+               Output('desc_button', 'children')],
+              [Input('desc_button', 'n_clicks')])
+def toggleDescription(click):
+    """Toggle description on/off."""
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        desc_children = ""
+        style = off_button_style
+        button_children = "Description: Off"
+
+    else:
+        desc_children = open('data/tables/description.txt').read()  # <-------- It makes no sense that the description doc is in the tables folder
+        style = on_button_style
+        button_children = "Description: On"
+
+    return desc_children, style, button_children
+
+
 @app.callback([Output('options', 'style'),
                Output('toggle_options', 'style'),
                Output('submit', 'style'),
@@ -1504,12 +1539,12 @@ for i in range(1, 3):
                 triggered_value['points']  = tv
 
             # print out variables for developing
-            print("key = " + json.dumps(key))
-            print("sync = " + json.dumps(sync))
-            print("locations = " + str(locations))
-            print("updates = " + str(updates))
-            print("triggered_value = " + str(triggered_value))
-            print("trigger = " + json.dumps(trigger))
+            # print("key = " + json.dumps(key))
+            # print("sync = " + json.dumps(sync))
+            # print("locations = " + str(locations))
+            # print("updates = " + str(updates))
+            # print("triggered_value = " + str(triggered_value))
+            # print("trigger = " + json.dumps(trigger))
 
             # Two cases, if syncing return a copy, if not split
             if 'On' in sync:
@@ -1922,6 +1957,7 @@ for i in range(1, 3):
                    Input('choice_2', 'value'),
                    Input('map_type', 'value'),
                    Input('signal', 'children'),
+                   Input("point_size_{}".format(i), "value"),
                    Input('location_store_{}'.format(i), 'children')],
                   [State('function_choice', 'value'),
                    State('key_{}'.format(i), 'children'),
@@ -1930,8 +1966,9 @@ for i in range(1, 3):
                    State('date_print_1', 'children'),
                    State('date_print_2', 'children'),
                    State('map_{}'.format(i), 'relayoutData'),])
-    def makeMap(choice1, choice2, map_type, signal, location, function, key,
-                sync, date_sync, date_print_1, date_print_2, map_extent):
+    def makeMap(choice1, choice2, map_type, signal, point_size, location,
+                function, key, sync, date_sync, date_print_1, date_print_2,
+                map_extent):
         '''
         This actually renders the map. I want to modularize, but am struggling
         on this.
@@ -1946,7 +1983,7 @@ for i in range(1, 3):
         date_print_1 = '2000 - 2019'
         date_sync = 'On'
         '''
-        print("SIGNAL: " + signal)
+        # print("SIGNAL: " + signal)
         # Temporary, split location up
         location = json.loads(location)
         location, crds = location
@@ -1956,14 +1993,13 @@ for i in range(1, 3):
             map_extent = default_extent
         elif 'mapbox.center' not in map_extent.keys():
             map_extent = default_extent
-        print(str(map_extent))
+        # print(str(map_extent))
 
         # Identify element number
         key = int(key)
 
         # Prevent update from location unless it is a state or shape filter
         trig = dash.callback_context.triggered[0]['prop_id']
-
         if trig == 'location_store_{}.children'.format(key):
             if 'corr' not in function:
                 if 'grid' in location[0]:
@@ -1983,17 +2019,17 @@ for i in range(1, 3):
         # If we are syncing times, use the key to find the right signal
         if 'On' in date_sync:
             signal = signal[0]
+            date_print = date_print_1
         else:
             signal = signal[key - 1]
+            if key == 1:
+                date_print = date_print_1
+            else:
+                date_print = date_print_2
 
         # Collect signals
         [year_range, [month1, month2], month_filter] = signal[0]
         [colorscale, reverse] = signal[1:]
-
-        if key == 1:
-            date_print = date_print_1
-        else:
-            date_print = date_print_2
 
         # DASH doesn't seem to like passing True/False as values
         verity = {'no': False, 'yes':True}
@@ -2043,7 +2079,7 @@ for i in range(1, 3):
 
         # Filter for state filters
         flag, y, x, label, idx = location
-        print('FLAG:' + flag)
+        # print('FLAG:' + flag)
         if flag == 'state' or flag == 'county':
             array = array * data.mask
         elif flag == 'shape':
@@ -2120,7 +2156,7 @@ for i in range(1, 3):
                               cmax=amax,
                               cmin=amin,
                               opacity=1.0,
-                              size=source.res[0] * 20,
+                              size=point_size,
                               colorbar=dict(textposition="auto",
                                             orientation="h",
                                             font=dict(size=15,
@@ -2134,7 +2170,7 @@ for i in range(1, 3):
                   hovermode='closest',
                   showlegend=False,
                   marker=dict(color='#000000',
-                              size=source.res[0] * 20 + .5))
+                              size=point_size * 1.05))
 
         # package these in a list
         data = [d2, d1]
@@ -2190,7 +2226,6 @@ for i in range(1, 3):
             function = 'oarea'
             location =  ['all', 'y', 'x', 'Contiguous United States', 0]
         '''
-
         # Temporary, split location up
         location = json.loads(location)
         location, crds = location
@@ -2210,7 +2245,7 @@ for i in range(1, 3):
 
         # Create signal for the global_store
         choice_store = json.loads(choice_store)
-        print("SIGNAL = " + signal)
+        # print("SIGNAL = " + signal)
         signal = json.loads(signal)
 
         # If we are syncing times, use the key to find the right signal
@@ -2407,6 +2442,113 @@ for i in range(1, 3):
         return figure, href, json.dumps(area_store)
 
 
+    # @app.server.route("/downloads")
+    # def string_csv(df):
+    #     """Take a dataframe and return a string io object."""
+    #     sio = io.StringIO()
+    #     sio.write(df) 
+    #     sio.seek(0)    
+    #     return send_file(sio,
+    #                      mimetype='text/csv',
+    #                      attachment_filename='downloadFile.csv',
+    #                      as_attachment=True)
+
+
+    @app.callback([Output("download_store_{}".format(i), "value"),
+                   Output('download_all_link_{}'.format(i), 'href')],
+                  [Input('download_all_link_{}'.format(i), 'n_clicks')],
+                  [State('signal', 'children'),
+                   State('choice_{}'.format(i), 'value'),
+                   State('choice_store', 'children'),
+                   State('location_store_{}'.format(i), 'children'),
+                   State('key_{}'.format(i), 'children'),
+                   State('click_sync', 'children'),
+                   State('date_sync', 'children'),
+                   State('function_choice', 'value'),
+                   State('area_store_{}'.format(i), 'children')])
+    def make_csv(click, signal, choice, choice_store, location, key, sync,
+                 date_sync, function, area_store):
+        """Take the selections made for this element and return a data frame
+        containing all indicators.
+        """
+        if not click:
+            raise PreventUpdate
+
+        print_args(make_csv, click, signal, choice, choice_store, location,
+                   key, sync, date_sync, function, area_store)
+
+        # Temporary, split location up
+        location = json.loads(location)
+        location, crds = location
+
+        # Identify element number
+        key = int(key)
+
+        # Create signal for the global_store
+        choice_store = json.loads(choice_store)
+        signal = json.loads(signal)
+
+        # If we are syncing times, use the key to find the right signal
+        if 'On' in date_sync:
+            signal = signal[0]
+        else:
+            signal = signal[key - 1]
+
+        # Collect signals
+        [year_range, [month1, month2], month_filter] = signal[0]
+
+        # Get data
+        dfs = []
+        for index in tqdm(list(indexnames.keys())):
+            data = retrieveData(signal, function, index, location)
+            dates = data.dataset_interval.time.values
+            dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
+
+            # If the function is oarea, we plot five overlapping timeseries
+            label = location[3]
+            nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
+                          'vpdmin', 'vpdmean']
+            if function != 'oarea' or choice in nonindices:
+                # Get the time series from the data object
+                timeseries = data.getSeries(location, crdict)
+    
+                # Create data frame as string for download option
+                columns = OrderedDict({'month': dates,
+                                       'value': list(timeseries),
+                                       'function': function_names[function],  # <-- This doesn't always make sense
+                                       'location': location[-2],
+                                       'index': indexnames[index],
+                                       'coord_extent': str(crds)})
+                df = pd.DataFrame(columns)
+
+            else:
+                label = location[3]
+                ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+
+                # Save to file for download option
+                columns = OrderedDict({'month': dates,
+                                       'd0': ts_series_ninc[0],
+                                       'd1': ts_series_ninc[1],
+                                       'd2': ts_series_ninc[2],
+                                       'd3': ts_series_ninc[3],
+                                       'd4': ts_series_ninc[4],
+                                       'dsci': dsci,
+                                       'function': 'Percent Area',
+                                       'location':  label,
+                                       'coord_extent': str(crds),
+                                       'index': indexnames[index]})
+                df = pd.DataFrame(columns)
+
+            dfs.append(df)
+
+        df = pd.concat(dfs)
+        df_str = df.to_csv(encoding='utf-8', index=False)
+        href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
+
+        return df_str, href
+
+
 # In[] Run Application through the server
 if __name__ == '__main__':
     app.run_server()
+    # app.run_server(debug=True)

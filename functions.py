@@ -8,33 +8,35 @@ Created on Tue Jan 22 18:02:17 2019
 """
 
 # In[]: Environment
-# Start by ignoring the yml deprecation warning (annoying)
-import warnings
-warnings.filterwarnings("ignore")
 import datetime as dt
-from dash.exceptions import PreventUpdate
-import dask
-import dask.array as da
-from dateutil.relativedelta import relativedelta
 import gc
-from glob import glob
 import json
-from collections import OrderedDict
+import inspect
 import os
-from osgeo import gdal, ogr, osr
-from matplotlib.animation import FuncAnimation
-import matplotlib.pyplot as plt
-from netCDF4 import Dataset
-from numba import jit
-import numpy as np
-import pandas as pd
-from pyproj import Proj
-import salem
-from scipy.stats import rankdata
-from tqdm import tqdm
 import sys
 import warnings
+
+from collections import OrderedDict
+from dateutil.relativedelta import relativedelta
+from glob import glob
+
+import dask
+import dask.array as da
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import salem
 import xarray as xr
+
+from dash.exceptions import PreventUpdate
+from osgeo import gdal, ogr, osr
+from matplotlib.animation import FuncAnimation
+from netCDF4 import Dataset
+from numba import jit
+from pyproj import Proj
+from scipy.stats import rankdata
+from tqdm import tqdm
+
 warnings.filterwarnings("ignore")
 
 # This could be a CLI argument
@@ -159,6 +161,18 @@ unit_map = {'noaa': '%',
 
 
 # In[]: Functions
+def print_args(func, *args):
+    """Print a functions key word argument inputs for easy assignment."""
+    print("\nARGUMENTS for " + func.__name__ + ":")
+    sig = inspect.signature(func)
+    keys = sig.parameters.keys()
+    kwargs = dict(zip(keys, args))
+    for key, arg in kwargs.items():
+        if isinstance(arg, str):
+            arg = "'" + arg + "'"
+        print("  {} = {}".format(key, arg))
+    print("\n")
+
 @jit(nopython=True)
 def correlationField(ts, arrays):
     '''
