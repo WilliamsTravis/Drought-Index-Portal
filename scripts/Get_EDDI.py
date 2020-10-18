@@ -23,23 +23,15 @@ import numpy as np
 import os
 from osgeo import gdal
 import pandas as pd
+import pathlib
 import sys
 from tqdm import tqdm
 import xarray as xr
 
-# I hadn't learned how to do this yet
-if sys.platform == 'win32':
-    sys.path.insert(0, 'C:/Users/trwi0358/github/Ubuntu-Practice-Machine')
-    os.chdir('C:/Users/trwi0358/github/Ubuntu-Practice-Machine')
-    data_path = ''
-elif 'travis' in os.getcwd():
-    sys.path.insert(0, '/home/travis/github/Ubuntu-Practice-Machine')
-    os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
-    data_path = ''
-else:
-    sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
-    os.chdir('/root/Sync/Ubuntu-Practice-Machine')
-    data_path = '/root/Sync'
+# Refactor all of this
+pwd = str(pathlib.Path(__file__).parent.absolute())
+data_path = os.path.join(pwd, "..")
+sys.path.insert(0, data_path)
 
 from functions import isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
 

@@ -6,6 +6,7 @@ Created on Tue May 14 11:39:16 2019
 """
 
 import os
+import tqdm
 from functions import Admin_Elements, Index_Maps, movie, im
 
 

@@ -1,3 +1,12 @@
+"""
+This is an old test I hardly remember, it must be from the Plotly forums.
+It looks like a great way to share point highlighting between graphs! So, for
+the Drought Index Portal, this might show us how to highlight the same points
+in both portals from a single selection when syncing locations.
+
+Travis
+"""
+
 import dash
 from dash.dependencies import Input, Output
 import dash_core_components as dcc

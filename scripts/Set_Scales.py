@@ -1,4 +1,4 @@
-4# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Created on Thu Feb 14 23:14:33 2019
 
@@ -10,6 +10,11 @@ from tqdm import tqdm
 import xarray as xr
 
 user = os.environ['USERNAME']
+<<<<<<< HEAD
+=======
+
+# Check if we are working in Windows or Linux to find the data directory
+>>>>>>> 4f9a37164d09bc3c41f42fea55e65f62c85ca19e
 root = os.path.abspath(os.path.dirname(__file__))
 os.chdir(os.path.join(root, '..'))
 
@@ -22,7 +27,11 @@ local_indices = ['spi1', 'spi2', 'spi3', 'spi4', 'spi5', 'spi6', 'spi7',
                  'eddi12', 'tmin', 'tmax', 'tdmean', 'tmean', 'ppt', 'vpdmax',
                  'vpdmin', 'vpdmean']
 ncpath = 'data/droughtindices/netcdfs'
+<<<<<<< HEAD
 index_paths = [os.path.join(ncpath, i  + '.nc') for i in local_indices]
+=======
+index_paths = [os.path.join(ncpath,  i  + '.nc') for i in local_indices]
+>>>>>>> 4f9a37164d09bc3c41f42fea55e65f62c85ca19e
 
 maxes = {}
 mins = {}

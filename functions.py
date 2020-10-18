@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Support functions for Ubuntu-Practice-Machine
+Support functions for Drought-Index-Portal
 
 Created on Tue Jan 22 18:02:17 2019
 
@@ -8,34 +8,36 @@ Created on Tue Jan 22 18:02:17 2019
 """
 
 # In[]: Environment
-# Start by ignoring the yml deprecation warning (annoying)
-import warnings
-warnings.filterwarnings("ignore")
 import datetime as dt
-from dash.exceptions import PreventUpdate
-import dask
-import dask.array as da
-from dateutil.relativedelta import relativedelta
 import gc
-from glob import glob
-from inspect import currentframe, getframeinfo
 import json
-from collections import OrderedDict
+import inspect
 import os
-from osgeo import gdal, ogr, osr
-from matplotlib.animation import FuncAnimation
-import matplotlib.pyplot as plt
-from netCDF4 import Dataset
-from numba import jit
-import numpy as np
-import pandas as pd
-from pyproj import Proj
-import salem
-from scipy.stats import rankdata
-from tqdm import tqdm
 import sys
 import warnings
+
+from collections import OrderedDict
+from dateutil.relativedelta import relativedelta
+from glob import glob
+
+# import dask
+import dask.array as da
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import salem
 import xarray as xr
+
+from dash.exceptions import PreventUpdate
+from osgeo import gdal, ogr, osr
+from matplotlib.animation import FuncAnimation
+from netCDF4 import Dataset
+from numba import jit
+from pyproj import Proj
+from scipy.stats import rankdata
+from tqdm import tqdm
+
+warnings.filterwarnings("ignore")
 
 # This could be a CLI argument
 data_path = ''
@@ -102,13 +104,14 @@ title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
              'tdmean': 'Mean Dew Point Temperature (PRISM)', 
              'ppt': 'Total Precipitation (PRISM)',
              'vpdmax': 'Maximum Vapor Pressure Deficit (PRISM)' ,
-             'vpdmin': 'Minimum Vapor Pressure Deficit (PRISM)'}
+             'vpdmin': 'Minimum Vapor Pressure Deficit (PRISM)',
+             'vpdmean': 'Mean Vapor Pressure Deficit (PRISM)'}
 
 unit_map = {'noaa': '%',
             'mdn1': '°C',
             'pdsi': 'Index',
             'pdsisc': 'Index',
-            'pzi': 'Index',
+            'pdsiz': 'Index',
             'spi1': 'Index',
             'spi2': 'Index',
             'spi3': 'Index',
@@ -150,7 +153,7 @@ unit_map = {'noaa': '%',
             'tmin': '°C',
             'tmax': '°C',
             'tmean': '°C',
-            'tdmean': '°C', 
+            'tdmean': '°C',
             'ppt': 'mm',
             'vpdmax': 'hPa' ,
             'vpdmin': 'hPa',
@@ -158,6 +161,26 @@ unit_map = {'noaa': '%',
 
 
 # In[]: Functions
+def print_args(func, *args, **kwargs):
+    """Print a functions key word argument inputs for easy assignment."""
+    # # Trying to get calling function, not working
+    # curframe = inspect.currentframe()
+    # calframe = inspect.getouterframes(curframe, 2)
+    # func_string = calframe[1][3]
+    # func = globals()[func_string]
+
+    print("\nARGUMENTS for " + func.__name__ + ":")
+    sig = inspect.signature(func)
+    keys = sig.parameters.keys()
+    first_kwargs = dict(zip(keys, args))
+    kwargs = {**first_kwargs, **kwargs}
+    for key, arg in kwargs.items():
+        if isinstance(arg, str):
+            arg = "'" + arg + "'"
+        print("  {} = {}".format(key, arg))
+    print("\n")
+
+
 @jit(nopython=True)
 def correlationField(ts, arrays):
     '''
@@ -212,6 +235,14 @@ def isInt(string):
         return True
     except:
         return False
+
+def isNumber(string):
+    try:
+        int(string)
+        return True
+    except:
+        return False
+
 
 
 def movie(array, titles=None, axis=0, na=-9999):
@@ -339,16 +370,15 @@ def readRasters(files, navalue=-9999):
     files = list of files to read in
     navalue = a number (float) for nan values if we forgot 
                 to translate the file with one originally
-    
+
     This converts monthly rasters into numpy arrays and them as a list in another
             list. The other parts are the spatial features needed to write
             any results to a raster file. The list order is:
-                
+
       [[name_date (string),arraylist (numpy)], spatial geometry (gdal object),
        coordinate reference system (gdal object)]
-    
-    The file naming convention required is: "INDEXNAME_YYYYMM.tif"
 
+    The file naming convention required is: "INDEXNAME_YYYYMM.tif"
     """
     print("Converting raster to numpy array...")
     files = [f for f in files if os.path.isfile(f)]
@@ -1548,7 +1578,7 @@ class Coordinate_Dictionaries:
 
 
 class Index_Maps():
-    '''
+    """
     This class creates a singular map as a function of some timeseries of
     rasters for use in the Ubuntu-Practice-Machine index comparison app.
     It also returns information needed for rendering.
@@ -1571,7 +1601,7 @@ class Index_Maps():
                                   'spi2', 'spi3', 'spi6', 'spei1', 'spei2',
                                   'spei3', 'spei6', 'eddi1', 'eddi2', 'eddi3',
                                   'eddi6'
-    '''
+    """
     # Create Initial Values
     def __init__(self, choice='pdsi', choice_type='original',
                  time_data=[[2000, 2018], [1, 12], list(range(1, 13))],
@@ -1596,12 +1626,12 @@ class Index_Maps():
 
     @time_data.setter
     def time_data(self, time_data):
-        '''
+        """
         To avoid reading in a new dataset when only changing dates, this
         method is separate. It sets the beginning and end dates and months used
         in all of the calculations and updates an xarray reference called
         "dataset_interval".
-        '''
+        """
         # Get the full data set
         dataset = self.dataset
 
@@ -1770,22 +1800,28 @@ class Index_Maps():
         self.dataset = dataset
 
     def setMask(self, location, crdict):
-        '''
+        """
         Take a location object and the coordinate dictionary to create an
         xarray for masking the dask datasets without pulling into memory.
 
         location = location from Location_Builder or 1d array
         crdict = coordinate dictionary
-        '''
+        """
         # Get x, y coordinates from location
         flag, y, x, label, idx = location
         mask = crdict.grid.copy()
 
         # Create mask array
-        if flag != 'all':
+        if flag not in ["all", "bbox"]:
             y = json.loads(y)
             x = json.loads(x)
             gridids = crdict.grid[y, x]
+            mask[~np.isin(crdict.grid, gridids)] = np.nan
+            mask = mask * 0 + 1
+        elif flag == "bbox":
+            y = json.loads(y)
+            x = json.loads(x)
+            gridids = crdict.grid[y[0]:y[-1], x[0]:x[-1]].flatten()
             mask[~np.isin(crdict.grid, gridids)] = np.nan
             mask = mask * 0 + 1
         else:
@@ -1797,7 +1833,6 @@ class Index_Maps():
         lons = np.arange(nlon) * geom[1] + geom[0]
         lats = np.arange(nlat) * geom[5] + geom[3]
 
-
         # Create mask xarray
         xmask = xr.DataArray(mask,
                              coords={'lat': lats,
@@ -1807,9 +1842,9 @@ class Index_Maps():
         self.mask = xmask
 
     def setReverse(self):
-        '''
+        """
         Set an attribute to reverse the colorscale if needed for the indicator.
-        '''
+        """
         choice = self.choice
         reversals = ['eddi', 'tmin', 'tmax', 'tmean', 'tdmean', 'vpdmax',
                      'vpdmin', 'vpdmean']
@@ -1960,10 +1995,10 @@ class Index_Maps():
             pcts = ratios.compute().data * 100
             return pcts
 
-        # Calculate non-inclusive percentages # <------------------------------ parallelizing with delayed speeds it up but takes more memory
-        pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
-        pnincs = np.array(dask.compute(*pnincs))
-#        pnincs =  np.array([catFilter(arrays, cats[i]) for i in range(5)])
+        # Calculate non-inclusive percentages # <------------------------------ parallelizing with delayed speeds it up but takes just a bit too much memory for the virtual machine to handle the full time series
+#        pnincs = [dask.delayed(catFilter)(arrays, cats[i]) for i in range(5)]
+#        pnincs = np.array(dask.compute(*pnincs))
+        pnincs =  np.array([catFilter(arrays, cats[i]) for i in range(5)])
 
         # Use the noninclusive percentages to create the inclusive percentages
         pincs = [np.sum(pnincs[i:], axis=0) for i in range(len(pnincs))]
@@ -1989,40 +2024,71 @@ class Index_Maps():
                      "pmean": self.getMean,
                      "pmin": self.getMin,
                      "pmax": self.getMax,
-                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now
+                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now (skipped,  performed in app for now)
                      "ocorr": self.getMean,
                      "pcorr": self.getMean}
         function = functions[function]
 
         return function()
 
-
 class Location_Builder:
-    '''
+    """
     This takes a location selection determined to be the triggering choice,
     decides what type of location it is, and builds the appropriate location
     list object needed further down the line. To do so, it holds county,
     state, grid, and other administrative information.
-    '''
-
+    """
     def __init__(self, trig_id, trig_val, coordinate_dictionary, admin_df,
                  state_array, county_array):
         self.trig_id = trig_id
         self.trig_val = trig_val
-        self.cd = coordinate_dictionary
+        self.crdict = coordinate_dictionary
         self.admin_df = admin_df
         self.states_df = admin_df[['state', 'state_abbr',
                                    'state_fips']].drop_duplicates().dropna()
         self.state_array = state_array
         self.county_array = county_array
 
+    def bbox_filter(self, string):
+        """Filter a set of points for those within a geographic bounding box."""
+        # Remove any unneeded symbols
+        symbols = ["-", ".", " ", ","]
+        new_string = ""
+        for s in string:
+            if s.isnumeric() or s in symbols:
+                new_string = new_string + s
+    
+        # Turn this into  a list of numbers
+        bbox = [float(s) for s in new_string.split(",")]
+    
+        # Make sure these are out of bounds
+        lons = np.array(self.crdict.lons)
+        lats = np.array(self.crdict.lats)
+        minlon, minlat, maxlon, maxlat = bbox
+        if minlon < lons.min():
+            minlon = lons.min()
+        if minlat < lats.min():
+            minlat = lats.min()
+        if maxlon > lons.max():
+            maxlon = lons.max()
+        if maxlat > lats.max():
+            maxlat = lats.max()
+
+        # Now convert these to their nearest available coordinate
+        minlon = lons[lons <= minlon][-1]
+        minlat = lats[lats <= minlat][0]
+        maxlon = lons[lons >= maxlon][0]
+        maxlat = lats[lats >= maxlat][-1]
+
+        bbox = [minlon, minlat, maxlon, maxlat]
+
+        return bbox
+
     def chooseRecent(self):
-        '''
+        """
         Check the location for various features to determine what type of
         selection it came from. Return a list with some useful elements.
-
         Possible triggering elements:
-
             'map_1.clickData',
             'map_2.clickData',
             'map_1.selectedData',
@@ -2031,33 +2097,28 @@ class Location_Builder:
             'county_2.value',
             'state_1.value',
             'state_2.value'
-        '''
+        """
+        # Unpack elements
         trig_id = self.trig_id
         trig_val = self.trig_val
         admin_df = self.admin_df
         states_df = self.states_df
-        cd = self.cd
+        crdict = self.crdict
         county_array = self.county_array
         state_array = self.state_array
-
-        # print("Location Picker Trigger: " + str(trig_id))
-        # print("Location Picker Value: " + str(trig_val))
-
         # 1: Selection is a county selection
         if 'county' in trig_id:
             county = admin_df['place'][admin_df.fips == trig_val].unique()[0]
             y, x = np.where(county_array == trig_val)
-            # crds = 
             location = ['county', str(list(y)), str(list(x)), county]
 
         # 2: Selection is a single grid IDs
         elif 'clickData' in trig_id:
             lon = trig_val['points'][0]['lon']
             lat = trig_val['points'][0]['lat']
-            crds = [lat, lon]
-            x = cd.londict[lon]
-            y = cd.latdict[lat]
-            gridid = cd.grid[y, x]
+            x = crdict.londict[lon]
+            y = crdict.latdict[lat]
+            gridid = crdict.grid[y, x]
             counties = admin_df['place'][admin_df.grid == gridid]
             county = counties.unique()
             label = county[0] + ' (Grid ' + str(int(gridid)) + ')'
@@ -2067,16 +2128,9 @@ class Location_Builder:
         elif 'selectedData' in trig_id:
             if trig_val is not None:
                 selections = trig_val['points']
-                lats = [d['lat'] for d in selections]
-                lons = [d['lon'] for d in selections]
-                crds = [max(lats), min(lons), min(lats), max(lons)]
-                y = list([cd.latdict[d['lat']] for d in selections])
-                x = list([cd.londict[d['lon']] for d in selections])
-                try:
-                    counties = np.array([d['text'][:d['text'].index(' (')] for
-                                     d in selections])
-                except:
-                    counties = np.array([d['text'][:d['text'].index(':')] for
+                y = list([crdict.latdict[d['lat']] for d in selections])
+                x = list([crdict.londict[d['lon']] for d in selections])
+                counties = np.array([d['text'][:d['text'].index('<')] for
                                      d in selections])
                 local_df = admin_df[admin_df['place'].isin(
                                     list(np.unique(counties)))]
@@ -2125,21 +2179,41 @@ class Location_Builder:
             # We don't have the x,y values just yet
             try:
                 shp = gdal.Open('data/shapefiles/temp/temp.tif').ReadAsArray()
-                shp[shp==-9999] = np.nan
+                shp[shp == -9999] = np.nan
                 y, x = np.where(~np.isnan(shp))
-                # crds = 
                 location = ['shape', str(list(y)), str(list(x)), trig_val]
             except:
                 location = ['all', 'y', 'x', 'Contiguous United States']
 
-        # 4: A reset button was clicked
+        # 4: A bounding box was entered        
+        elif "bbox" in trig_id:
+            # Reformat bounding box
+            minlon, minlat, maxlon, maxlat = self.bbox_filter(trig_val)
+
+            # Convert coordinates to array indices
+            xmin = crdict.londict[minlon]
+            ymin = crdict.latdict[maxlat] # Inverse y-axis here
+            xmax = crdict.londict[maxlon]
+            ymax = crdict.latdict[minlat]
+
+            y = [y for y in range(ymin, ymax + 1)]
+            x = [x for x in range(xmin, xmax + 1)]
+
+            # Convert indices to gridids
+            gridids = crdict.grid[ymin:ymax, xmin:xmax].flatten()
+            local_df = admin_df[admin_df['grid'].isin(gridids)]
+
+            # Use gradient to print NW and SE most counties as a range
+            NW = local_df['place'][
+                local_df['gradient'] == min(local_df['gradient'])].item()
+            SE = local_df['place'][
+                local_df['gradient'] == max(local_df['gradient'])].item()
+            label = NW + " to " + SE
+            location = ['bbox', str(y), str(x), label]
+
+
+        # 5: A reset button was clicked
         elif 'reset_map' in trig_id:
             location = ['all', 'y', 'x', 'Contiguous United States']
 
-        # I am not done creating coord objects yet
-        try:
-            crds
-        except:
-            crds = "Coordinates not available yet"
-
-        return location, crds
+        return location

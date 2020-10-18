@@ -13,25 +13,16 @@ import datetime as dt
 import numpy as np
 import os
 from osgeo import gdal
+import pathlib
 import sys
 import xarray as xr
 import rasterio
 from rasterio.enums import Resampling
 
 # In[] Set up working environment
-# I hadn't learned how to do this yet
-if sys.platform == 'win32':
-    sys.path.insert(0, 'C:/Users/trwi0358/github/Ubuntu-Practice-Machine')
-    os.chdir('C:/Users/trwi0358/github/Ubuntu-Practice-Machine')
-    data_path = ''
-elif 'travis' in os.getcwd():
-    sys.path.insert(0, '/home/travis/github/Ubuntu-Practice-Machine')
-    os.chdir('/home/travis/github/Ubuntu-Practice-Machine')
-    data_path = ''
-else:
-    sys.path.insert(0, '/root/Sync/Ubuntu-Practice-Machine')
-    os.chdir('/root/Sync/Ubuntu-Practice-Machine')
-    data_path = '/root/Sync'
+pwd = str(pathlib.Path(__file__).parent.absolute())
+data_path = os.path.join(pwd, "..")
+sys.path.insert(0, data_path)
 
 from functions import isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
 
