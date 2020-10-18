@@ -4,8 +4,8 @@ Installation Steps (Anaconda method)
 2) Get Anaconda
 3) Create and activate virtual conda environment from the yaml file
 
-   conda env create -f requirements.yaml
-   conda activate dict
+   conda env create -f environment.yaml
+   conda activate drip
 
 4) Install nginx (Should probably just add this to the requirements file)
 
@@ -93,7 +93,7 @@ Installation Steps (Anaconda method)
 	    sudo nginx -t
 
  6) If this works setup the automatic data renewal process with crontab. Instructions coming.
- 7) Now we need to either download and transform all of the data. There are many sources of data and, at the moment, each has
+ 7) Now we need to either download and transform all of the data or transfer from an existing source. There are many sources of data and, at the moment, each has
     its own script.
  7) Now, to run the actual application use a webserver gateway interface like green unicorn. The syntax
     is simple enough:
