@@ -23,7 +23,7 @@ Work on DrIP is supported in part by grants and resources from the National Inte
 #### **About us:**
 
 **Author**: Travis Williams -
-**Email**: Travissius@gmail.com
+**Email**: travis.williams@nrel.gov
 
 **Advisors**:
 William R. Travis (william.travis@colorado.edu), 
