@@ -1,4 +1,4 @@
-Installation Steps (Anaconda method)
+Installation Steps (Using Anaconda and a Linux machine)
 
 1) Clone repository
 2) Get Anaconda
