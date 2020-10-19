@@ -71,8 +71,10 @@ import datetime as dt
 import gc
 import io
 import json
+import multiprocessing as mp
 import os
 import psutil
+import io
 import tempfile
 import urllib
 import warnings
@@ -84,6 +86,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
 import fiona
+import flask
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -93,7 +96,7 @@ import xarray as xr
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from flask_caching import Cache
-from flask import send_file
+from flask import send_file, send_from_directory, Flask
 from osgeo import gdal, osr
 from tqdm import tqdm
 from functions import (Admin_Elements, Index_Maps, Location_Builder,
@@ -295,8 +298,9 @@ indexnames = {'pdsi': 'Palmer Drought Severity Index',
               'tdmean': 'Mean Dew Point Temperature (°C)',
               'ppt': 'Average Precipitation (mm)',
               'vpdmax': 'Maximum Vapor Pressure Deficit (hPa)' ,
-              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)',
-              'vpdmean': 'Mean Vapor Pressure Deficit (hPa)'}
+              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)'
+              # 'vpdmean': 'Mean Vapor Pressure Deficit (hPa)'
+}
 
 # Function options
 function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
@@ -700,7 +704,7 @@ def divMaker(id_num, index='noaa'):
                       + 'indicators given the selections made for the '
                       + ' element above and is titled '
                       + '"timeseries_all_{}.csv"'.format(id_num)),
-                   href="/download", target='_blank',
+                   href="", target='_blank',
                    style={"margin-left": "15px"}),
 
             # Storage
@@ -1555,10 +1559,10 @@ for i in range(1, 3):
             trigger = context.triggered[0]['prop_id']
 
             # Print argument values and trigger
-            print_args(locationPicker, click1, click2, select1, select2,
-                       county1, county2, shape1, shape2, bbox1, bbox2, update1,
-                       update2, reset1, reset2, state1, state2, sync, key,
-                       triggered_value=triggered_value, trigger=trigger)
+            # print_args(locationPicker, click1, click2, select1, select2,
+            #            county1, county2, shape1, shape2, bbox1, bbox2, update1,
+            #            update2, reset1, reset2, state1, state2, sync, key,
+            #            triggered_value=triggered_value, trigger=trigger)
 
             # Figure out which element we are working with
             key = int(key) - 1
@@ -2013,9 +2017,9 @@ for i in range(1, 3):
         """
         # Print arguments
         trig = dash.callback_context.triggered[0]['prop_id']
-        print_args(makeMap, choice1, choice2, map_type, signal, point_size,
-                    location, function, key, sync, date_sync, date_print_1,
-                    date_print_2, map_extent, trig=trig)
+        # print_args(makeMap, choice1, choice2, map_type, signal, point_size,
+        #             location, function, key, sync, date_sync, date_print_1,
+        #             date_print_2, map_extent, trig=trig)
 
         # Temporary, split location up
         location = json.loads(location)
@@ -2482,37 +2486,30 @@ for i in range(1, 3):
     #                      as_attachment=True)
 
 
-    @app.callback([Output("download_store_{}".format(i), "value"),
-                   Output('download_all_link_{}'.format(i), 'href')],
-                  [Input('download_all_link_{}'.format(i), 'n_clicks')],
-                  [State('signal', 'children'),
-                   State('choice_{}'.format(i), 'value'),
-                   State('choice_store', 'children'),
-                   State('location_store_{}'.format(i), 'children'),
-                   State('key_{}'.format(i), 'children'),
-                   State('click_sync', 'children'),
-                   State('date_sync', 'children'),
-                   State('function_choice', 'value'),
+    @app.callback(Output('download_all_link_{}'.format(i), 'href'),
+                  [Input('signal', 'children'),
+                   Input('choice_{}'.format(i), 'value'),
+                   Input('location_store_{}'.format(i), 'children'),
+                   Input('click_sync', 'children'),
+                   Input('date_sync', 'children'),
+                   Input('function_choice', 'value')],
+                  [State('key_{}'.format(i), 'children'),
                    State('area_store_{}'.format(i), 'children')])
-    def make_csv(click, signal, choice, choice_store, location, key, sync,
-                 date_sync, function, area_store):
+    def update_all_csvlink(signal, choice, location,
+                           sync, date_sync, function, key, area_store):
         """Take the selections made for this element and return a data frame
         containing all indicators.
         """
-        if not click:
+        if not signal:
             raise PreventUpdate
 
-        # print_args(make_csv, click, signal, choice, choice_store, location,
-        #            key, sync, date_sync, function, area_store)
-
-        # Temporary, split location up
-        location = json.loads(location)
+        print_args(update_all_csvlink, signal, choice, location,
+                   sync, date_sync, function, key, area_store)
 
         # Identify element number
         key = int(key)
 
         # Create signal for the global_store
-        choice_store = json.loads(choice_store)
         signal = json.loads(signal)
 
         # If we are syncing times, use the key to find the right signal
@@ -2520,60 +2517,92 @@ for i in range(1, 3):
             signal = signal[0]
         else:
             signal = signal[key - 1]
+        signal = json.dumps(signal)
 
-        # Collect signals
-        [year_range, [month1, month2], month_filter] = signal[0]
+        path = "{}_{}_{}_{}_{}".format(signal, function, choice, location,
+                                       key)
+        return "/download?value=" + path
 
-        # Get data
-        dfs = []
-        for index in tqdm(list(indexnames.keys())):
-            data = retrieveData(signal, function, index, location)
-            dates = data.dataset_interval.time.values
-            dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
+def make_csv(arg):
+     signal, function, index, location, choice = arg
+     data = retrieveData(signal, function, index, location)
+     dates = data.dataset_interval.time.values
+     dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
+ 
+     # If the function is oarea, we plot five overlapping timeseries
+     label = location[3]
+     nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
+                   'vpdmin', 'vpdmean']
+     if function != 'oarea' or choice in nonindices:
+         # Get the time series from the data object
+         timeseries = data.getSeries(location, crdict)
+ 
+         # Create data frame as string for download option
+         columns = OrderedDict({'month': dates,
+                                 'value': list(timeseries),
+                                 'function': function_names[function],  # <-- This doesn't always make sense
+                                 'location': location[-2],
+                                 'index': indexnames[index]})
+         df = pd.DataFrame(columns)
+ 
+     else:
+         label = location[3]
+         ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+ 
+         # Save to file for download option
+         columns = OrderedDict({'month': dates,
+                                 'd0': ts_series_ninc[0],
+                                 'd1': ts_series_ninc[1],
+                                 'd2': ts_series_ninc[2],
+                                 'd3': ts_series_ninc[3],
+                                 'd4': ts_series_ninc[4],
+                                 'dsci': dsci,
+                                 'function': 'Percent Area',
+                                 'location':  label,
+                                 'index': indexnames[index]})
+         df = pd.DataFrame(columns)
+     return df
 
-            # If the function is oarea, we plot five overlapping timeseries
-            label = location[3]
-            nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
-                          'vpdmin', 'vpdmean']
-            if function != 'oarea' or choice in nonindices:
-                # Get the time series from the data object
-                timeseries = data.getSeries(location, crdict)
 
-                # Create data frame as string for download option
-                columns = OrderedDict({'month': dates,
-                                       'value': list(timeseries),
-                                       'function': function_names[function],  # <-- This doesn't always make sense
-                                       'location': location[-2],
-                                       'index': indexnames[index]})
-                df = pd.DataFrame(columns)
+def make_csvs(path):
+    """Take a path with query information and save a csv."""
+    # Separate Path
+    signal, function, choice, location, key = path.split("_")
+    location = json.loads(location)
+    signal = json.loads(signal)
 
-            else:
-                label = location[3]
-                ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+    # Get data
+    dfs = []
+    args = []
+    for index in list(indexnames.keys()):
+        args.append([signal, function, index, location, choice])
+    with mp.Pool(mp.cpu_count()) as pool:
+        for df in pool.imap(make_csv, args):
+            dfs.append(df)  
 
-                # Save to file for download option
-                columns = OrderedDict({'month': dates,
-                                       'd0': ts_series_ninc[0],
-                                       'd1': ts_series_ninc[1],
-                                       'd2': ts_series_ninc[2],
-                                       'd3': ts_series_ninc[3],
-                                       'd4': ts_series_ninc[4],
-                                       'dsci': dsci,
-                                       'function': 'Percent Area',
-                                       'location':  label,
-                                       'index': indexnames[index]})
-                df = pd.DataFrame(columns)
+    df = pd.concat(dfs)
 
-            dfs.append(df)
+    return df, key
 
-        df = pd.concat(dfs)
-        df_str = df.to_csv(encoding='utf-8', index=False)
-        href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
 
-        return df_str, href
+@server.route("/download")
+def download_csv():
+    path = flask.request.args.get("value")
+    df, key = make_csvs(path)
+    str_io = io.StringIO()
+    df.to_csv(str_io)
+    mem = io.BytesIO()
+    mem.write(str_io.getvalue().encode("utf-8"))
+    mem.seek(0)
+    str_io.close()
+    filename = "timeseries_all_{}.csv".format(key)
+    return flask.send_file(mem,
+                           mimetype="text/csv",
+                           attachment_filename=filename,
+                           as_attachment=True)
 
 
 # In[] Run Application through the server
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run_server()
     # app.run_server(debug=True)
