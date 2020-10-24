@@ -74,7 +74,6 @@ import json
 import multiprocessing as mp
 import os
 import psutil
-import io
 import tempfile
 import urllib
 import warnings
@@ -90,24 +89,20 @@ import flask
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import psutil
 import xarray as xr
 
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from flask_caching import Cache
-from flask import send_file, send_from_directory, Flask
 from osgeo import gdal, osr
-from tqdm import tqdm
+
 from functions import (Admin_Elements, Index_Maps, Location_Builder,
                        print_args, shapeReproject, unit_map)
 
-# What to do with the mean of empty slice warning?
 warnings.filterwarnings("ignore")
 
-
 # In case the data needs to be stored elsewhere
-DATA_PATH = ''
+DATA_PATH = ""
 
 
 # In[] The DASH application and server
@@ -121,17 +116,17 @@ app.scripts.config.serve_locally = True
 server = app.server
 
 # Disable exceptions (attempt to speed things up)
-app.config['suppress_callback_exceptions'] = True
+app.config["suppress_callback_exceptions"] = True
 
 # Create a simple file storeage cache, holds unique outputs of Index_Maps
-cache = Cache(config={'CACHE_TYPE': 'filesystem',
-                      'CACHE_DIR': 'data/cache',
-                      'CACHE_THRESHOLD': 2})
+cache = Cache(config={"CACHE_TYPE": "filesystem",
+                      "CACHE_DIR": "data/cache",
+                      "CACHE_THRESHOLD": 2})
 
 # Create a separate cache to hold drought area data for toggling DSCI on/off
-cache2 = Cache(config={'CACHE_TYPE': 'filesystem',
-                       'CACHE_DIR': 'data/cache2',
-                       'CACHE_THRESHOLD': 2})
+cache2 = Cache(config={"CACHE_TYPE": "filesystem",
+                       "CACHE_DIR": "data/cache2",
+                       "CACHE_THRESHOLD": 2})
 cache.init_app(server)
 cache2.init_app(server)
 
@@ -139,18 +134,18 @@ cache2.init_app(server)
 # For testing
 source_signal = [
     [[[1980, 2020], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 
-     'Default', 'no'],
+     "Default", "no"],
     [[[2000, 2020], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 
-     'Default', 'no']
+     "Default", "no"]
 ]
-source_choice = 'spi1'
-source_function = 'omean'
-source_location = ['grids', '[10, 11, 11, 11, 12, 12, 12, 12]',
-                   '[243, 242, 243, 244, 241, 242, 243, 244]',
-                   'Aroostook County, ME to Aroostook County, ME', 2]
+source_choice = "spi1"
+source_function = "omean"
+source_location = ["grids", "[10, 11, 11, 11, 12, 12, 12, 12]",
+                   "[243, 242, 243, 244, 241, 242, 243, 244]",
+                   "Aroostook County, ME to Aroostook County, ME", 2]
 
 # Get time dimensions from the first data set, assuming netcdfs are uniform
-sample_path = os.path.join(DATA_PATH, 'data/droughtindices/netcdfs/spi1.nc')
+sample_path = os.path.join(DATA_PATH, "data/droughtindices/netcdfs/spi1.nc")
 with xr.open_dataset(sample_path) as data:
     min_date = data.time.data[0]
     max_date = data.time.data[-1]
@@ -160,193 +155,193 @@ min_year = pd.Timestamp(min_date).year + 5
 max_month = pd.Timestamp(max_date).month
 
 # Initializing Values
-default_function = 'omean'
-default_function_type = 'index'
-default_sample = 'spi3'
-default_1 = 'spi11'
-default_2 = 'spi3'
-default_date = '1980 - {}'.format(max_year)
-default_basemap = 'dark'
+default_function = "omean"
+default_function_type = "index"
+default_sample = "spi3"
+default_1 = "spi11"
+default_2 = "spi3"
+default_date = "1980 - {}".format(max_year)
+default_basemap = "dark"
 default_location = '["all", "y", "x", "Contiguous United States", 0]'
 default_years = [1980, max_year]
-default_extent = {'mapbox.center': {'lon': -92, 'lat': 40},
-                  'mapbox.zoom': 2.2, 'mapbox.bearing': 0, 'mapbox.pitch': 0}
+default_extent = {"mapbox.center": {"lon": -92, "lat": 40},
+                  "mapbox.zoom": 2.2, "mapbox.bearing": 0, "mapbox.pitch": 0}
 
 # Default click before the first click for any map (might not be necessary)
-default_click = {'points': [{'curveNumber': 0, 'lat': 40.0, 'lon': -105.75,
-                             'marker.color': 0, 'pointIndex': 0,
-                             'pointNumber': 0, 'text': 'Boulder County, CO'}]}
+default_click = {"points": [{"curveNumber": 0, "lat": 40.0, "lon": -105.75,
+                             "marker.color": 0, "pointIndex": 0,
+                             "pointNumber": 0, "text": "Boulder County, CO"}]}
 
 # Default for click store (includes an index for most recent click)
 default_clicks = [list(np.repeat(default_click.copy(), 4)), 0]
 default_clicks = json.dumps(default_clicks)
 
 # For scaling
-ranges = pd.read_csv('data/tables/index_ranges.csv')
+ranges = pd.read_csv("data/tables/index_ranges.csv")
 
 
 # In[] Interface Options
 # Drought Index Options
-indices = [{'label': 'PDSI', 'value': 'pdsi'},
-           {'label': 'PDSI-SC', 'value': 'pdsisc'},
-           {'label': 'Palmer Z Index', 'value': 'pdsiz'},
-           {'label': 'SPI-1', 'value': 'spi1'},
-           {'label': 'SPI-2', 'value': 'spi2'},
-           {'label': 'SPI-3', 'value': 'spi3'},
-           {'label': 'SPI-4', 'value': 'spi4'},
-           {'label': 'SPI-5', 'value': 'spi5'},
-           {'label': 'SPI-6', 'value': 'spi6'},
-           {'label': 'SPI-7', 'value': 'spi7'},
-           {'label': 'SPI-8', 'value': 'spi8'},
-           {'label': 'SPI-9', 'value': 'spi9'},
-           {'label': 'SPI-10', 'value': 'spi10'},
-           {'label': 'SPI-11', 'value': 'spi11'},
-           {'label': 'SPI-12', 'value': 'spi12'},
-           {'label': 'SPEI-1', 'value': 'spei1'},
-           {'label': 'SPEI-2', 'value': 'spei2'},
-           {'label': 'SPEI-3', 'value': 'spei3'},
-           {'label': 'SPEI-4', 'value': 'spei4'},
-           {'label': 'SPEI-5', 'value': 'spei5'},
-           {'label': 'SPEI-6', 'value': 'spei6'},
-           {'label': 'SPEI-7', 'value': 'spei7'},
-           {'label': 'SPEI-8', 'value': 'spei8'},
-           {'label': 'SPEI-9', 'value': 'spei9'},
-           {'label': 'SPEI-10', 'value': 'spei10'},
-           {'label': 'SPEI-11', 'value': 'spei11'},
-           {'label': 'SPEI-12', 'value': 'spei12'},
-           {'label': 'EDDI-1', 'value': 'eddi1'},
-           {'label': 'EDDI-2', 'value': 'eddi2'},
-           {'label': 'EDDI-3', 'value': 'eddi3'},
-           {'label': 'EDDI-4', 'value': 'eddi4'},
-           {'label': 'EDDI-5', 'value': 'eddi5'},
-           {'label': 'EDDI-6', 'value': 'eddi6'},
-           {'label': 'EDDI-7', 'value': 'eddi7'},
-           {'label': 'EDDI-8', 'value': 'eddi8'},
-           {'label': 'EDDI-9', 'value': 'eddi9'},
-           {'label': 'EDDI-10', 'value': 'eddi10'},
-           {'label': 'EDDI-11', 'value': 'eddi11'},
-           {'label': 'EDDI-12', 'value': 'eddi12'},
-           # {'label': 'LERI-1', 'value': 'leri1'},
-           # {'label': 'LERI-3', 'value': 'leri3'},
-           {'label': 'TMIN', 'value': 'tmin'},
-           {'label': 'TMAX', 'value': 'tmax'},
-           {'label': 'TMEAN', 'value': 'tmean'},
-           {'label': 'TDMEAN', 'value': 'tdmean'},
-           {'label': 'PPT', 'value': 'ppt'},
-           {'label': 'VPDMAX', 'value': 'vpdmax'},
-           # {'label': 'VPDMEAN', 'value': 'vpdmean'},
-           {'label': 'VPDMIN', 'value': 'vpdmin'}
+indices = [{"label": "PDSI", "value": "pdsi"},
+           {"label": "PDSI-SC", "value": "pdsisc"},
+           {"label": "Palmer Z Index", "value": "pdsiz"},
+           {"label": "SPI-1", "value": "spi1"},
+           {"label": "SPI-2", "value": "spi2"},
+           {"label": "SPI-3", "value": "spi3"},
+           {"label": "SPI-4", "value": "spi4"},
+           {"label": "SPI-5", "value": "spi5"},
+           {"label": "SPI-6", "value": "spi6"},
+           {"label": "SPI-7", "value": "spi7"},
+           {"label": "SPI-8", "value": "spi8"},
+           {"label": "SPI-9", "value": "spi9"},
+           {"label": "SPI-10", "value": "spi10"},
+           {"label": "SPI-11", "value": "spi11"},
+           {"label": "SPI-12", "value": "spi12"},
+           {"label": "SPEI-1", "value": "spei1"},
+           {"label": "SPEI-2", "value": "spei2"},
+           {"label": "SPEI-3", "value": "spei3"},
+           {"label": "SPEI-4", "value": "spei4"},
+           {"label": "SPEI-5", "value": "spei5"},
+           {"label": "SPEI-6", "value": "spei6"},
+           {"label": "SPEI-7", "value": "spei7"},
+           {"label": "SPEI-8", "value": "spei8"},
+           {"label": "SPEI-9", "value": "spei9"},
+           {"label": "SPEI-10", "value": "spei10"},
+           {"label": "SPEI-11", "value": "spei11"},
+           {"label": "SPEI-12", "value": "spei12"},
+           {"label": "EDDI-1", "value": "eddi1"},
+           {"label": "EDDI-2", "value": "eddi2"},
+           {"label": "EDDI-3", "value": "eddi3"},
+           {"label": "EDDI-4", "value": "eddi4"},
+           {"label": "EDDI-5", "value": "eddi5"},
+           {"label": "EDDI-6", "value": "eddi6"},
+           {"label": "EDDI-7", "value": "eddi7"},
+           {"label": "EDDI-8", "value": "eddi8"},
+           {"label": "EDDI-9", "value": "eddi9"},
+           {"label": "EDDI-10", "value": "eddi10"},
+           {"label": "EDDI-11", "value": "eddi11"},
+           {"label": "EDDI-12", "value": "eddi12"},
+           # {"label": "LERI-1", "value": "leri1"},
+           # {"label": "LERI-3", "value": "leri3"},
+           {"label": "TMIN", "value": "tmin"},
+           {"label": "TMAX", "value": "tmax"},
+           {"label": "TMEAN", "value": "tmean"},
+           {"label": "TDMEAN", "value": "tdmean"},
+           {"label": "PPT", "value": "ppt"},
+           {"label": "VPDMAX", "value": "vpdmax"},
+           # {"label": "VPDMEAN", "value": "vpdmean"},
+           {"label": "VPDMIN", "value": "vpdmin"}
 ]
 
 # Index dropdown labels
-indexnames = {'pdsi': 'Palmer Drought Severity Index',
-              'pdsisc': 'Self-Calibrated Palmer Drought Severity Index',
-              'pdsiz': 'Palmer Z-Index',
-              'spi1': 'Standardized Precipitation Index - 1 month',
-              'spi2': 'Standardized Precipitation Index - 2 month',
-              'spi3': 'Standardized Precipitation Index - 3 month',
-              'spi4': 'Standardized Precipitation Index - 4 month',
-              'spi5': 'Standardized Precipitation Index - 5 month',
-              'spi6': 'Standardized Precipitation Index - 6 month',
-              'spi7': 'Standardized Precipitation Index - 7 month',
-              'spi8': 'Standardized Precipitation Index - 8 month',
-              'spi9': 'Standardized Precipitation Index - 9 month',
-              'spi10': 'Standardized Precipitation Index - 10 month',
-              'spi11': 'Standardized Precipitation Index - 11 month',
-              'spi12': 'Standardized Precipitation Index - 12 month',
-              'spei1': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 1 month',
-              'spei2': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 2 month',
-              'spei3': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 3 month',
-              'spei4': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 4 month',
-              'spei5': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 5 month',
-              'spei6': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 6 month',
-              'spei7': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 7 month',
-              'spei8': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 8 month',
-              'spei9': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 9 month',
-              'spei10': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 10 month',
-              'spei11': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 11 month',
-              'spei12': 'Standardized Precipitation-Evapotranspiration Index' +
-                       ' - 12 month',
-              'eddi1': 'Evaporative Demand Drought Index - 1 month',
-              'eddi2': 'Evaporative Demand Drought Index - 2 month',
-              'eddi3': 'Evaporative Demand Drought Index - 3 month',
-              'eddi4': 'Evaporative Demand Drought Index - 4 month',
-              'eddi5': 'Evaporative Demand Drought Index - 5 month',
-              'eddi6': 'Evaporative Demand Drought Index - 6 month',
-              'eddi7': 'Evaporative Demand Drought Index - 7 month',
-              'eddi8': 'Evaporative Demand Drought Index - 8 month',
-              'eddi9': 'Evaporative Demand Drought Index - 9 month',
-              'eddi10': 'Evaporative Demand Drought Index - 10 month',
-              'eddi11': 'Evaporative Demand Drought Index - 11 month',
-              'eddi12': 'Evaporative Demand Drought Index - 12 month',
-              # 'leri1': 'Landscape Evaporative Response Index - 1 month',
-              # 'leri3': 'Landscape Evaporative Response Index - 3 month',
-              'tmin': 'Average Daily Minimum Temperature (°C)',
-              'tmax': 'Average Daily Maximum Temperature (°C)',
-              'tmean': 'Mean Temperature (°C)',
-              'tdmean': 'Mean Dew Point Temperature (°C)',
-              'ppt': 'Average Precipitation (mm)',
-              'vpdmax': 'Maximum Vapor Pressure Deficit (hPa)' ,
-              'vpdmin': 'Minimum Vapor Pressure Deficit (hPa)'
-              # 'vpdmean': 'Mean Vapor Pressure Deficit (hPa)'
+indexnames = {"pdsi": "Palmer Drought Severity Index",
+              "pdsisc": "Self-Calibrated Palmer Drought Severity Index",
+              "pdsiz": "Palmer Z-Index",
+              "spi1": "Standardized Precipitation Index - 1 month",
+              "spi2": "Standardized Precipitation Index - 2 month",
+              "spi3": "Standardized Precipitation Index - 3 month",
+              "spi4": "Standardized Precipitation Index - 4 month",
+              "spi5": "Standardized Precipitation Index - 5 month",
+              "spi6": "Standardized Precipitation Index - 6 month",
+              "spi7": "Standardized Precipitation Index - 7 month",
+              "spi8": "Standardized Precipitation Index - 8 month",
+              "spi9": "Standardized Precipitation Index - 9 month",
+              "spi10": "Standardized Precipitation Index - 10 month",
+              "spi11": "Standardized Precipitation Index - 11 month",
+              "spi12": "Standardized Precipitation Index - 12 month",
+              "spei1": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 1 month",
+              "spei2": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 2 month",
+              "spei3": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 3 month",
+              "spei4": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 4 month",
+              "spei5": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 5 month",
+              "spei6": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 6 month",
+              "spei7": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 7 month",
+              "spei8": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 8 month",
+              "spei9": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 9 month",
+              "spei10": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 10 month",
+              "spei11": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 11 month",
+              "spei12": "Standardized Precipitation-Evapotranspiration Index" +
+                       " - 12 month",
+              "eddi1": "Evaporative Demand Drought Index - 1 month",
+              "eddi2": "Evaporative Demand Drought Index - 2 month",
+              "eddi3": "Evaporative Demand Drought Index - 3 month",
+              "eddi4": "Evaporative Demand Drought Index - 4 month",
+              "eddi5": "Evaporative Demand Drought Index - 5 month",
+              "eddi6": "Evaporative Demand Drought Index - 6 month",
+              "eddi7": "Evaporative Demand Drought Index - 7 month",
+              "eddi8": "Evaporative Demand Drought Index - 8 month",
+              "eddi9": "Evaporative Demand Drought Index - 9 month",
+              "eddi10": "Evaporative Demand Drought Index - 10 month",
+              "eddi11": "Evaporative Demand Drought Index - 11 month",
+              "eddi12": "Evaporative Demand Drought Index - 12 month",
+              # "leri1": "Landscape Evaporative Response Index - 1 month",
+              # "leri3": "Landscape Evaporative Response Index - 3 month",
+              "tmin": "Average Daily Minimum Temperature (°C)",
+              "tmax": "Average Daily Maximum Temperature (°C)",
+              "tmean": "Mean Temperature (°C)",
+              "tdmean": "Mean Dew Point Temperature (°C)",
+              "ppt": "Average Precipitation (mm)",
+              "vpdmax": "Maximum Vapor Pressure Deficit (hPa)" ,
+              "vpdmin": "Minimum Vapor Pressure Deficit (hPa)"
+              # "vpdmean": "Mean Vapor Pressure Deficit (hPa)"
 }
 
 # Function options
-function_options_perc = [{'label': 'Mean', 'value': 'pmean'},
-                         {'label': 'Maximum', 'value': 'pmax'},
-                         {'label': 'Minimum', 'value': 'pmin'},
-                         {'label': 'Correlation', 'value': 'pcorr'}]
-function_options_orig = [{'label': 'Mean', 'value': 'omean'},
-                         {'label': 'Maximum', 'value': 'omax'},
-                         {'label': 'Minimum', 'value': 'omin'},
-                         {'label': 'Drought Severity Area', 'value':'oarea'},
-                         {'label': 'Correlation', 'value': 'ocorr'}]
-function_names = {'pmean': 'Average Percentiles',
-                  'pmax': 'Maxmium Percentiles',
-                  'pmin': 'Minimum Percentiles',
-                  'omean': 'Average Values',
-                  'omax': 'Maximum Values',
-                  'omin': 'Minimum Values',
-                  'oarea': 'Average Values',
-                  'pcorr': "Pearson's Correlation ",
-                  'ocorr': "Pearson's Correlation "}
+function_options_perc = [{"label": "Mean", "value": "pmean"},
+                         {"label": "Maximum", "value": "pmax"},
+                         {"label": "Minimum", "value": "pmin"},
+                         {"label": "Correlation", "value": "pcorr"}]
+function_options_orig = [{"label": "Mean", "value": "omean"},
+                         {"label": "Maximum", "value": "omax"},
+                         {"label": "Minimum", "value": "omin"},
+                         {"label": "Drought Severity Area", "value":"oarea"},
+                         {"label": "Correlation", "value": "ocorr"}]
+function_names = {"pmean": "Average Percentiles",
+                  "pmax": "Maxmium Percentiles",
+                  "pmin": "Minimum Percentiles",
+                  "omean": "Average Values",
+                  "omax": "Maximum Values",
+                  "omin": "Minimum Values",
+                  "oarea": "Average Values",
+                  "pcorr": "Pearson's Correlation ",
+                  "ocorr": "Pearson's Correlation "}
 
 # Acronym "options"
-ams = [{'label': 'PDSI: The Palmer Drought Severity Index (WWDT)', 'value': 0},
-       {'label': 'PDSI-Self Calibrated: The Self-Calibrating Palmer Drought ' +
-                 'Severity Index (WWDT)', 'value': 1},
-       {'label': 'Palmer Z Index: The Palmer Z Index (WWDT)', 'value': 2},
-       {'label': 'SPI: The Standardized Precipitation Index - 1 to 12 ' +
-                 'months (WWDT)', 'value': 3},
-       {'label': 'SPEI: The Standardized Precipitation-Evapotranspiration ' +
-                 'Index - 1 to 12 months (WWDT)', 'value': 4},
-       {'label': 'EDDI: The Evaporative Demand Drought Index - 1 to 12 ' +
-                 'months (PSD)', 'value': 5},
-       {'label': 'LERI: The Landscape Evaporative Response Index - 1 or 3 ' +
-                 'months (PSD)', 'value': 6},
-       {'label': 'TMIN: Average Daily Minimum Temperature ' +
-                 '(°C)(PRISM)', 'value': 7},
-       {'label': 'TMAX: Average Daily Maximum Temperature ' +
-                 '(°C)(PRISM)', 'value': 9},
-       {'label': 'TMEAN: Mean Temperature (°C)(PRISM)', 'value': 11},
-       {'label': 'TDMEAN: Mean Dew Point Temperature ' +
-                 '(°C)(PRISM)', 'value': 14},
-       {'label': 'PPT: Average Precipitation (mm)(PRISM)', 'value': 15},
-       {'label': 'VPDMAX: Maximum Vapor Pressure Deficit ' +
-                 '(hPa)(PRISM)', 'value': 18},
-       {'label': 'VPDMIN: Minimum Vapor Pressure Deficit ' +
-                 '(hPa)(PRISM)', 'value': 20}]
+ams = [{"label": "PDSI: The Palmer Drought Severity Index (WWDT)", "value": 0},
+       {"label": "PDSI-Self Calibrated: The Self-Calibrating Palmer Drought " +
+                 "Severity Index (WWDT)", "value": 1},
+       {"label": "Palmer Z Index: The Palmer Z Index (WWDT)", "value": 2},
+       {"label": "SPI: The Standardized Precipitation Index - 1 to 12 " +
+                 "months (WWDT)", "value": 3},
+       {"label": "SPEI: The Standardized Precipitation-Evapotranspiration " +
+                 "Index - 1 to 12 months (WWDT)", "value": 4},
+       {"label": "EDDI: The Evaporative Demand Drought Index - 1 to 12 " +
+                 "months (PSD)", "value": 5},
+       {"label": "LERI: The Landscape Evaporative Response Index - 1 or 3 " +
+                 "months (PSD)", "value": 6},
+       {"label": "TMIN: Average Daily Minimum Temperature " +
+                 "(°C)(PRISM)", "value": 7},
+       {"label": "TMAX: Average Daily Maximum Temperature " +
+                 "(°C)(PRISM)", "value": 9},
+       {"label": "TMEAN: Mean Temperature (°C)(PRISM)", "value": 11},
+       {"label": "TDMEAN: Mean Dew Point Temperature " +
+                 "(°C)(PRISM)", "value": 14},
+       {"label": "PPT: Average Precipitation (mm)(PRISM)", "value": 15},
+       {"label": "VPDMAX: Maximum Vapor Pressure Deficit " +
+                 "(hPa)(PRISM)", "value": 18},
+       {"label": "VPDMIN: Minimum Vapor Pressure Deficit " +
+                 "(hPa)(PRISM)", "value": 20}]
 
 acronym_text = ("""
     INDEX/INDICATOR ACRONYMS
@@ -382,43 +377,43 @@ acronym_text = ("""
     """)
 
 # County data frame and options
-counties_df = pd.read_csv('data/tables/unique_counties.csv')
+counties_df = pd.read_csv("data/tables/unique_counties.csv")
 rows = [r for idx, r in counties_df.iterrows()]
-county_options = [{'label': r['place'], 'value': r['fips']} for r in rows]
-fips_pos = {county_options[i]['value']: i for i in range(len(county_options))}
-label_pos = {county_options[i]['label']: i for i in range(len(county_options))}
+county_options = [{"label": r["place"], "value": r["fips"]} for r in rows]
+fips_pos = {county_options[i]["value"]: i for i in range(len(county_options))}
+label_pos = {county_options[i]["label"]: i for i in range(len(county_options))}
 
 # State options
-states_df = pd.read_table('data/tables/state_fips.txt', sep='|')
-states_df = states_df.sort_values('STUSAB')
-nconus = ['AK', 'AS', 'DC', 'GU', 'HI', 'MP', 'PR', 'UM', 'VI']
+states_df = pd.read_table("data/tables/state_fips.txt", sep="|")
+states_df = states_df.sort_values("STUSAB")
+nconus = ["AK", "AS", "DC", "GU", "HI", "MP", "PR", "UM", "VI"]
 states_df = states_df[~states_df.STUSAB.isin(nconus)]
 rows = [r for idx, r in states_df.iterrows()]
-state_options = [{'label': r['STUSAB'], 'value': r['STATE']} for r in rows]
-state_options.insert(0, {'label': 'ALL STATES IN CONUS', 'value': 'all'})
+state_options = [{"label": r["STUSAB"], "value": r["STATE"]} for r in rows]
+state_options.insert(0, {"label": "ALL STATES IN CONUS", "value": "all"})
 
 # Map type options
-maptypes = [{'label': 'Light', 'value': 'light'},
-            {'label': 'Dark', 'value': 'dark'},
-            {'label': 'Basic', 'value': 'basic'},
-            {'label': 'Outdoors', 'value': 'outdoors'},
-            {'label': 'Satellite', 'value': 'satellite'},
-            {'label': 'Satellite Streets', 'value': 'satellite-streets'}]
+maptypes = [{"label": "Light", "value": "light"},
+            {"label": "Dark", "value": "dark"},
+            {"label": "Basic", "value": "basic"},
+            {"label": "Outdoors", "value": "outdoors"},
+            {"label": "Satellite", "value": "satellite"},
+            {"label": "Satellite Streets", "value": "satellite-streets"}]
 
 # Color scale options
-colorscales = ['Default', 'Blackbody', 'Bluered', 'Blues', 'Earth', 'Electric',
-               'Greens', 'Greys', 'Hot', 'Jet', 'Picnic', 'Portland',
-               'Rainbow', 'RdBu', 'Reds', 'Viridis', 'RdWhBu',
-               'RdWhBu (Extreme Scale)', 'RdYlGnBu', 'BrGn']
-color_options = [{'label': c, 'value': c} for c in colorscales]
+colorscales = ["Default", "Blackbody", "Bluered", "Blues", "Earth", "Electric",
+               "Greens", "Greys", "Hot", "Jet", "Picnic", "Portland",
+               "Rainbow", "RdBu", "Reds", "Viridis", "RdWhBu",
+               "RdWhBu (Extreme Scale)", "RdYlGnBu", "BrGn"]
+color_options = [{"label": c, "value": c} for c in colorscales]
 
 # We need one external colorscale for a hard set drought area chart
-RdWhBu = [[0.00, 'rgb(115,0,0)'], [0.10, 'rgb(230,0,0)'],
-          [0.20, 'rgb(255,170,0)'], [0.30, 'rgb(252,211,127)'],
-          [0.40, 'rgb(255, 255, 0)'], [0.45, 'rgb(255, 255, 255)'],
-          [0.55, 'rgb(255, 255, 255)'], [0.60, 'rgb(143, 238, 252)'],
-          [0.70, 'rgb(12,164,235)'], [0.80, 'rgb(0,125,255)'],
-          [0.90, 'rgb(10,55,166)'], [1.00, 'rgb(5,16,110)']]
+RdWhBu = [[0.00, "rgb(115,0,0)"], [0.10, "rgb(230,0,0)"],
+          [0.20, "rgb(255,170,0)"], [0.30, "rgb(252,211,127)"],
+          [0.40, "rgb(255, 255, 0)"], [0.45, "rgb(255, 255, 255)"],
+          [0.55, "rgb(255, 255, 255)"], [0.60, "rgb(143, 238, 252)"],
+          [0.70, "rgb(12,164,235)"], [0.80, "rgb(0,125,255)"],
+          [0.90, "rgb(10,55,166)"], [1.00, "rgb(5,16,110)"]]
 
 # Get spatial dimensions from the sample data set above
 admin = Admin_Elements(resolution)
@@ -428,13 +423,13 @@ admin = Admin_Elements(resolution)
 # Date options
 years = [int(y) for y in range(min_year, max_year + 1)]
 months = [int(m) for m in range(1, 13)]
-yearmarks = {y: {'label': y, 'style': {"transform": "rotate(45deg)"}} for
+yearmarks = {y: {"label": y, "style": {"transform": "rotate(45deg)"}} for
              y in years}
-monthmarks = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-              7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
-monthoptions = [{'label': monthmarks[i], 'value': i} for i in range(1, 13)]
-months_slanted = {i: {'label': monthmarks[i],
-                      'style': {"transform": "rotate(45deg)"}} for i in months}
+monthmarks = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+              7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
+monthoptions = [{"label": monthmarks[i], "value": i} for i in range(1, 13)]
+months_slanted = {i: {"label": monthmarks[i],
+                      "style": {"transform": "rotate(45deg)"}} for i in months}
 
 # Only display every 5 years for space
 for y in years:
@@ -444,25 +439,25 @@ for y in years:
 
 # In[] Map Elements
 # Mapbox Access
-mapbox_access_token = ('pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk' +
-                       'MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ')
+mapbox_access_token = ("pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk" +
+                       "MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ")
 
 # Mapbox initial layout
 # Check this out! https://paulcbauer.shinyapps.io/plotlylayout/
 layout = dict(
     height=500,
-    font=dict(color='#CCCCCC',
-              fontweight='bold'),
-    titlefont=dict(color='#CCCCCC',
-                   size='20',
-                   family='Time New Roman',
-                   fontweight='bold'),
+    font=dict(color="#CCCCCC",
+              fontweight="bold"),
+    titlefont=dict(color="#CCCCCC",
+                   size="20",
+                   family="Time New Roman",
+                   fontweight="bold"),
     margin=dict(l=55, r=35, b=65, t=90, pad=4),
     hovermode="closest",
     plot_bgcolor="#083C04",
     paper_bgcolor="black",
-    legend=dict(font=dict(size=10, fontweight='bold'), orientation='h'),
-    title='<b>Index Values/b>',
+    legend=dict(font=dict(size=10, fontweight="bold"), orientation="h"),
+    title="<b>Index Values/b>",
     mapbox=dict(
         accesstoken=mapbox_access_token,
         style="satellite-streets",
@@ -472,32 +467,32 @@ layout = dict(
 
 
 # In[] Temporary CSS Items
-tab_height = '25px'
-tab_style = {'height': tab_height, 'padding': '0'}
-tablet_style = {'line-height': tab_height, 'padding': '0'}
-selected_style = {'color': 'black',
-                  'box-shadow': '1px 1px 0px white',
-                  'border-left': '1px solid lightgrey',
-                  'border-right': '1px solid lightgrey',
-                  'border-top': '3px solid black'}
-unselected_style = {'border-top-left-radius': '3px',
-                    'background-color': '#f9f9f9',
-                    'padding': '0px 24px',
-                    'border-bottom': '1px solid #d6d6d6'}
-on_button_style = {'height': '45px',
-                   'padding': '9px',
-                   'background-color': '#cfb87c',
-                   'border-radius': '4px',
-                   'font-family': 'Times New Roman',
-                   'font-size': '12px',
-                   'margin-top': '-5px'}
-off_button_style =  {'height': '45px',
-                     'padding': '9px',
-                     'background-color': '#b09d6d',
-                     'border-radius': '4px',
-                     'font-family': 'Times New Roman',
-                     'font-size': '12px',
-                     'margin-top': '-5px'}
+tab_height = "25px"
+tab_style = {"height": tab_height, "padding": "0"}
+tablet_style = {"line-height": tab_height, "padding": "0"}
+selected_style = {"color": "black",
+                  "box-shadow": "1px 1px 0px white",
+                  "border-left": "1px solid lightgrey",
+                  "border-right": "1px solid lightgrey",
+                  "border-top": "3px solid black"}
+unselected_style = {"border-top-left-radius": "3px",
+                    "background-color": "#f9f9f9",
+                    "padding": "0px 24px",
+                    "border-bottom": "1px solid #d6d6d6"}
+on_button_style = {"height": "45px",
+                   "padding": "9px",
+                   "background-color": "#cfb87c",
+                   "border-radius": "4px",
+                   "font-family": "Times New Roman",
+                   "font-size": "12px",
+                   "margin-top": "-5px"}
+off_button_style =  {"height": "45px",
+                     "padding": "9px",
+                     "background-color": "#b09d6d",
+                     "border-radius": "4px",
+                     "font-family": "Times New Roman",
+                     "font-size": "12px",
+                     "margin-top": "-5px"}
 
 # In[]: Application Structure
 # Dynamic Elements
@@ -698,25 +693,26 @@ def divMaker(id_num, index='noaa'):
                    href="", target='_blank'),
             html.A('Download Selected Data (All Indicators)', 
                    id="download_all_link_{}".format(id_num),
-                   download='timeseries_all_{}.csv'.format(id_num),
+                   download="timeseries_all_{}.csv".format(id_num),
                    title=
-                     ('This csv includes data for all available indices/'
-                      + 'indicators given the selections made for the '
-                      + ' element above and is titled '
-                      + '"timeseries_all_{}.csv"'.format(id_num)),
-                   href="", target='_blank',
+                     ("This csv includes data for all available indices/"
+                      + "indicators given the selections made for the "
+                      + "element above. Please allow several minutes for "
+                      + "this download to begin. Titled "
+                      + "timeseries_all_{}.csv".format(id_num)),
+                   href="", target="_blank",
                    style={"margin-left": "15px"}),
 
             # Storage
-            dcc.Store(id='download_store_{}'.format(id_num)),
-            html.Div(id='key_{}'.format(id_num),
-                     children='{}'.format(id_num),
-                     style={'display': 'none'}),
-            html.Div(id='label_store_{}'.format(id_num),
-                     style={'display': 'none'}),
-            html.Div(id='shape_store_{}'.format(id_num),
-                     style={'display': 'none'})],
-        className='six columns')
+            dcc.Store(id="download_store_{}".format(id_num)),
+            html.Div(id="key_{}".format(id_num),
+                     children="{}".format(id_num),
+                     style={"display": "none"}),
+            html.Div(id="label_store_{}".format(id_num),
+                     style={"display": "none"}),
+            html.Div(id="shape_store_{}".format(id_num),
+                     style={"display": "none"})],
+        className="six columns")
 
     return div
 
@@ -807,20 +803,14 @@ navbar = html.Nav(
                  'margin-left': '-5px'}),
                  # End Acronym Button
 
-
           # Toggle Buttons
           html.Div([
             html.Button(id='toggle_options',
                         children='Toggle Options: Off',
-                        n_clicks=1,
+                        n_clicks=0,
                         type='button',
                         title=('Display/hide options that ' +
                                'apply to each map below.'),
-                        style={'display': 'none'}),
-            html.Button(id="desc_button",
-                        children='Project Description: Off',
-                        title=('Display/hide a description of ' +
-                               'the application with instructions.'),
                         style={'display': 'none'}),
             html.Button(id="click_sync",
                         children='Location Syncing: On',
@@ -831,7 +821,13 @@ navbar = html.Nav(
                         children='Year Syncing: On',
                         title=('Sync/unsync the years ' +
                                'of the time series between each map.'),
-                        style={'display': 'none'})
+                        style={'display': 'none'}),
+            html.Button(id="desc_button",
+                        n_clicks=0,
+                        children='Project Description: Off',
+                        title=('Display/hide a description of ' +
+                               'the application with instructions.'),
+                        style={'display': 'none'}),
                         ],
             style={'float': 'left',
                    'margin-left': '15px'})],
@@ -1380,42 +1376,42 @@ def toggleDescription(click):
         button_children = "Description: Off"
 
     else:
-        desc_children = open('data/tables/description.txt').read()  # <-------- It makes no sense that the description doc is in the tables folder
+        desc_children = open("data/tables/description.txt").read()  # <-------- It makes no sense that the description doc is in the tables folder
         style = on_button_style
         button_children = "Description: On"
 
     return desc_children, style, button_children
 
 
-@app.callback([Output('options', 'style'),
-               Output('toggle_options', 'style'),
-               Output('submit', 'style'),
-               Output('toggle_options', 'children')],
-              [Input('toggle_options', 'n_clicks')])
+@app.callback([Output("options", "style"),
+               Output("toggle_options", "style"),
+               Output("submit", "style"),
+               Output("toggle_options", "children")],
+              [Input("toggle_options", "n_clicks")])
 def toggleOptions(click):
-    '''Toggle options on/off'''
+    """Toggle options on/off"""
     if click % 2 == 0:
-        div_style = {'display': 'none'}
-        button_style = off_button_style
-        submit_style = {'display': 'none'}
+        div_style = {"display": "none"}
+        button_style = {**off_button_style, **{"margin-right": "15px"}}
+        submit_style = {"display": "none"}
         children = "Display Options: Off"
     else:
         div_style = {}
-        button_style = on_button_style
-        submit_style = {'background-color': '#C7D4EA',
-                        'border-radius': '2px',
-                        'font-family': 'Times New Roman',
-                        'margin-top': '100px',
-                        'margin-bottom': '35px'}
+        button_style = {**on_button_style, **{"margin-right": "15px"}}
+        submit_style = {"background-color": "#C7D4EA",
+                        "border-radius": "2px",
+                        "font-family": "Times New Roman",
+                        "margin-top": "100px",
+                        "margin-bottom": "35px"}
         children = "Display Options: On"
     return div_style, button_style, submit_style, children
 
 
-@app.callback([Output('click_sync', 'style'),
-               Output('click_sync', 'children')],
-              [Input('click_sync', 'n_clicks')])
+@app.callback([Output("click_sync", "style"),
+               Output("click_sync", "children")],
+              [Input("click_sync", "n_clicks")])
 def toggleLocationSyncButton(click):
-    '''Change the color of on/off location syncing button - for css'''
+    """Change the color of on/off location syncing button - for css"""
     if not click:
         click = 0
     if click % 2 == 0:
@@ -1427,116 +1423,115 @@ def toggleLocationSyncButton(click):
     return style, children
 
 
-@app.callback(Output('month_check_1', 'values'),
-              [Input('all_months_1', 'n_clicks'),
-               Input('no_months_1', 'n_clicks')])
+@app.callback(Output("month_check_1", "values"),
+              [Input("all_months_1", "n_clicks"),
+               Input("no_months_1", "n_clicks")])
 def toggleMonthFilter1(all_months, no_months):
-    '''This fills or empties the month filter boxes with/of checks'''
+    """This fills or empties the month filter boxes with/of checks"""
     # If no clicks yet, prevent update
     if not any([all_months, no_months]):
         raise PreventUpdate
 
     # Find which input triggered this callback
     context = dash.callback_context
-    triggered_value = context.triggered[0]['value']
-    trigger = context.triggered[0]['prop_id']
+    triggered_value = context.triggered[0]["value"]
+    trigger = context.triggered[0]["prop_id"]
     if triggered_value:
-        if 'all' in trigger:
+        if "all" in trigger:
             return list(range(1, 13))
         else:
             return [None]
 
 
-@app.callback(Output('month_check_2', 'values'),
-              [Input('all_months_2', 'n_clicks'),
-               Input('no_months_2', 'n_clicks')])
-def toggleMonthFilter1(all_months, no_months):
-    '''This fills or empties the month filter boxes with/of checks'''
+@app.callback(Output("month_check_2", "values"),
+              [Input("all_months_2", "n_clicks"),
+               Input("no_months_2", "n_clicks")])
+def toggleMonthFilter2(all_months, no_months):
+    """This fills or empties the month filter boxes with/of checks"""
     # If no clicks yet, prevent update
     if not any([all_months, no_months]):
         raise PreventUpdate
 
     # Find which input triggered this callback
     context = dash.callback_context
-    triggered_value = context.triggered[0]['value']
-    trigger = context.triggered[0]['prop_id']
+    triggered_value = context.triggered[0]["value"]
+    trigger = context.triggered[0]["prop_id"]
     if triggered_value:
-        if 'all' in trigger:
+        if "all" in trigger:
             return list(range(1, 13))
         else:
             return [None]
 
 
-@app.callback(Output('year_div2', 'style'),
-              [Input('date_sync', 'n_clicks')])
+@app.callback(Output("year_div2", "style"),
+              [Input("date_sync", "n_clicks")])
 def toggleYears2(click):
-    '''
+    """
     When syncing years, there should only be one time slider
-    '''
+    """
     if not click:
         click = 0
     if click % 2 == 0:
-        style = {'display': 'none', 'margin-top': '0', 'margin-bottom': '80'}
+        style = {"display": "none", "margin-top": "0", "margin-bottom": "80"}
     else:
-        style = {'margin-top': '0', 'margin-bottom': '80'}
+        style = {"margin-top": "0", "margin-bottom": "80"}
     return style
 
 
-@app.callback(Output('month_div2', 'style'),
-              [Input('date_sync', 'n_clicks')])
+@app.callback(Output("month_div2", "style"),
+              [Input("date_sync", "n_clicks")])
 def toggleMonths2(click):
-    '''
+    """
     When syncing years, there should only be one time slider
-    '''
+    """
     if not click:
         click = 0
     if click % 2 == 0:
-        style = {'display': 'none', 'margin-top': '0', 'margin-bottom': '80'}
+        style = {"display": "none", "margin-top": "0", "margin-bottom": "80"}
     else:
-        style = {'margin-top': '30', 'margin-bottom': '30'}
+        style = {"margin-top": "30", "margin-bottom": "30"}
     return style
 
 
-@app.callback([Output('date_sync', 'style'),
-               Output('date_sync', 'children')],
-              [Input('date_sync', 'n_clicks')])
-def toggleYearSyncButton(click):
-    '''
-    Change the color of on/off date syncing button - for css
-    '''
+@app.callback([Output("date_sync", "style"),
+               Output("date_sync", "children")],
+              [Input("date_sync", "n_clicks")])
+def toggleDateSyncButton(click):
+    """Change the color of on/off date syncing button - for css."""
     if not click:
         click = 0
     if click % 2 == 0:
         children = "Date Syncing: On"
-        style = on_button_style
+        style = {**on_button_style, **{"margin-right": "15px"}}
+
     else:
         children = "Date Syncing: Off"
-        style = off_button_style
+        style = {**off_button_style, **{"margin-right": "15px"}}
     return style, children
 
 
 # In[] App callbacks
 # For multiple instances
 for i in range(1, 3):
-    @app.callback(Output('location_store_{}'.format(i), 'children'),
-                  [Input('map_1', 'clickData'),
-                   Input('map_2', 'clickData'),
-                   Input('map_1', 'selectedData'),
-                   Input('map_2', 'selectedData'),
-                   Input('county_1', 'value'),
-                   Input('county_2', 'value'),
-                   Input('shape_store_1', 'children'),
-                   Input('shape_store_2', 'children'),
-                   Input('bbox_1', 'value'),
-                   Input('bbox_2', 'value'),
-                   Input('update_graphs_1', 'n_clicks'),
-                   Input('update_graphs_2', 'n_clicks'),
-                   Input('reset_map_1', 'n_clicks'),
-                   Input('reset_map_2', 'n_clicks')],
-                  [State('state_1', 'value'),
-                   State('state_2', 'value'),
-                   State('click_sync', 'children'),
-                   State('key_{}'.format(i), 'children')])
+    @app.callback(Output("location_store_{}".format(i), "children"),
+                  [Input("map_1", "clickData"),
+                   Input("map_2", "clickData"),
+                   Input("map_1", "selectedData"),
+                   Input("map_2", "selectedData"),
+                   Input("county_1", "value"),
+                   Input("county_2", "value"),
+                   Input("shape_store_1", "children"),
+                   Input("shape_store_2", "children"),
+                   Input("bbox_1", "value"),
+                   Input("bbox_2", "value"),
+                   Input("update_graphs_1", "n_clicks"),
+                   Input("update_graphs_2", "n_clicks"),
+                   Input("reset_map_1", "n_clicks"),
+                   Input("reset_map_2", "n_clicks")],
+                  [State("state_1", "value"),
+                   State("state_2", "value"),
+                   State("click_sync", "children"),
+                   State("key_{}".format(i), "children")])
     def locationPicker(click1, click2, select1, select2, county1, county2,
                        shape1, shape2, bbox1, bbox2, update1, update2, reset1,
                        reset2, state1, state2, sync, key):
@@ -2588,6 +2583,7 @@ def make_csvs(path):
 @server.route("/download")
 def download_csv():
     path = flask.request.args.get("value")
+    print("Sending csv: " + path)
     df, key = make_csvs(path)
     str_io = io.StringIO()
     df.to_csv(str_io)
@@ -2604,5 +2600,5 @@ def download_csv():
 
 # In[] Run Application through the server
 if __name__ == "__main__":
-    app.run_server()
-    # app.run_server(debug=True)
+    # app.run_server()
+    app.run_server(debug=True)
