@@ -71,7 +71,6 @@ import datetime as dt
 import gc
 import io
 import json
-import multiprocessing as mp
 import os
 import psutil
 import tempfile
@@ -95,6 +94,7 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from flask_caching import Cache
 from osgeo import gdal, osr
+from tqdm import tqdm
 
 from functions import (Admin_Elements, Index_Maps, Location_Builder,
                        print_args, shapeReproject, unit_map)
@@ -157,9 +157,9 @@ max_month = pd.Timestamp(max_date).month
 # Initializing Values
 default_function = "omean"
 default_function_type = "index"
-default_sample = "spi3"
-default_1 = "spi11"
-default_2 = "spi3"
+default_sample = "spei6"
+default_1 = "spei6"
+default_2 = "pdsi"
 default_date = "1980 - {}".format(max_year)
 default_basemap = "dark"
 default_location = '["all", "y", "x", "Contiguous United States", 0]'
@@ -697,9 +697,9 @@ def divMaker(id_num, index='noaa'):
                    title=
                      ("This csv includes data for all available indices/"
                       + "indicators given the selections made for the "
-                      + "element above. Please allow several minutes for "
-                      + "this download to begin. Titled "
-                      + "timeseries_all_{}.csv".format(id_num)),
+                      + "element above and is titled "
+                      + '"timeseries_all_{}.csv".'.format(id_num)
+                      + " This can take a moment."),
                    href="", target="_blank",
                    style={"margin-left": "15px"}),
 
@@ -1118,7 +1118,9 @@ body = html.Div([
                 style={'display': 'none'})
                 # End Signals
 
-       ], className='ten columns offset-by-one')
+       ], className='ten columns offset-by-one',
+    style={"margin-bottom": "50px"})
+        
        # End Static Elements
 
 app.layout = html.Div([navbar, body])
@@ -2519,44 +2521,49 @@ for i in range(1, 3):
         return "/download?value=" + path
 
 def make_csv(arg):
-     signal, function, index, location, choice = arg
-     data = retrieveData(signal, function, index, location)
-     dates = data.dataset_interval.time.values
-     dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
- 
-     # If the function is oarea, we plot five overlapping timeseries
-     label = location[3]
-     nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
-                   'vpdmin', 'vpdmean']
-     if function != 'oarea' or choice in nonindices:
-         # Get the time series from the data object
-         timeseries = data.getSeries(location, crdict)
- 
-         # Create data frame as string for download option
-         columns = OrderedDict({'month': dates,
-                                 'value': list(timeseries),
-                                 'function': function_names[function],  # <-- This doesn't always make sense
-                                 'location': location[-2],
-                                 'index': indexnames[index]})
-         df = pd.DataFrame(columns)
- 
-     else:
-         label = location[3]
-         ts_series, ts_series_ninc, dsci = data.getArea(crdict)
- 
-         # Save to file for download option
-         columns = OrderedDict({'month': dates,
-                                 'd0': ts_series_ninc[0],
-                                 'd1': ts_series_ninc[1],
-                                 'd2': ts_series_ninc[2],
-                                 'd3': ts_series_ninc[3],
-                                 'd4': ts_series_ninc[4],
-                                 'dsci': dsci,
-                                 'function': 'Percent Area',
-                                 'location':  label,
-                                 'index': indexnames[index]})
-         df = pd.DataFrame(columns)
-     return df
+    signal, function, index, location, choice = arg
+    data = retrieveData(signal, function, index, location)
+    dates = data.dataset_interval.time.values
+    dates = [pd.to_datetime(str(d)).strftime('%Y-%m') for d in dates]
+
+    # If the function is oarea, we plot five overlapping timeseries
+    label = location[3]
+    nonindices = ['tdmean', 'tmean', 'tmin', 'tmax', 'ppt',  'vpdmax',
+                  'vpdmin', 'vpdmean']
+
+
+    if function != 'oarea' or choice in nonindices:
+        # Get the time series from the data object
+        try:
+            timeseries = data.getSeries(location, crdict)
+        except Exception as e:
+            print(e)
+
+        # Create data frame as string for download option
+        columns = OrderedDict({'month': dates,
+                                'value': list(timeseries),
+                                'function': function_names[function],  # <-- This doesn't always make sense
+                                'location': location[-2],
+                                'index': indexnames[index]})
+        df = pd.DataFrame(columns)
+
+    else:
+        label = location[3]
+        ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+
+        # Save to file for download option
+        columns = OrderedDict({'month': dates,
+                                'd0': ts_series_ninc[0],
+                                'd1': ts_series_ninc[1],
+                                'd2': ts_series_ninc[2],
+                                'd3': ts_series_ninc[3],
+                                'd4': ts_series_ninc[4],
+                                'dsci': dsci,
+                                'function': 'Percent Area',
+                                'location':  label,
+                                'index': indexnames[index]})
+        df = pd.DataFrame(columns)
+    return df
 
 
 def make_csvs(path):
@@ -2569,12 +2576,11 @@ def make_csvs(path):
     # Get data
     dfs = []
     args = []
-    for index in list(indexnames.keys()):
-        args.append([signal, function, index, location, choice])
-    with mp.Pool(mp.cpu_count()) as pool:
-        for df in pool.imap(make_csv, args):
-            dfs.append(df)  
-
+    for index in tqdm(list(indexnames.keys())):
+        arg = [signal, function, index, location, choice]
+        args.append(arg)
+        df = make_csv(arg)
+        dfs.append(df)
     df = pd.concat(dfs)
 
     return df, key
