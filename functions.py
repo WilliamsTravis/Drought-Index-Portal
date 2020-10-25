@@ -1456,12 +1456,12 @@ class Admin_Elements:
 
         return path_package
 
-    def rasterize(self, src, dst, attribute, all_touch=False,
+    def rasterize(self, src, dst, attribute, extent, all_touch=False,
                   epsg=4326, na=-9999):
-        '''
+        """
         It seems to be unreasonably involved to do this in Python compared to
         the command line.
-        '''
+        """
         resolution = self.resolution
 
         # Open shapefile, retrieve the layer
