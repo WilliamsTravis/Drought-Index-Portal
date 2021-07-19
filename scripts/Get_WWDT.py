@@ -84,7 +84,6 @@ try:
 except:
     res = 0.25
 
-# In[] Set up paths and urls
 wwdt_url = 'https://wrcc.dri.edu/wwdt/data/PRISM'
 local_path1 = os.path.join(data_path,
                           'data/droughtindices/netcdfs/wwdt/tifs')
@@ -401,7 +400,7 @@ for index in indices:
 
 # We use a pre-made min/max value data frame to set color scales
 print("Downloads and transformations complete, establishing index ranges...")
-index_paths = [os.path.join(data_path,'data/droughtindices/netcdfs',
+index_paths = [os.path.join(data_path, "data/droughtindices/netcdfs",
                             i  + '.nc') for i in local_indices]
 maxes = {}
 mins = {}
@@ -420,7 +419,7 @@ for i in tqdm(range(len(index_paths)), position=0):
 df = pd.DataFrame([maxes, mins]).T
 df.columns = ['max', 'min']
 df['index'] = df.index
-df.to_csv('data/index_ranges.csv', index=False)
+df.to_csv(os.path.join(data_path, "data/index_ranges.csv"), index=False)
 
 
 print("Update Complete.")

@@ -1,30 +1,28 @@
 # -*- coding: utf-8 -*-
-"""
-I think I can get solar radiation and wind parameters, these are also variables
-that some of the more complex drought indices incorporate.
+"""I think I can get solar radiation and wind parameters, these are also
+variables that some of the more complex drought indices incorporate.
 
 Created on Sat Aug 10 18:41:24 2019
 
 @author: trwi0358
 """
-import warnings
-warnings.filterwarnings("ignore")
-import datetime as dt
-import numpy as np
 import os
-from osgeo import gdal
+import datetime as dt
 import pathlib
 import sys
-import xarray as xr
-import rasterio
-from rasterio.enums import Resampling
 
-# In[] Set up working environment
+import numpy as np
+import xarray as xr
+
+from drip import isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
+from osgeo import gdal
+
+
 pwd = str(pathlib.Path(__file__).parent.absolute())
 data_path = os.path.join(pwd, "..")
 sys.path.insert(0, data_path)
 
-from functions import isInt, toNetCDF, toNetCDFAlbers, toNetCDFPercentile
+
 
 # gdal.PushErrorHandler('CPLQuietErrorHandler')
 os.environ['GDAL_PAM_ENABLED'] = 'NO'
@@ -39,7 +37,7 @@ try:
 except:
     res = 0.25
 
-# In[] Data source and target directory
+
 temp_folder = os.path.join(data_path, 'data/droughtindices/netcdfs/gridmet')
 day_folder = os.path.join(temp_folder, 'temp')
 pc_folder = os.path.join(data_path, 'data/droughtindices/netcdfs/percentiles')
@@ -50,7 +48,7 @@ if not os.path.exists(day_folder):
 if not os.path.exists(pc_folder):
     os.makedirs(pc_folder)
 
-# In[] Today's date, month, and year
+
 todays_date = dt.datetime.today()
 today = np.datetime64(todays_date)
 thisyear = todays_date.year
@@ -63,7 +61,7 @@ print("####################################################")
 print("\nRunning Get_PRISM.py using a " + str(res) + " degree resolution:\n")
 print(str(today) + '\n')
 
-# In[]
+
 # This dataset starts in 1979
 years = range(1979, thisyear + 1)
 

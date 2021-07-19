@@ -64,7 +64,6 @@ Created on April 15th 2019
 @author: Travis Williams - Earth Lab of the Universty of Colorado Boulder
          Travis.Williams@colorado.edu
 """
-
 import base64
 import copy
 import datetime as dt
@@ -133,9 +132,9 @@ cache2.init_app(server)
 # In[] Default Values
 # For testing
 source_signal = [
-    [[[1980, 2020], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 
+    [[[1980, 2021], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 
      "Default", "no"],
-    [[[2000, 2020], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 
+    [[[2000, 2021], [1, 12], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]], 
      "Default", "no"]
 ]
 source_choice = "spi1"
@@ -437,7 +436,6 @@ for y in years:
         yearmarks[y] = ""
 
 
-# In[] Map Elements
 # Mapbox Access
 mapbox_access_token = ("pk.eyJ1IjoidHJhdmlzc2l1cyIsImEiOiJjamZiaHh4b28waXNk" +
                        "MnptaWlwcHZvdzdoIn0.9pxpgXxyyhM6qEF_dcyjIQ")
@@ -466,7 +464,6 @@ layout = dict(
 )
 
 
-# In[] Temporary CSS Items
 tab_height = "25px"
 tab_style = {"height": tab_height, "padding": "0"}
 tablet_style = {"line-height": tab_height, "padding": "0"}
@@ -494,7 +491,6 @@ off_button_style =  {"height": "45px",
                      "font-size": "12px",
                      "margin-top": "-5px"}
 
-# In[]: Application Structure
 # Dynamic Elements
 def divMaker(id_num, index='noaa'):
     div = html.Div([
@@ -1125,7 +1121,6 @@ body = html.Div([
 
 app.layout = html.Div([navbar, body])
 
-# In[]: App Callbacks
 # For singular elements
 @app.callback([Output('date_range_1', 'children'),
                Output('date_print_1', 'children')],
@@ -1512,7 +1507,6 @@ def toggleDateSyncButton(click):
     return style, children
 
 
-# In[] App callbacks
 # For multiple instances
 for i in range(1, 3):
     @app.callback(Output("location_store_{}".format(i), "children"),
@@ -2604,7 +2598,6 @@ def download_csv():
                            as_attachment=True)
 
 
-# In[] Run Application through the server
 if __name__ == "__main__":
-    # app.run_server()
-    app.run_server(debug=True)
+    app.run_server()
+    # app.run_server(debug=True)
