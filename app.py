@@ -824,7 +824,13 @@ navbar = html.Nav(
                         title=('Display/hide a description of ' +
                                'the application with instructions.'),
                         style={'display': 'none'}),
-                        ],
+            html.Button(id="other_button",
+                        n_clicks=0,
+                        children='Other Portals: Off',
+                        title=('Display/hide a list of links to other '
+                               'drought data portals.'),
+                        style={'display': 'none'}),
+            ],
             style={'float': 'left',
                    'margin-left': '15px'})],
           style={'position': 'fixed','top': '0px', 'left': '0px',
@@ -837,25 +843,41 @@ navbar = html.Nav(
 body = html.Div([
 
       # Title
-      html.Div([
-        html.H1('Drought Index Portal (DrIP)'),
-        html.H4('A tool to display, compare, and extract time series for ' +
-                'various indicators of drought in the Contiguous United ' +
-                'States'),
-          html.Hr()],
-            className='twelve columns',
-            style={'font-weight': 'bolder',
-                   'text-align': 'center',
-                   'font-size': '50px',
-                   'font-family': 'Times New Roman',
-                   'margin-top': '100'}
-            ),
-            # End Title
+      html.Div(
+          id="title_div",    
+          children=[
+              html.H1('Drought Index Portal (DrIP)'),
+              html.H4('A tool to display, compare, and extract time series ' +
+                      'for various indicators of drought in the Contiguous ' +
+                      'United States'),
+              html.Hr()],
+          className='twelve columns',
+          style={'font-weight': 'bolder',
+                 'text-align': 'center',
+                 'font-size': '50px',
+                 'font-family': 'Times New Roman',
+                 'margin-top': '100'}
+      ),
+      # End Title
 
      # Description
      html.Div([
        html.Div([
          dcc.Markdown(id='description')],
+                      style={'text-align':'center',
+                             'width':'70%',
+                             'margin':'0px auto'}),
+         html.Hr(style={'margin-bottom': '1px'})],
+         style={'text-align':'center',
+                'margin': '0 auto',
+                'width': '100%'}
+         ),
+         # End Description
+
+     # Other Portal Links
+     html.Div([
+       html.Div([
+         dcc.Markdown(id='other_links')],
                       style={'text-align':'center',
                              'width':'70%',
                              'margin':'0px auto'}),
@@ -1373,11 +1395,37 @@ def toggleDescription(click):
         button_children = "Description: Off"
 
     else:
-        desc_children = open("data/tables/description.txt").read()  # <-------- It makes no sense that the description doc is in the tables folder
+        desc_children = open("static/description.txt").read()  # <-------- It makes no sense that the description doc is in the tables folder
         style = on_button_style
         button_children = "Description: On"
 
     return desc_children, style, button_children
+
+
+@app.callback([Output('other_links', 'children'),
+               Output('title_div', 'style'),
+               Output('other_button', 'style'),
+               Output('other_button', 'children')],
+              [Input('other_button', 'n_clicks')])
+def toggleFuture(click):
+    """Toggle description on/off."""
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        desc_children = ""
+        style = off_button_style
+        title_style = {'font-weight': 'bolder', 'text-align': 'center',
+                       'font-size': '50px', 'font-family': 'Times New Roman',
+                       'margin-top': '100'}
+        button_children = "Other Portals: Off"
+
+    else:
+        desc_children = open("static/other_links.txt").read()  # <-------- It makes no sense that the description doc is in the tables folder
+        style = on_button_style
+        title_style = {'display': 'none'}
+        button_children = "Other Portals: On"
+
+    return desc_children, title_style, style, button_children
 
 
 @app.callback([Output("options", "style"),

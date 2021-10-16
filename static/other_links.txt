@@ -1,0 +1,13 @@
+### **Future Projections of Selective Drought Indices**
+
+Applications to plot and download time-series data for future projections of various drought indices can be accessed through the links provided below. These future projections can be accessed for any point location within the contiguous United States between 1950-2099 available from 40 downscaled projections from MACAv2-METDATA datasets that considers both RCP 4.5 and RCP 8.5 emission scenarios. These applications also provide observed-historical (1979 onwards) time series based on gridMET, which is the training data used in the development of the MACAv2-METDATA downscaling climate projections. More detailed documentation for each application is provided within its respective link.
+
+
+[Standardized Precipitation Index (SPI)](https://nccasc.shinyapps.io/SPI_Projections/)
+
+[Standardized Precipitation Evapotranspiration Index (SPEI)](https://nccasc.shinyapps.io/SPEI_Projections/)
+
+[Evaporative Demand Drought Index (EDDI)](https://nccasc.shinyapps.io/EDDI_Projections/)
+
+[Forest Drought Stress Index (FDSI)](https://nccasc.shinyapps.io/FDSI_Projections/)
+
