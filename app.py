@@ -826,7 +826,7 @@ navbar = html.Nav(
                         style={'display': 'none'}),
             html.Button(id="other_button",
                         n_clicks=0,
-                        children='Other Portals: Off',
+                        children='Future Projections: Off',
                         title=('Display/hide a list of links to other '
                                'drought data portals.'),
                         style={'display': 'none'}),
@@ -1417,13 +1417,13 @@ def toggleFuture(click):
         title_style = {'font-weight': 'bolder', 'text-align': 'center',
                        'font-size': '50px', 'font-family': 'Times New Roman',
                        'margin-top': '100'}
-        button_children = "Other Portals: Off"
+        button_children = "Future Projections: Off"
 
     else:
         desc_children = open("static/other_links.txt").read()  # <-------- It makes no sense that the description doc is in the tables folder
         style = on_button_style
         title_style = {'display': 'none'}
-        button_children = "Other Portals: On"
+        button_children = "Future Projections: On"
 
     return desc_children, title_style, style, button_children
 
