@@ -7,7 +7,6 @@ Created on Tue Jan 22 18:02:17 2019
 @author: User
 """
 
-# In[]: Environment
 import datetime as dt
 import gc
 import json
