@@ -97,8 +97,9 @@ class WWDT_Builder(Adjustments):
             self.resample_all()
             self.combine()
 
-            logger.info("Removing %s", self.combined_path.parent)
-            shutil.rmtree(self.combined_path.parent)
+            tmp_folder = self.home.joinpath(f"{self.index}")
+            logger.info("Removing %s", tmp_folder)
+            shutil.rmtree(tmp_folder)
 
             end = time.time()
             duration = round((end - start) / 60, 2)
@@ -166,7 +167,7 @@ class WWDT_Builder(Adjustments):
     @property
     def combined_path(self):
         """Return path for all year, 12-monthly combined dataset."""
-        return self.home.joinpath(self.index, self.index + ".nc")
+        return self.home.joinpath(self.index + ".nc")
 
     @property
     def final_path(self):
@@ -199,65 +200,75 @@ class WWDT_Builder(Adjustments):
         """Resample indices to target resolution."""
         dst = str(path).replace(".nc", "_2.nc")
         path = str(path)
-        with xr.open_dataset(path) as data:
-            data = set_georeferencing(self.index, data)
 
-            if not self.template:
-                if data.rio.resolution()[0] != self.resolution:
-                    logger.info("Resampling %s to %f decimal degrees...", path,
-                                self.resolution)
-                    try:
-                        ndata = data.rio.reproject(
-                            data.rio.crs,
-                            transform=self.resolution,
-                            resampling=Resampling.bilinear
-                        )
-                        ndata.to_netcdf(dst)
-                        ndata.close()
-                        logger.info("Resampling %s to %f complete.", path,
-                                    self.resolution)
-                    except Exception as error:
-                        print(error.__dict__)
-                        print(f"Resampling {path} failed with error message: "
-                            f"{type(error)}, {error}")
-                        logger.error("Resampling %s failed. %s: %s", path,
-                                    type(error), error)
-                else:
-                    logger.info("%s already has %f resolution, skipping...",
-                                path, self.resolution)
+        # Move to function if this works
+        try:
+            data = xr.open_dataset(path)
+        except RuntimeError:
+            try:
+                data = xr.open_dataset(path)
+                logger.warning("RuntimeError opening %s, trying again.", path)
+            except RuntimeError as error:
+                logger.error("RuntimeError opening %s: %s", path, error)
 
-            else:
-                logger.info("Reprojecting %s to match georeferencing of "
-                            "%s ...", path, self.template)
+        data = set_georeferencing(self.index, data)
 
-                # Reproject Matching requires x and y dim names
-                templ = xr.open_dataset(self.template)
-                templ = set_georeferencing(self.index, templ, xy=True)
-                data = set_georeferencing(self.index, data, xy=True)
-
+        if not self.template:
+            if data.rio.resolution()[0] != self.resolution:
+                logger.info("Resampling %s to %f decimal degrees...", path,
+                            self.resolution)
                 try:
-                    ndata = data.rio.reproject_match(
-                        match_data_array=templ["index"],
+                    ndata = data.rio.reproject(
+                        data.rio.crs,
+                        transform=self.resolution,
                         resampling=Resampling.bilinear
                     )
-                    ndata = set_georeferencing(self.index, ndata)
                     ndata.to_netcdf(dst)
-                    templ.close()
-                    ndata.close()
+                    logger.info("Resampling %s to %f complete.", path,
+                                self.resolution)
                 except Exception as error:
                     print(error.__dict__)
                     print(f"Resampling {path} failed with error message: "
-                          f"{type(error)}, {error}")
+                        f"{type(error)}, {error}")
                     logger.error("Resampling %s failed. %s: %s", path,
                                 type(error), error)
+            else:
+                logger.info("%s already has %f resolution, skipping...",
+                            path, self.resolution)
 
-                path = Path(path)
-                tmp = path.parent.joinpath("tmp", path.name)
-                tmp.parent.mkdir(exist_ok=True)
-                shutil.move(path, tmp)
-                shutil.move(dst, path)
-                logger.info("Reprojection of %s to match %s complete.", path,
-                            self.template)
+        else:
+            logger.info("Reprojecting %s to match georeferencing of "
+                        "%s ...", path, self.template)
+
+            # Reproject Matching requires x and y dim names
+            templ = xr.open_dataset(self.template)
+            templ = set_georeferencing(self.index, templ, xy=True)
+            data = set_georeferencing(self.index, data, xy=True)
+
+            try:
+                ndata = data.rio.reproject_match(
+                    match_data_array=templ["index"],
+                    resampling=Resampling.bilinear
+                )
+                ndata = set_georeferencing(self.index, ndata)
+                ndata.to_netcdf(dst)
+                templ.close()
+            except Exception as error:
+                print(error.__dict__)
+                print(f"Resampling {path} failed with error message: "
+                        f"{type(error)}, {error}")
+                logger.error("Resampling %s failed. %s: %s", path,
+                            type(error), error)
+
+            data.close()
+
+            path = Path(path)
+            tmp = path.parent.joinpath("tmp", path.name)
+            tmp.parent.mkdir(exist_ok=True)
+            shutil.move(path, tmp)
+            shutil.move(dst, path)
+            logger.info("Reprojection of %s to match %s complete.", path,
+                        self.template)
 
     def resample_all(self):
         """Resample all downloading monthly files to target resolution."""

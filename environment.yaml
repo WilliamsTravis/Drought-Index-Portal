@@ -9,19 +9,21 @@ dependencies:
     - dash-bootstrap-components
     - dask
     - flask-caching
+    - geopandas
     - gfortran
+    - netcdf4
+    - numba
+    - numpy
     - pandas
+    - pytest
     - python=3.10
     - rasterio
     - rioxarray
-    - netcdf4
-    - numpy
-    - geopandas
-    - pip
-    - pytest
+    - salem
     - scipy
     - tqdm
     - xarray
     - yaml
+    - pip
     - pip:
        - addfips

@@ -1,6 +1,20 @@
 # -*- coding: utf-8 -*-
 """Download rainfall and drought indices.
 
+Combination of spi6 failed with incorrect shape: target spatial shape: (1405, 621), generated spatial shape (1705, 741)
+Traceback (most recent call last):
+  File "/home/travis/github/Drought-Index-Portal/installation/download_datasets.py", line 52, in <module>
+    main()
+  File "/home/travis/github/Drought-Index-Portal/installation/download_datasets.py", line 40, in main
+    get_wwdt()
+  File "/home/travis/github/Drought-Index-Portal/installation/download_datasets.py", line 23, in get_wwdt
+    di.build(overwrite=False)
+  File "/home/travis/github/Drought-Index-Portal/drip/downloaders/wwdt.py", line 98, in build
+    self.combine()
+  File "/home/travis/github/Drought-Index-Portal/drip/downloaders/wwdt.py", line 139, in combine
+    assert tshape == nshape
+AssertionError
+
 Author: travis
 Date: Sun 05 Jun 2022 09:35:02 AM MDT
 """
@@ -17,11 +31,10 @@ def get_wwdt():
     ri = CPC_Builder()
     for index in INDEX_NAMES:
         if not index.startswith("ri"):
-            break
             logger.info("Building %s ...", index)
             print(f"Building {index}...")
             di = WWDT_Builder(index, template=ri.final_path)
-            di.build()
+            di.build(overwrite=False)
 
 
 def get_cpc():

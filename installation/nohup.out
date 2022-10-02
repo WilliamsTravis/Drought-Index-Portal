@@ -1,0 +1,55 @@
+Traceback (most recent call last):
+  File "/home/travis/github/Drought-Index-Portal/installation/download_datasets.py", line 7, in <module>
+    from drip.downloaders.wwdt import WWDT_Builder
+ModuleNotFoundError: No module named 'drip'
+Building CPC rainfall index...
+Building pdsi...
+Building scpdsi...
+Building pzi...
+Traceback (most recent call last):
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/file_manager.py", line 201, in _acquire_with_cache_info
+    file = self._cache[self._key]
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/lru_cache.py", line 55, in __getitem__
+    value = self._cache[key]
+KeyError: [<class 'netCDF4._netCDF4.Dataset'>, ('/home/travis/github/Drought-Index-Portal/drip/data/indices/pzi/pzi_01_temp.nc',), 'r', (('clobber', True), ('diskless', False), ('format', 'NETCDF4'), ('persist', False))]
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/travis/github/Drought-Index-Portal/installation/download_datasets.py", line 52, in <module>
+    main()
+  File "/home/travis/github/Drought-Index-Portal/installation/download_datasets.py", line 40, in main
+    get_wwdt()
+  File "/home/travis/github/Drought-Index-Portal/installation/download_datasets.py", line 23, in get_wwdt
+    di.build()
+  File "/home/travis/github/Drought-Index-Portal/drip/downloaders/wwdt.py", line 97, in build
+    self.resample_all()
+  File "/home/travis/github/Drought-Index-Portal/drip/downloaders/wwdt.py", line 267, in resample_all
+    for _ in pool.imap(self.resample, paths):
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/multiprocessing/pool.py", line 873, in next
+    raise value
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+  File "/home/travis/github/Drought-Index-Portal/drip/downloaders/wwdt.py", line 203, in resample
+    with xr.open_dataset(path) as data:
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/api.py", line 531, in open_dataset
+    backend_ds = backend.open_dataset(
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/netCDF4_.py", line 555, in open_dataset
+    store = NetCDF4DataStore.open(
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/netCDF4_.py", line 384, in open
+    return cls(manager, group=group, mode=mode, lock=lock, autoclose=autoclose)
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/netCDF4_.py", line 332, in __init__
+    self.format = self.ds.data_model
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/netCDF4_.py", line 393, in ds
+    return self._acquire()
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/netCDF4_.py", line 387, in _acquire
+    with self._manager.acquire_context(needs_lock) as root:
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/contextlib.py", line 135, in __enter__
+    return next(self.gen)
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/file_manager.py", line 189, in acquire_context
+    file, cached = self._acquire_with_cache_info(needs_lock)
+  File "/home/travis/anaconda3/envs/drip/lib/python3.10/site-packages/xarray/backends/file_manager.py", line 207, in _acquire_with_cache_info
+    file = self._opener(*self._args, **kwargs)
+  File "src/netCDF4/_netCDF4.pyx", line 2463, in netCDF4._netCDF4.Dataset.__init__
+  File "src/netCDF4/_netCDF4.pyx", line 2026, in netCDF4._netCDF4._ensure_nc_success
+FileNotFoundError: [Errno 2] No such file or directory: b'/home/travis/github/Drought-Index-Portal/drip/data/indices/pzi/pzi_01_temp.nc'

@@ -63,8 +63,8 @@ class Current_Builder(Downloader):
 
     def baselines(self, year1=1948, year2=2016):
         """Return average value for each month across time period."""
-        if self.interval_path.exists():
-            path = self.interval_path
+        if self.ri_path.exists():
+            path = self.ri_path
             with xr.open_dataset(path, mask_and_scale=True) as data:
                 interval_idx = data.groupby("time.month").groups
                 baselines = {}
@@ -74,7 +74,7 @@ class Current_Builder(Downloader):
                     baselines[interval] = mdata["precip"]
             return baselines
         else:
-            raise OSError("f{self.interval_path} does not exist.")
+            raise OSError(f"{self.ri_path} does not exist.")
 
     def build_cpc(self, overwrite=False):
         """Download CPC Precipitation file and build index."""
@@ -89,7 +89,6 @@ class Current_Builder(Downloader):
         if not dst.exists():
             self.download(entry)
             self._fix_georeferencing()
-            adjust_intervals(self.ri_path, self.interval_path, time_dim="time")
             self.calc_index()
 
         end = time.time()
@@ -98,8 +97,8 @@ class Current_Builder(Downloader):
 
     def calc_index(self, year1=1948, year2=2016):
         """Index values by mean since given year."""
-        if self.interval_path.exists():
-            path = self.interval_path
+        if self.ri_path.exists():
+            path = self.ri_path
             baselines = self.baselines(year1, year2)
             indices = []
             with xr.open_dataset(path, mask_and_scale=True) as data:
@@ -116,7 +115,7 @@ class Current_Builder(Downloader):
                 os.remove(self.final_path)
             index.to_netcdf(self.final_path)
         else:
-            raise OSError("f{self.interval_path} does not exist.")
+            raise OSError(f"{self.interval_path} does not exist.")
 
     @property
     def home(self):

@@ -1,29 +1,39 @@
-# -*- coding: utf-8 -*-
-"""Options.
-
-Created on Sat Mar  5 14:50:35 2022
-
-@author: travis
-"""
-import dash_bootstrap_components as dbc
-
-INDICES = [
-    {"label": "CPC RI", "value": "ri"},
+"""Dataset options."""
+INDEX_OPTIONS = [
+    {"label": "RI", "value": "ri"},
     {"label": "PDSI", "value": "pdsi"},
     {"label": "PDSI-Self Calibrated", "value": "scpdsi"},
     {"label": "Palmer Z Index", "value": "pzi"},
     {"label": "EDDI-1", "value": "eddi1"},
     {"label": "EDDI-2", "value": "eddi2"},
     {"label": "EDDI-3", "value": "eddi3"},
+    {"label": "EDDI-4", "value": "eddi4"},
+    {"label": "EDDI-5", "value": "eddi5"},
     {"label": "EDDI-6", "value": "eddi6"},
     {"label": "SPI-1", "value": "spi1"},
     {"label": "SPI-2", "value": "spi2"},
     {"label": "SPI-3", "value": "spi3"},
+    {"label": "SPI-4", "value": "spi4"},
+    {"label": "SPI-5", "value": "spi5"},
     {"label": "SPI-6", "value": "spi6"},
-    {"label": "SPEI-1", "value": "spei1"},
-    {"label": "SPEI-2", "value": "spei2"},
-    {"label": "SPEI-3", "value": "spei3"},
-    {"label": "SPEI-6", "value": "spei6"}
+    {"label": "SPI-7", "value": "spi7"},
+    {"label": "SPI-8", "value": "spi8"},
+    {"label": "SPI-9", "value": "spi9"},
+    {"label": "SPI-10", "value": "spi10"},
+    {"label": "SPI-11", "value": "spi11"},
+    {"label": "SPI-12", "value": "spi12"},
+    {"label": "spei-1", "value": "spei1"},
+    {"label": "spei-2", "value": "spei2"},
+    {"label": "spei-3", "value": "spei3"},
+    {"label": "spei-4", "value": "spei4"},
+    {"label": "spei-5", "value": "spei5"},
+    {"label": "spei-6", "value": "spei6"},
+    {"label": "spei-7", "value": "spei7"},
+    {"label": "spei-8", "value": "spei8"},
+    {"label": "spei-9", "value": "spei9"},
+    {"label": "spei-10", "value": "spei10"},
+    {"label": "spei-11", "value": "spei11"},
+    {"label": "spei-12", "value": "spei12"}
 ]
 
 INDEX_NAMES = {
@@ -31,6 +41,12 @@ INDEX_NAMES = {
     "pdsi": "Palmer Drought Severity Index",
     "scpdsi": "Self-Calibrated Palmer Drought Severity Index",
     "pzi": "Palmer Z Index",
+    "eddi1": "Evaporative Demand Index - 1 month",
+    "eddi2": "Evaporative Demand Index - 2 month",
+    "eddi3": "Evaporative Demand Index - 3 month",
+    "eddi4": "Evaporative Demand Index - 4 month",
+    "eddi5": "Evaporative Demand Index - 5 month",
+    "eddi6": "Evaporative Demand Index - 6 month",
     "spi1": "Standardized Precipitation Index - 1 month",
     "spi2": "Standardized Precipitation Index - 2 month",
     "spi3": "Standardized Precipitation Index - 3 month",
@@ -56,14 +72,3 @@ INDEX_NAMES = {
     "spei11": "Standardized Precipitation-Evaporation Index - 11 month",
     "spei12": "Standardized Precipitation-Evaporation Index - 12 month"
 }
-
-RETURNS = [
-    {"label": "Indemnities", "value": "indemnity"},
-    {"label": "Index", "value": "index_array"},
-    {"label": "Loss Ratios", "value": "loss_ratio"},
-    {"label": "Net Payouts", "value": "net_payout"},
-    {"label": "Payment Calculation Factors", "value": "pcf"},
-    {"label": "Payout Frequencies", "value": "frequency"},
-    {"label": "Producer Premiums", "value": "premium_producer"},
-    {"label": "Subsidies", "value": "subsidy"},
-]
