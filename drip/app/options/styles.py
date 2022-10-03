@@ -1,4 +1,6 @@
 """HTML style options for DrIP app (in lieu if CSS)."""
+ON_COLOR = "#cfb87c"
+OFF_COLOR = "#b09d6d"
 STYLES = dict(
     tab={
         "height": "30px",
@@ -24,7 +26,7 @@ STYLES = dict(
     on_button={
         "height": "45px",
         "padding": "9px",
-        "background-color": "#cfb87c",
+        "background-color": ON_COLOR,
         "border-radius": "4px",
         "font-family": "Times New Roman",
         "font-size": "12px",
@@ -33,7 +35,7 @@ STYLES = dict(
     off_button={
         "height": "45px",
         "padding": "9px",
-        "background-color": "#b09d6d",
+        "background-color": OFF_COLOR,
         "border-radius": "4px",
         "font-family": "Times New Roman",
         "font-size": "12px",

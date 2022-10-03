@@ -52,3 +52,11 @@ class Paths:
             name = path.name.replace(".nc", "")
             indices[name] = path
         return indices
+
+    @classmethod
+    @property
+    def log_directory(cls):
+        """Return path to log directory."""
+        log_dir = Path("~/.drip/logs").expanduser()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        return log_dir

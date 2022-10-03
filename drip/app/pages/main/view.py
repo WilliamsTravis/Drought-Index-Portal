@@ -147,49 +147,61 @@ def divMaker(id_num, index="noaa"):
 
         # Maps
         html.Div([
-            dcc.Graph(id="map_{}".format(id_num),
-                      config={"showSendToCloud": True}),
+            dcc.Graph(
+                id="map_{}".format(id_num),
+                config={"showSendToCloud": True}
+            ),
             html.Div([
                 html.Div([
-                    html.P("Point Size:",
-                           className="two columns",
-                           style={"margin-top": 5.5,
-                                  "margin-left": 2,
-                                  "padding": 0,
-                                  "float": "left",
-
-                                  }),
-                    dcc.Input(id="point_size_{}".format(id_num),
-                              type="number",
-                              value=4,
-                              size=3,
-                              className="two columns",
-                              style={"background-color": "white",
-                                     "font-family": "Times New Roman",
-                                     "float": "left",
-                                     "margin-left": "-20px",
-                                     "jutifyContent": "center",
-                                     "height": "80%"}
-                              ),
-                    html.P("Bounding Box:",
-                           className="three columns",
-                           style={"margin-top": 5.5,
-                                  "padding": 0,
-                                  "float": "left"
-                                  }),
-                    dcc.Input(id="bbox_{}".format(id_num),
-                              type="text",
-                              className="five columns",
-                              placeholder=("lon min, lat min, lon max, "
-                                           "lat max"),
-                              debounce=1,
-                              style={"background-color": "white",
-                                     "font-family": "Times New Roman",
-                                     "float": "left",
-                                     "margin-left": "-55px",
-                                     "jutifyContent": "center",
-                                     "height": "80%"}
-                              ),
+                    html.P(
+                        children="Point Size:",
+                        className="two columns",
+                        style={
+                            "margin-top": 5.5,
+                            "margin-left": 2,
+                            "padding": 0,
+                            "float": "left",
+                        }
+                    ),
+                    dcc.Input(
+                        id="point_size_{}".format(id_num),
+                        type="number",
+                        value=4,
+                        size="3",
+                        className="two columns",
+                        style={
+                            "background-color": "white",
+                            "font-family": "Times New Roman",
+                            "float": "left",
+                            "margin-left": "-20px",
+                            "jutifyContent": "center",
+                            "height": "80%"
+                        }
+                    ),
+                    html.P(
+                        children="Bounding Box:",
+                        className="three columns",
+                        style={
+                            "margin-top": 5.5,
+                            "padding": 0,
+                            "float": "left"
+                        }
+                    ),
+                    dcc.Input(
+                        id="bbox_{}".format(id_num),
+                        type="text",
+                        className="five columns",
+                        placeholder="lon min, lat min, lon max, lat max",
+                        debounce=True,
+                        style={
+                            "background-color": "white",
+                            "font-family": "Times New Roman",
+                            "float": "left",
+                            "margin-left": "-55px",
+                            "jutifyContent": "center",
+                            "height": "80%"
+                        }
+                    ),
                 ], className="row",
                     style={"border": "3.10px solid lightgrey",
                            "margin-top": "-7"
@@ -424,6 +436,7 @@ LAYOUT = html.Div([
                                  dcc.Checklist(
                                      className="check_blue",
                                      id="month_check_1",
+                                     value=list(range(1, 13)),
                                      options=Options.date_marks["months"],
                                      labelStyle={"display": "inline-block"}
                                  ),
@@ -504,6 +517,7 @@ LAYOUT = html.Div([
                             dcc.Checklist(
                                 className="check_blue",
                                 id="month_check_2",
+                                value=list(range(1, 13)),
                                 options=Options.date_marks["months"],
                                 labelStyle={"display": "inline-block"}
                             ),

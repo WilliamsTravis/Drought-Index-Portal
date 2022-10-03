@@ -183,7 +183,6 @@ NAVBAR = html.Nav(
                         "portals."
                     ),
                     style={**BUTTON_STYLE, **{"margin-left": "-2px"}}
-
                 ),
                 html.Button(
                     id="click_sync",

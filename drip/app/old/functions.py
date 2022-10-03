@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Support functions for Drought-Index-Portal
-
-Created on Tue Jan 22 18:02:17 2019
-
-@author: User
-"""
-
+"""Old functions from the first DrIP."""
 import datetime as dt
 import gc
 import json
@@ -35,10 +28,11 @@ from pyproj import Proj
 from scipy.stats import rankdata
 from tqdm import tqdm
 
+from drip import Paths
+
 warnings.filterwarnings("ignore")
 
-# This could be a CLI argument
-data_path = ''
+
 
 # In[]: Variables
 title_map = {'noaa': 'NOAA CPC-Derived Rainfall Index',
@@ -303,9 +297,9 @@ def movie(array, titles=None, axis=0, na=-9999):
     return anim
 
 
-def meanNC(minsrc='data/droughtindices/netcdfs/vpdmin.nc',
-           maxsrc='data/droughtindices/netcdfs/vpdmax.nc',
-           dst='data/droughtindices/netcdfs/vpdmean.nc'):
+def meanNC(minsrc='data/indices/vpdmin.nc',
+           maxsrc='data/indices/vpdmax.nc',
+           dst='data/indices/vpdmean.nc'):
     ncmax = xr.open_dataset(maxsrc)
     ncmin = xr.open_dataset(minsrc)
     ncmean = ncmin.copy()
@@ -612,8 +606,8 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
     reflect the actual dates used in each dataset.  # <------------------------ Not critical since we aren't sharing these files yet, but do this before we do
 
     Test parameters for toNetCDF2
-        tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/temp*')
-        ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/*nc')
+        tfiles = glob('f:/data/indices/wwdt/tifs/temp*')
+        ncfiles = glob('f:/data/indices/wwdt/*nc')
         savepath = 'testing.nc'
         index = 'spi1'
         year1=1948
@@ -779,9 +773,9 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
     albers equal area conic projection
 
     Test parameters for toNetCDF2
-        tfiles = glob('f:/data/droughtindices/netcdfs/wwdt/tifs/proj*')
-        ncfiles = glob('f:/data/droughtindices/netcdfs/wwdt/temp_*[0-9]*.nc')
-        savepath = 'f:/data/droughtindices/netcdfs/wwdt/testing.nc'
+        tfiles = glob('f:/data/indices/wwdt/tifs/proj*')
+        ncfiles = glob('f:/data/indices/wwdt/temp_*[0-9]*.nc')
+        savepath = 'f:/data/indices/wwdt/testing.nc'
         index = 'spi1'
         year1=1895
         month1=1
@@ -1047,8 +1041,8 @@ def toNetCDFPercentile(src_path, dst_path):
     space
 
     Sample arguments:
-    src_path = 'f:/data/droughtindices/netcdfs/spi2.nc'
-    dst_path = 'f:/data/droughtindices/netcdfs/percentiles/spi2.nc'
+    src_path = 'f:/data/indices/spi2.nc'
+    dst_path = 'f:/data/indices/percentiles/spi2.nc'
 
     src = Dataset(src_path)
     dst = Dataset(dst_path, 'w')
@@ -1212,24 +1206,24 @@ def wgsToAlbers(arrays, crdict, proj_sample):
 
 
 # In[]:Classes
-class Admin_Elements:
+class Admin_Elements(Paths):
     def __init__(self, resolution):
         self.resolution = resolution
 
     def buildAdmin(self):
         resolution = self.resolution
         res_str = str(round(resolution, 3))
-        res_ext = '_' + res_str.replace('.', '_')
-        county_path = 'data/rasters/us_counties' + res_ext + '.tif'
-        state_path = 'data/rasters/us_states' + res_ext + '.tif'
+        res_ext = f"_{res_str.replace('.', '_')}"
+        county_path = self.home.joinpath(f"rasters/us_counties{res_ext}.tif")
+        state_path = self.home.joinpath(f"rasters/us_states{res_ext}.tif")
 
         # Use the shapefile for just the county, it has state and county fips
-        src_path = 'data/shapefiles/contiguous_counties.shp'
+        src_path = self.home.joinpath("shapefiles/contiguous_counties.shp")
 
         # And rasterize
-        self.rasterize(src_path, county_path, attribute='COUNTYFP',
+        self.rasterize(src_path, county_path, attribute="COUNTYFP",
                        extent=[-130, 50, -55, 20])
-        self.rasterize(src_path, state_path, attribute='STATEFP',
+        self.rasterize(src_path, state_path, attribute="STATEFP",
                        extent=[-130, 50, -55, 20])
 
     def buildAdminDF(self):
@@ -1384,10 +1378,10 @@ class Admin_Elements:
         del ds
 
     def getElements(self):
-        '''
+        """
         I want to turn this into a class that handles all resolution dependent
         objects, but for now I'm just tossing this together for a meeting.
-        '''
+        """
         # Get paths
         [grid_path, gradient_path, county_path, state_path,
          source_path, albers_path, admin_path] = self.pathRequest()
@@ -1428,30 +1422,31 @@ class Admin_Elements:
         # Set paths to each element then make sure they exist
         resolution = self.resolution
         res_str = str(round(resolution, 3))
-        res_ext = '_' + res_str.replace('.', '_')
-        grid_path = 'data/rasters/grid' + res_ext + '.tif'
-        gradient_path = 'data/rasters/gradient' + res_ext + '.tif'
-        county_path = 'data/rasters/us_counties' + res_ext + '.tif'
-        state_path = 'data/rasters/us_states' + res_ext + '.tif'
-        source_path = 'data/rasters/source_array' + res_ext + '.nc'
-        albers_path = 'data/rasters/source_albers' + res_ext + '.tif'
-        admin_path = 'data/tables/admin_df' + res_ext + '.csv'
-        na_path = 'data/rasters/na_banner' + res_ext + '.tif'
+        res_ext = f"_{res_str.replace('.', '_')}"
+        grid_path = self.paths["rasters"].joinpath(f"grid{res_ext}.tif")
+        gradient_path = self.paths["rasters"].joinpath(f"gradient{res_ext}.tif")
+        county_path = self.paths["rasters"].joinpath(f"us_counties{res_ext}.tif")
+        state_path = self.paths["rasters"].joinpath(f"us_states{res_ext}.tif")
+        source_path = self.paths["rasters"].joinpath(f"source_array{res_ext}.nc")
+        albers_path = self.paths["rasters"].joinpath(f"source_albers{res_ext}.tif")
+        admin_path = self.paths["tables"].joinpath(f"admin_df{res_ext}.csv")
+        na_path = self.paths["rasters"].joinpath(f"na_banner{res_ext}.tif")
 
-        if not os.path.exists(county_path) or not os.path.exists(state_path):
+        if not county_path.exists() or not state_path.exists():
             self.buildAdmin()
-        if not os.path.exists(grid_path) or not os.path.exists(gradient_path):
+        if not grid_path.exists() or not gradient_path.exists():
             self.buildGrid()
-        if not os.path.exists(source_path) or not os.path.exists(albers_path):
+        if not source_path.exists() or not albers_path.exists():
             self.buildSource()
-        if not os.path.exists(admin_path):
+        if not admin_path.exists():
             self.buildAdminDF()
-        if not os.path.exists(na_path):
+        if not na_path.exists():
             self.buildNA()
 
         # Return everything at once
-        path_package = [grid_path, gradient_path, county_path, state_path,
-                        source_path, albers_path, admin_path]
+        posix_package = [grid_path, gradient_path, county_path, state_path,
+                         source_path, albers_path, admin_path]
+        path_package = [str(posix) for posix in posix_package]
 
         return path_package
 
@@ -1464,14 +1459,14 @@ class Admin_Elements:
         resolution = self.resolution
 
         # Open shapefile, retrieve the layer
-        src_data = ogr.Open(src)
+        src_data = ogr.Open(str(src))
         layer = src_data.GetLayer()
         extent = layer.GetExtent()  # This is wrong
 
         # Create the target raster layer
         xmin, xmax, ymin, ymax = extent
-        cols = int((xmax - xmin)/resolution)
-        rows = int((ymax - ymin)/resolution)
+        cols = int((xmax - xmin) / resolution)
+        rows = int((ymax - ymin) / resolution)
         trgt = gdal.GetDriverByName('GTiff').Create(dst, cols, rows, 1,
                                    gdal.GDT_Float32)
         trgt.SetGeoTransform((xmin, resolution, 0, ymax, 0, -resolution))
@@ -1575,7 +1570,7 @@ class Coordinate_Dictionaries:
         return point
 
 
-class Index_Maps():
+class Index_Maps(Paths):
     """
     This class creates a singular map as a function of some timeseries of
     rasters for use in the Ubuntu-Practice-Machine index comparison app.
@@ -1611,7 +1606,7 @@ class Index_Maps():
         self.reverse = False
         self.setData()
         self.setReverse()
-        self.index_ranges = pd.read_csv('data/tables/index_ranges.csv')
+        self.index_ranges = pd.read_csv(self.paths["tables"].joinpath("index_ranges.csv"))
         self.time_data = time_data  # This updates info but cannot be accessed  # <-- Help
 
     @property
@@ -1653,7 +1648,7 @@ class Index_Maps():
             # Get the right resolution file
             res = data.crs.GeoTransform[1]
             res_print = str(res).replace('.', '_')
-            na_path = 'data/rasters/na_banner_' + res_print + '.tif'
+            na_path = self.paths["rasters"].joinpath(f"na_banner_{res_print}.tif")
 
             # The whole data set just says "NA" using the value -9999
             today = dt.datetime.now()
@@ -1778,17 +1773,21 @@ class Index_Maps():
         we can access the full dataset hear without worrying about that.
         '''
         # There are three types of datsets
-        type_paths = {'original': 'data/droughtindices/netcdfs/',
-                      'area': 'data/droughtindices/netcdfs/',
-                      'correlation_o': 'data/droughtindices/netcdfs/',
-                      'correlation_p':
-                          'data/droughtindices/netcdfs/percentiles',
-                      'percentile': 'data/droughtindices/netcdfs/percentiles',
-                      'projected': 'data/droughtindices/netcdfs/albers'}
+        type_paths = {
+            'original': '',
+            'area': '',
+            'correlation_o': '',
+            'correlation_p':
+                'percentiles',
+            'percentile': 'percentiles',
+            'projected': 'albers'
+        }
 
         # Build path and retrieve the data set
-        netcdf_path =  type_paths[self.choice_type]
-        file_path = os.path.join(data_path, netcdf_path, self.choice + '.nc')
+        file_path =  self.paths["indices"].joinpath(
+            type_paths[self.choice_type],
+            f"{self.choice}.nc"
+        )
         if self.chunk:
             dataset = xr.open_dataset(file_path, chunks=100)  # <------------------ Best chunk size/shape?
         else:
