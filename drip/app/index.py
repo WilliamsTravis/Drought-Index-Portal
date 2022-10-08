@@ -9,5 +9,5 @@ if __name__ == "__main__":
     app.run_server(
         use_reloader=True,
         dev_tools_hot_reload=True,
-        debug=True
+        debug=False
     )
