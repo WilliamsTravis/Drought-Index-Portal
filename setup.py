@@ -1,8 +1,9 @@
 from setuptools import setup
 
 
-# with open("requirements.txt") as f:
-#     INSTALL_REQUIREMENTS = f.readlines()
+with open("requirements.txt") as f:
+    INSTALL_REQUIREMENTS = f.readlines()
+
 
 setup(
     name="drip",

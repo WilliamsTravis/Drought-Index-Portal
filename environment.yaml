@@ -3,26 +3,26 @@ channels:
     - conda-forge
     - defaults
 dependencies:
-    - beautifulsoup4
-    - bottleneck
     - dash
     - dash-bootstrap-components
     - dask
     - flask-caching
     - geopandas
-    - gfortran
+    - ipython
     - netcdf4
     - numba
     - numpy
     - pandas
     - pytest
-    - python=3.9
+    - python
     - rasterio
     - rioxarray
     - salem
     - scipy
+    - spyder-kernels
     - tqdm
     - xarray
+    - werkzeug
     - yaml
     - pip
     - pip:

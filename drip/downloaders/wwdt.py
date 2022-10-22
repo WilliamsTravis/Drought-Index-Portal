@@ -7,13 +7,7 @@ Notes:
     Watch for this resampling error:
         "failed to prevent overwriting existing key grid_mapping in attrs."
     Is only periodic, check for this before overwritting original.
-
-
-Created on Sat May 14 13:09:51 2022
-
-@author: travis
 """
-import json
 import os
 import shutil
 import time
@@ -23,19 +17,17 @@ from multiprocessing.pool import ThreadPool
 from pathlib import Path
 
 import dask
-import numpy as np
 import xarray as xr
 
 from rasterio.enums import Resampling
-
-import drip
 
 from drip.downloaders.utilities import (
     set_georeferencing,
     Downloader
 )
 from drip.loggers import init_logger, set_handler
-from drip.options import INDEX_NAMES
+from drip.app.options.options import INDEX_NAMES
+from drip.downloaders.utilities import NetCDF
 
 logger = init_logger(__name__)
 
@@ -56,7 +48,7 @@ class Adjustments(Downloader):
         return array
 
 
-class WWDT_Builder(Adjustments):
+class WWDT_Builder(NetCDF):
     """Methods for downloading and formatting selected data from the WWDT."""
 
     def __init__(self, index, resolution=0.25, template=None,

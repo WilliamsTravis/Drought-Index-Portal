@@ -6,8 +6,4 @@ from drip.app.app import app, server
 
 
 if __name__ == "__main__":
-    app.run_server(
-        use_reloader=True,
-        dev_tools_hot_reload=True,
-        debug=False
-    )
+    app.run_server(debug=False, port=8050)
