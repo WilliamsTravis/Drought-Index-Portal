@@ -21,10 +21,7 @@ import xarray as xr
 
 from rasterio.enums import Resampling
 
-from drip.downloaders.utilities import (
-    set_georeferencing,
-    Downloader
-)
+from drip.downloaders.utilities import Downloader
 from drip.loggers import init_logger, set_handler
 from drip.app.options.options import INDEX_NAMES
 from drip.downloaders.utilities import NetCDF
@@ -34,18 +31,6 @@ logger = init_logger(__name__)
 
 PRISM_URL = "https://wrcc.dri.edu/wwdt/data/PRISM"
 
-
-class Adjustments(Downloader):
-    """Methods to adjust original drought index."""
-
-    def __init__(self):
-        """Initialize DroughtAdjust object."""
-        super().__init__()
-    
-    def normalize(self, array):
-        """Standardize index values to a 0.0-1.0 range."""
-        array = (array - array.min()) / (array.max() - array.min())
-        return array
 
 
 class WWDT_Builder(NetCDF):
@@ -193,7 +178,6 @@ class WWDT_Builder(NetCDF):
         dst = str(path).replace(".nc", "_2.nc")
         path = str(path)
 
-        # Move to function if this works
         try:
             data = xr.open_dataset(path)
         except RuntimeError:
@@ -290,3 +274,8 @@ class WWDT_Builder(NetCDF):
         """Create logging file handler for this process."""
         filename = self.home.joinpath("logs", index + ".log")
         set_handler(logger, filename)
+
+
+if __name__ == "__main__":
+    index = "pdsi"
+    self = Data_Builder(index=index)

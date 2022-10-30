@@ -30,10 +30,14 @@ set_handler(logger, Paths.log_directory.joinpath("callbacks.log"))
 
 
 # Get spatial dimensions from the sample data set above
-resolution = Options.transform[1]
+resolution = Options.transform[0]
 admin = Admin_Elements(resolution)
 [state_array, county_array, grid, mask,
  source, albers_source, crdict, admin_df] = admin.getElements()  # <----------- remove albers ource here (carefully)
+
+# Using an existing dataset for source
+source_path = Paths.paths["indices"].joinpath("pdsi/pdsi.nc")
+source = xr.open_dataset(source_path)
 
 
 # For singular elements
@@ -213,6 +217,7 @@ def optionsFunctions(function_type):
 
 
 @cache.memoize()
+@calls.log
 def retrieveData(signal, function, choice, location):
     """
     This takes the user defined signal and uses the Index_Map class to filter"
@@ -965,7 +970,7 @@ for i in range(1, 3):
             reverse = not reverse
 
         # Pull array into memory
-        array = data.getFunction(function).compute() * data.mask.data
+        array = data.getFunction(function).compute() #* data.mask.data
 
         # Individual array min/max
         amax = np.nanmax(array)
@@ -1032,15 +1037,15 @@ for i in range(1, 3):
             title_size = 20
 
         # Replace the source array with the data from above
-        source.data[0] = array * mask
+        # source.value[0] = array #* mask
 
         # Create a data frame of coordinates, index values, labels, etc
-        dfs = xr.DataArray(source, name="data")
+        dfs = xr.DataArray(array, name="value")
         pdf = dfs.to_dataframe()
         step = crdict.res
         to_bin = lambda x: np.floor(x / step) * step
-        pdf["latbin"] = pdf.index.get_level_values("y").map(to_bin)
-        pdf["lonbin"] = pdf.index.get_level_values("x").map(to_bin)
+        pdf["latbin"] = pdf.index.get_level_values("latitude").map(to_bin)
+        pdf["lonbin"] = pdf.index.get_level_values("longitude").map(to_bin)
         pdf["gridx"] = pdf["lonbin"].map(crdict.londict)
         pdf["gridy"] = pdf["latbin"].map(crdict.latdict)
 

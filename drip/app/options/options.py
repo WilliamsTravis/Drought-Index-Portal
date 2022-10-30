@@ -90,8 +90,8 @@ class Options(Paths):
     def dates(cls):
         """Return minimum and maxmium dates in sample dataset."""
         with xr.open_dataset(cls.sample_path) as data:
-            min_date = data.day.data[0]
-            max_date = data.day.data[-1]
+            min_date = data.time.data[0]
+            max_date = data.time.data[-1]
         dates = {}
         dates["max_year"] = pd.Timestamp(max_date).year
         dates["min_year"] = pd.Timestamp(min_date).year + 1  # for 12 month indices
@@ -199,7 +199,7 @@ class Options(Paths):
     @property
     def sample_path(cls):
         """Return a sample path for an existing drought index netcdf file."""
-        path = cls.indices[cls.index_keys[0]]
+        path = cls.indices[cls.index_keys[-1]]
         try:
             path.exists()
             return path
@@ -229,6 +229,5 @@ class Options(Paths):
     def transform(cls):
         """Return geotransform of sample dataset."""
         with xr.open_dataset(cls.sample_path) as data:
-            transform_string = data.spatial_ref.GeoTransform
-        transform = [float(t) for t in transform_string.split()]
+            transform = data.crs.GeoTransform
         return transform

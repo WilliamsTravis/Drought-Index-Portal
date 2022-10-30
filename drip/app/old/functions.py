@@ -245,14 +245,14 @@ def movie(array, titles=None, axis=0, na=-9999):
     """
     if "netCDF" in str(type(array)):
         if titles is None:
-            titles = array.variables["day"]
+            titles = array.variables["time"]
         key = list(array.variables.keys())[3]  # I am guessing it"s always 3
         array = array.variables[key][:]
         if na in array:
             array[array==na] = np.nan
     elif "xarray" in str(type(array)):
         if titles is None:
-            titles = array.day
+            titles = array.time
         array = array.index
         if na in array:
             array.data[array.data==na] = np.nan
@@ -515,7 +515,7 @@ def toNetCDFSingle(file, ncfile, savepath, index, epsg=4326, wmode="w"):
 
     # We need some things from the old nc file
     data = Dataset(ncfile)
-    days = data.variables["day"][0]  # This is in days since 1900
+    days = data.variables["time"][0]  # This is in days since 1900
 
     # Read raster for the structure
     data = gdal.Open(file)
@@ -531,7 +531,7 @@ def toNetCDFSingle(file, ncfile, savepath, index, epsg=4326, wmode="w"):
     # Dimensions
     nco.createDimension("latitude", nlat)
     nco.createDimension("longitude", nlon)
-    nco.createDimension("day", None)
+    nco.createDimension("time", None)
 
     # Variables
     latitudes = nco.createVariable("latitude",  "f4", ("latitude",))
@@ -1637,11 +1637,11 @@ class Index_Maps(Paths):
         d1 = dt.datetime(year1, month1, 1)
         d2 = dt.datetime(year2, month2, 1)
         d2 = d2 + relativedelta(months=+1) - relativedelta(days=+1)
-        data = dataset.sel(day=slice(d1, d2))
-        data = data.sel(day=np.in1d(data["day.month"], month_filter))
+        data = dataset.sel(time=slice(d1, d2))
+        data = data.sel(time=np.in1d(data["time.month"], month_filter))
 
         # If this filters all of the data out, return a special "NA" data set
-        if len(data.day) == 0:
+        if len(data.time) == 0:
 
             # Get the right resolution file
             res = data.crs.GeoTransform[1]
@@ -1662,10 +1662,10 @@ class Index_Maps(Paths):
             lats = data.coords["latitude"].data
             lons = data.coords["longitude"].data
             array = xr.DataArray(arrays,
-                                 coords={"day": days,
+                                 coords={"time": days,
                                          "latitude": lats,
                                          "longitude": lons},
-                                 dims={"day": 2,
+                                 dims={"time": 2,
                                        "latitude": len(lats),
                                        "longitude": len(lons)})
             data = xr.Dataset({"value": array})
@@ -1775,15 +1775,15 @@ class Index_Maps(Paths):
             "original": "",
             "area": "",
             "correlation_o": "",
-            "correlation_p": "percentiles",
-            "percentile": "percentiles",
-            "projected": "albers"
+            "correlation_p": "_percentile",
+            "percentile": "_percentile",
+            "projected": "_projected"
         }
 
         # Build path and retrieve the data set
         file_path =  self.paths["indices"].joinpath(
-            type_paths[self.choice_type],
-            f"{self.choice}.nc"
+            self.choice,
+            f"{self.choice}{type_paths[self.choice_type]}.nc"
         )
         if self.chunk:
             dataset = xr.open_dataset(file_path, chunks=100)  # <------------------ Best chunk size/shape?
@@ -1849,7 +1849,7 @@ class Index_Maps(Paths):
 
     def getTime(self):
         # Now read in the corrollary albers data set
-        dates = pd.DatetimeIndex(self.dataset_interval.day[:].values)
+        dates = pd.DatetimeIndex(self.dataset_interval.time[:].values)
         year1 = min(dates.year)
         year2 = max(dates.year)
         month1 = dates.month[0]
@@ -1860,13 +1860,13 @@ class Index_Maps(Paths):
         return time_data
 
     def getMean(self):
-        return self.dataset_interval.mean("day", skipna=True).index.data
+        return self.dataset_interval.value.mean(dim="time", skipna=True)
 
     def getMin(self):
-        return self.dataset_interval.min("day", skipna=True).index.data
+        return self.dataset_interval.value.min(dim="time", skipna=True)
 
     def getMax(self):
-        return self.dataset_interval.max("day", skipna=True).index.data
+        return self.dataset_interval.value.max(dim="time", skipna=True)
 
     def getSeries(self, location, crdict):
         """

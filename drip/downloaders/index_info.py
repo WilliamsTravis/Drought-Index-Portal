@@ -10,10 +10,16 @@ DrIP dataset source.
 This also stores the server address for each index.
 """
 SPATIAL_REFERENCES = {
-    "wwdt": "epsg:4326"
+    "wwdt": "epsg:4326",
+    "eddi": "epsg:4326",
+    "prism": "epsg:4326"
 }
 
 ADDRESSES = {
+    "ftp://ftp2.psl.noaa.gov/Projects/EDDI/CONUS_archive": [
+        f"eddi{i}" for i in range(1, 13)
+    ],
+    "prism.nacse.org": [],
     "https://wrcc.dri.edu/wwdt/data/PRISM": [
         'pdsi',
         'scpdsi',
@@ -45,7 +51,8 @@ ADDRESSES = {
     ]
 }
 
+
 HOSTS = {}
 for host in ADDRESSES:
-    for key in ADDRESSES[host]:    
+    for key in ADDRESSES[host]:
         HOSTS[key] = host

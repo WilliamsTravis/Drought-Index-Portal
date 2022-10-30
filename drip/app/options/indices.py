@@ -10,6 +10,12 @@ INDEX_OPTIONS = [
     {"label": "EDDI-4", "value": "eddi4"},
     {"label": "EDDI-5", "value": "eddi5"},
     {"label": "EDDI-6", "value": "eddi6"},
+    {"label": "EDDI-7", "value": "eddi7"},
+    {"label": "EDDI-8", "value": "eddi8"},
+    {"label": "EDDI-9", "value": "eddi9"},
+    {"label": "EDDI-10", "value": "eddi10"},
+    {"label": "EDDI-11", "value": "eddi11"},
+    {"label": "EDDI-12", "value": "eddi12"},
     {"label": "SPI-1", "value": "spi1"},
     {"label": "SPI-2", "value": "spi2"},
     {"label": "SPI-3", "value": "spi3"},
@@ -33,7 +39,13 @@ INDEX_OPTIONS = [
     {"label": "spei-9", "value": "spei9"},
     {"label": "spei-10", "value": "spei10"},
     {"label": "spei-11", "value": "spei11"},
-    {"label": "spei-12", "value": "spei12"}
+    {"label": "spei-12", "value": "spei12"},
+    {"label": "tmin", "value": "tmin"},
+    {"label": "tmax", "value": "tmax"},
+    {"label": "tdmean", "value": "tdmean"},
+    {"label": "ppt", "value": "ppt"},
+    {"label": "vpdmax", "value": "vpdmax"},
+    {"label": "vpdmin", "value": "vpdmin"},
 ]
 
 INDEX_NAMES = {
@@ -47,6 +59,12 @@ INDEX_NAMES = {
     "eddi4": "Evaporative Demand Index - 4 month",
     "eddi5": "Evaporative Demand Index - 5 month",
     "eddi6": "Evaporative Demand Index - 6 month",
+    "eddi7": "Evaporative Demand Index - 7 month",
+    "eddi8": "Evaporative Demand Index - 8 month",
+    "eddi9": "Evaporative Demand Index - 9 month",
+    "eddi10": "Evaporative Demand Index - 10 month",
+    "eddi11": "Evaporative Demand Index - 11 month",
+    "eddi12": "Evaporative Demand Index - 12 month",
     "spi1": "Standardized Precipitation Index - 1 month",
     "spi2": "Standardized Precipitation Index - 2 month",
     "spi3": "Standardized Precipitation Index - 3 month",
@@ -70,5 +88,12 @@ INDEX_NAMES = {
     "spei9": "Standardized Precipitation-Evaporation Index - 9 month",
     "spei10": "Standardized Precipitation-Evaporation Index - 10 month",
     "spei11": "Standardized Precipitation-Evaporation Index - 11 month",
-    "spei12": "Standardized Precipitation-Evaporation Index - 12 month"
+    "spei12": "Standardized Precipitation-Evaporation Index - 12 month",
+    "tmin": "Temperature - Minimum (C)",
+    "tmax": "Temperature - Maximum (C)",
+    "tmean": "Temperature - Mean (C)",
+    "tdmean": "Dew Point Temperature - Mean (C)",
+    "ppt": "Precipitation (mm)?",
+    "vpdmax": "Vapor Pressure Deficit - Maxmimumm",
+    "vpdmin": "Vapor Pressure Deficit - Minimum"
 }

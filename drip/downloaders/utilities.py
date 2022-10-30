@@ -1,4 +1,4 @@
-r"""Index Utilities
+"""Index Utilities
 
 Methods to help download and format drought indices from source.
 
@@ -6,11 +6,15 @@ date: Sun Mar 27th, 2022
 author: Travis Williams
 """
 import datetime as dt
+import dateutil.parser
+import json
 import os
+import shutil
 import socket
 import time
 import urllib
 
+from ftplib import FTP
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from socket import timeout
@@ -20,14 +24,18 @@ from urllib.error import HTTPError, URLError
 import netCDF4
 import numpy as np
 import pandas as pd
+import pathos.multiprocessing as mp
+import pyproj
+import rasterio as rio
 
-from osgeo import osr
+from osgeo import gdal, osr
+from scipy.stats import rankdata
 
 import drip
 
 from drip.app.options.indices import INDEX_NAMES
 from drip.downloaders.index_info import HOSTS, SPATIAL_REFERENCES
-from drip.loggers import init_logger
+from drip.loggers import init_logger, set_handler
 
 logger = init_logger(__name__)
 socket.setdefaulttimeout(20)
@@ -55,18 +63,19 @@ class Downloader(drip.Paths):
         argstr = ", ".join([f"{k}='{v}'" for k, v in self.__dict__.items()])
         return f"<Downloader object: {argstr}>"
 
-    def download_all(self, entries):
+    def download_all(self, download_paths):
         """Download all files.
 
         Parameters
         ----------
-        entries : list
+        download_paths : list
             List of dictionaries containing 'url' and 'dst' keys for remote
             source and local destination, respectively.
         """
-        logger.info("Downloading %d files...", len(entries))
+        # We have a set of different methods here
+        logger.info("Downloading %d files...", len(self.download_paths))
         with ThreadPool(os.cpu_count() - 1) as pool:
-            for _ in pool.imap(self.download, entries):
+            for _ in pool.imap(self.download, self.download_paths):
                 pass
 
     def download(self, entry):
@@ -79,8 +88,8 @@ class Downloader(drip.Paths):
             local destination, respectively.
         """
         start = time.time()
-        url = entry["url"]
-        dst = entry["dst"]
+        url = entry["remote"]
+        dst = entry["local"]
 
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         if os.path.exists(dst):
@@ -97,7 +106,7 @@ class Downloader(drip.Paths):
         if not os.path.exists(dst):
             logger.error("%s did not download correctly.", dst)
 
-    def _download(url, dst):
+    def _download(self, url, dst):
         """Download file.
 
         Parameters
@@ -143,24 +152,34 @@ class Adjustments(Downloader):
 class NetCDF(Adjustments):
     """Methods for building, combining, and warping netcdf files."""
 
-    def __init__(self, index, directory=None):
+    def __init__(self, index, resolution=0.25, directory=None,
+                 percentile=False, projected=False):
         """Initialize NetCDF object.
-        
+
         Parameters
         ----------
         index : str
             DrIP key for target index. Available keys can be found in
-            drip.app.options.indices.INDEX_NAMES.
         directory : str | pathlib.PosixPath
             Path to directory in which to write files. Defaults to 
             ~/.drip/datasets
+            drip.app.options.indices.INDEX_NAMES.
+        percentile : boolean
+            Build netcdf as ranked percentiles relative to the full record.
+        projected : boolean
+            Build netcdf and project to EPSG:5070.
         """
         if not directory:
-            self.directory = self.paths["indices"].joinpath(index)
+            home = self.paths["indices"]
+            self.directory = home.joinpath(index)
+            self.directory.mkdir(exist_ok=True, parents=True)
         else:
             self.directory = Path(".").absolute()
+
         self.host = HOSTS[index]
         self.index = index
+        self.percentile = percentile
+        self.projected = projected
         self.today = np.datetime64(dt.datetime.today())
 
     def __repr__(self):
@@ -172,69 +191,96 @@ class NetCDF(Adjustments):
         msg = f"{name}\n  {attr_str}"
         return msg
 
-    def build(self, paths, dst, datadim="data", aggdim="day"):
-        """Format downloaded netcd4 files into a single DrIP dataset.
+    def combine(self, paths, time_tag="NETCDF_DIM_day"):
+        """Combine formatted geotiffs files into a single DrIP dataset.
 
         Parameters
         ----------
         paths : list
             List of paths to NetCDF files.
-        dst : str
-            Path to target output file.
         datadim : str
             String representing target data dimension in data object.
         timedim : str
             String representing time dimension in data object.
         """
         # Read in a multifile dataset
-        data = netCDF4.MFDataset(paths, aggdim=aggdim)
+        paths = list(paths)
+        paths.sort()
+        data = [rio.open(path) for path in paths]
+        arrays = np.concatenate([d.read() for d in data])
 
         # Get original and sorted time arrays
-        time_array = data[timedim][:]
-        sorted_time = time_array.copy()
+        time = []
+        for d in data:
+            for i in range(1, d.count + 1):
+                time.append(int(d.tags(i)[time_tag]))
+        time = np.array(time)
+        sorted_time = time.copy()
         sorted_time.sort()
 
         # Use the index positions of the original to track the data positions
         idxs = []
         for st in sorted_time:
-          idx = np.where(time_array == st)[0][0]
+          idx = int(np.where(time == st)[0])
           idxs.append(idx)
 
         # Sort data array (way to do this out of memory?)
-        time_axis =  data[datadim].dimensions.index(timedim)
-        sorted_array = np.rollaxis(data[datadim], time_axis)[idxs]
+        sorted_array = np.rollaxis(arrays, 0)[idxs]
 
         # Assemble pieces into singular netcdf file
-        self._assemble(dst, sorted_array, sorted_time, data)
+        self._assemble(sorted_array, sorted_time, data)
+        self._assemble(sorted_array, sorted_time, data, percentile=True)
 
-    def _add_crs_variable(self, nco, geo_info):
+    @property
+    def home(self):
+        """Return data home directory."""
+        return self.paths["indices"].joinpath(self.index)
+
+    def final_path(self, percentile=False, projected=False):
+        """Return final path for indexed NetCDF file."""
+        if percentile:
+            modifier = "_percentile"
+        else:
+            modifier = ""
+
+        if projected:
+            modifier += "_projected"
+
+        return self.home.joinpath(f"{self.index}{modifier}.nc")
+
+    def to_date(self, date_string):
+        """Convert date string to days since 1900-01-01."""
+        base = dateutil.parser.parse("19000101")
+        date = dateutil.parser.parse(date_string)
+        days = (date - base).days
+
+        return days
+
+    def _add_crs_variable(self, nco, profile):
         """Build and return a spatial referencing variable."""
         # Create coordinate reference system variable
         crs = nco.createVariable("crs", "c")
 
         # The reference code is stored, not consistent enough to infer
-        proj = SPATIAL_REFERENCES["wwdt"]
+        proj = profile["crs"]
         refs = osr.SpatialReference()
-        if proj.lower().startswith("epsg"):
-            code = int(proj.split(":")[-1])
-            refs.ImportFromEPSG(code)
-        elif isinstance(proj, str) and "+" in proj:
-            refs.ImportFromProj4(proj)
+        epsg = proj.to_epsg()
+        refs.ImportFromEPSG(epsg)
 
         # Append spatial referencing attributes
-        crs.spatial_ref = proj
-        crs.GeoTransform = geo_info["transform"]
+        crs.spatial_ref = f"epsg:{epsg}"
+        crs.GeoTransform = profile["transform"]
         crs.grid_mapping_name = "latitude_longitude"
         crs.longitude_of_prime_meridian = 0.0
         crs.semi_major_axis = refs.GetSemiMajor()
         crs.inverse_flattening = refs.GetInvFlattening()
 
-    def _add_global_attributes(self, nco, geo_info):
+    def _add_global_attributes(self, nco, profile):
         """Add attributes to netcdf object"""
         # Global attributes
         nco.title = INDEX_NAMES[self.index]
         nco.subtitle = "Monthly Index values since 1895-01-01"
-        xres = geo_info["transform"][1]
+        xres = profile["transform"][1]
         nco.description = (
             f"Monthly gridded data at {xres} decimal degrees (15 "
             "arc-minute resolution, calibrated to 1895-2010 for the "
@@ -250,67 +296,86 @@ class NetCDF(Adjustments):
 
         return nco
 
-    def _assemble(self, dst, sorted_array, sorted_time, data):
+    def _assemble(self, sorted_array, sorted_time, data, percentile=False):
         """Assemble a new netcdf file with sorted data and time arrays."""
-        # Create Dataset
-        nco = netCDF4.Dataset(dst, mode="w", format="NETCDF4")
-
         # Get spatial geometry information
-        geo_info = self._get_geometry(data)
+        profile = data[0].profile
+        crs = profile["crs"]
+        width = profile["width"]
+        height = profile["height"]
 
-        # Dimensions
-        nco.createDimension("latitude", geo_info["nlat"])
-        nco.createDimension("longitude", geo_info["nlon"])
-        nco.createDimension("time", None)
+        # Find percentiles if requested
+        if percentile:
+            sorted_array = self._get_percentiles(sorted_array)
 
-        # Variables
-        latitudes = nco.createVariable("latitude",  "f4", ("latitude",))
-        longitudes = nco.createVariable("longitude",  "f4", ("longitude",))
-        times = nco.createVariable("time", "f8", ("time",))
-        variable = nco.createVariable(
-            "value",
-            "f4",
-            ("time", "latitude", "longitude"),
-            fill_value=-9999
-        )
-        variable.standard_name = "index"
-        variable.units = "unitless"
-        variable.long_name = "Index Value"
-        variable.setncattr("grid_mapping", "crs")
-        self._add_crs_variable(nco, geo_info)
+        # Create Dataset
+        projected = crs.is_projected
+        dst = self.final_path(percentile=percentile, projected=projected)
+        if os.path.exists(dst):
+            os.remove(dst)
 
-        # Variable Attrs
-        times.units = "days since 1900-01-01"  # Use index_info.py for this
-        times.standard_name = "time"
-        times.calendar = "gregorian"
-        latitudes.units = "degrees_south"
-        latitudes.standard_name = "latitude"
-        longitudes.units = "degrees_east"
-        longitudes.standard_name = "longitude"
+        # Build file
+        with netCDF4.Dataset(dst, mode="w", format="NETCDF4") as nco:
 
-        # Add attributes
-        nco = self._add_global_attributes(nco, geo_info)
+            # Dimensions
+            nco.createDimension("latitude", height)
+            nco.createDimension("longitude", width)
+            nco.createDimension("time", None)
 
-        # Pull multifile data out
-        array = data["data"][:]
-        time = data["day"][:]
+            # Variables
+            latitudes = nco.createVariable("latitude",  "f4", ("latitude",))
+            longitudes = nco.createVariable("longitude",  "f4", ("longitude",))
+            times = nco.createVariable("time", "f8", ("time",))
+            variable = nco.createVariable(
+                "value",
+                "f4",
+                ("time", "latitude", "longitude"),
+                fill_value=-9999  # Inferfrom data
+            )
+            variable.standard_name = "data"
+            variable.units = "unitless"
+            variable.long_name = "Index Value"
+            variable.setncattr("grid_mapping", "crs")
+            self._add_crs_variable(nco, profile)
 
-        # This allows the option to store the data as percentiles
-        # if percentiles:
-        #     arrays[arrays == -9999] = np.nan  # Infer nan from file
-        #     arrays = percentileArrays(arrays)
+            # Variable Attrs
+            times.units = "days since 1900-01-01"  # Use index_info.py for this
+            times.standard_name = "time"
+            times.calendar = "gregorian"
+            latitudes.units = "degrees_south"
+            latitudes.standard_name = "latitude"
+            longitudes.units = "degrees_east"
+            longitudes.standard_name = "longitude"
 
-        # Write - set this to write one or multiple
-        latitudes[:] = geo_info["ys"]
-        longitudes[:] = geo_info["xs"]
-        times[:] = time.astype(int)
-        variable[:, :, :] = array
-    
-        # Done
-        nco.close()
+            # Add attributes
+            nco = self._add_global_attributes(nco, profile)
+
+            # Write - set this to write one or multiple
+            transform = profile["transform"]
+            xres = transform[0]
+            xmin = transform[2]
+            yres = transform[4]
+            ymax = transform[5]
+            latitudes[:] = [ymax + (i * yres) for i in range(height)]
+            longitudes[:] = [xmin + (i * xres) for i in range(width)]
+            times[:] = sorted_time
+            variable[:, :, :] = sorted_array
+
+        return dst
 
     def _get_geometry(self, data):
-        """Get spatial geometric information"""
+        """Get spatial geometric information from netcdf object or file.
+        
+        Parameters
+        ---------
+        data : str | posix.PosixPath | netCDF4._netCDF4.MFDataset | netCDF4._netCDF4.Dataset
+        """
+        import pathlib
+
+        # Open data set if path
+        if isinstance(data, pathlib.PosixPath) or isinstance(data, str):
+            data = netCDF4.Dataset(data)
+
         # There are many coordinate names that could be used
         xdim = self._guess_lon(data)
         ydim = self._guess_lat(data)
@@ -320,8 +385,8 @@ class NetCDF(Adjustments):
         ymin = float(min(data[ydim]))
         ymax = float(max(data[ydim]))
         xres = mode(np.diff(data[xdim]))
-        yres = mode(np.diff(data[ydim]))  # There are two unique values here
-        transform = (xmin, xres, 0, ymax, 0, yres)
+        yres = mode(np.diff(data[ydim][::-1]))  # There are two unique values here
+        transform = (xres, 0, xmin, 0, yres, ymax)
 
         # Create vector of x and y coordinates
         nlat = data[ydim].shape[0]
@@ -331,13 +396,16 @@ class NetCDF(Adjustments):
 
         # Package together
         info = dict(
+            crs=pyproj.CRS(SPATIAL_REFERENCES["wwdt"]),
             nlat=nlat,
             nlon=nlon,
             transform=transform,
             xdim=xdim,
-            xs=xs,
             ydim=ydim,
-            ys=ys
+            top=max(ys),
+            left=min(xs),
+            bottom=min(ys),
+            right=max(xs)
         )
 
         return info
@@ -360,11 +428,414 @@ class NetCDF(Adjustments):
                            "key to POSSIBLE_LONS.")
         return dims[0]     
 
+    def _get_percentiles(self, array):
+        """Return an array of time-ranked percentiles in parallel.
+
+        Parameters
+        ----------
+        array : np.ndarray | np.ma.core.MaskedArray
+            A 3D array of values ordered by time, latitude, and longitude in
+            that order
+
+        Returns
+        -------
+        np.ndarray | np.ma.core.MaskedArray
+            Percentiles of the input dataset.
+        """
+        # Apply percentile function
+        ncpu = mp.cpu_count() - 1
+        chunks = np.array_split(array, ncpu)
+        new_arrays = []
+        with mp.Pool(ncpu) as pool:
+            for new_array in pool.imap(self._percentile_chunk, chunks):
+                new_arrays.append(new_array)
+
+        # Piece array back together
+        percentiles = np.concatenate(new_arrays, axis=0)
+
+        return percentiles
+
+    def _percentile_chunk(self, chunk):
+        """Calculate and return an array of time ranked percentiles of values.
+
+        Parameters
+        ----------
+        array : np.ndarray | np.ma.core.MaskedArray
+            A 3D array of values ordered by time, latitude, and longitude in
+            that order
+
+        Returns
+        -------
+        np.ndarray | np.ma.core.MaskedArray
+            Percentiles of the input dataset.
+        """
+        return np.apply_along_axis(self._percentile_vector, axis=0, arr=chunk)
+
+    def _percentile_vector(self, vector):
+        """Calcuate the percentile value for each item in a 1D vector."""
+        return (rankdata(vector) / len(vector)) * 100
+
+
+    def _warp(self, src, dst, dst_srs="epsg:4326", xres=None, yres=None):
+        """Reproject array to epsg:5070.
+
+        Adding ram will almost certainly increase the speed. That’s not at all the same as saying that it is worth it, or that the speed increase will be significant. Disks are the slowest part of the process.
+
+        By default gdalwarp won't take much advantage of RAM. Using the flag "-wm 500" will operate on 500MB chunks at a time which is better than the default. To increase the io block cache size may also help. This can be done on the command like:
+
+        gdalwarp --config GDAL_CACHEMAX 500 -wm 500 ...
+        This uses 500MB of RAM for read/write caching, and 500MB of RAM for working buffers during the warp. Beyond that it is doubtful more memory will make a substantial difference.
+
+        Check CPU usage while gdalwarp is running. If it is substantially less than 100% then you know things are IO bound. Otherwise they are CPU bound.
+
+        Caution : increasing the value of the -wm param may lead to loss of performance in certain circumstances, particularly when gdalwarping *many* small rasters into a big mosaic. See http://trac.osgeo.org/gdal/ticket/3120 for more details
+        """
+        # Alternate strategy, much like first
+        # Reproject to tiff with gdal, all bands
+        # Read in tiff array,
+        # Reset (or better use before setting) geometry using tiff array
+        # Continue along
+        from osgeo import gdal
+
+        # Get geographic information
+        na = -9999 # Infer from datatype
+
+        # Resample
+        if xres and yres:
+            warped = gdal.Warp(
+                srcDSOrSrcDSTab=str(src),
+                destNameOrDestDS=str(dst),
+                dstNodata=float(na),
+                dstSRS=dst_srs,
+                format="GTiff",
+                targetAlignedPixels=True,  # test this
+                xRes=xres,
+                yRes=yres
+            )
+
+        # Reproject
+        else:
+            warped = gdal.Warp(
+                destNameOrDestDS=str(dst),
+                srcDSOrSrcDSTab=str(src),
+                dstSRS=dst_srs,
+                dstNodata=float(na),
+                format="GTiff"
+            )
+
+
+class EDDI(NetCDF):
+    """Methods for retrieving EDDI files."""
+
+    def __init__(self, index):
+        """Initialize EDDI object."""
+        super().__init__(index)
+        self.period = int(index.replace("eddi", ""))
+        self.target_dir = self.home.joinpath("originals")
+        self.target_dir.mkdir(exist_ok=True, parents=True)
+        self.con_args = [
+            "ftp.cdc.noaa.gov",
+            "anonymous",
+            "anonymous@cdc.noaa.gov"
+        ]
+
+    def download_eddi(self):
+        """Download an EDDI dataset."""
+        logger.info(f"Downloading datasets for {self.index}...")
+        paths = self.eddi_paths
+        with FTP(*self.con_args) as ftp:
+            for path in paths:
+                self._get(ftp, path, write=True)
+
+    def format_eddi(self, time_tag="NETCDF_DIM_day"):
+        """Reformat EDDI asc files to geotiff for use in DataBuilder."""
+        # Collect all paths
+        paths = list(self.target_dir.glob("*asc"))
+        paths.sort()
+
+        # Group by month and get days since 1900
+        monthly = {}
+        for i in range(1, 13):
+            if i not in monthly:
+                monthly[i] = {}
+            mpaths = [p for p in paths if p.name[-8: -6] == f"{i:02d}"]
+            array = np.array([rio.open(mp).read(1) for mp in mpaths])
+            date_strings = [mp.name[-12:-4] for mp in mpaths]
+            days = [self.to_date(date) for date in date_strings]
+            monthly[i]["paths"] = mpaths
+            monthly[i]["days"] = days
+            monthly[i]["array"] = array
+
+        # Write to geotiff
+        profile = rio.open(paths[0]).profile
+        profile["crs"] = "epsg:4326"
+        profile["driver"] = "GTiff"
+        for month, values in monthly.items():
+            profile = profile.copy()
+            array = values["array"]
+            count = array.shape[0]
+            profile["count"] = count
+            fname = f"{self.index}_{month:02d}_temp.tif"
+            dst = self.home.joinpath("originals", fname)
+            with rio.open(dst, "w", **profile) as file:
+                for i in range(count):
+                    band = i + 1
+                    meta = {time_tag: values["days"][i]}
+                    file.write(array[i], band)
+                    file.update_tags(band, **meta)
+
+        # Reproject and resample
+        self._adjust_eddi()
+
+    @property
+    def eddi_paths(self):
+        """Get the last day of the month."""
+        pattern = f"{self.period:02d}mn_"
+        paths = []
+        with FTP(*self.con_args) as ftp:
+            ftp.cwd("/Projects/EDDI/CONUS_archive/data/")
+            years = [item for item in ftp.nlst() if isint(item)]
+            for year in years:
+                cwd = f"/Projects/EDDI/CONUS_archive/data/{year}"
+                ftp.cwd(cwd)
+                all_paths = [f for f in ftp.nlst() if pattern in f]
+                for i in range(1, 13):
+                    mpattern = f"{i:02d}"
+                    mpaths = [p for p in all_paths if p[-8:-6] == mpattern]
+                    if mpaths:
+                        paths.append(Path(f"{cwd}/{mpaths[-1]}"))
+
+        return paths
+
+    def _adjust_eddi(self):
+        """Resample all downloaded monthly files to target resolution."""
+        # Collect all needed arguments
+        resample_list = []
+        reproject_list = []
+        resolution = self.resolution
+        monthlies = list(self.home.joinpath("originals").glob("*tif"))
+        monthlies.sort()
+        for src in monthlies:
+            rs_name = src.name.replace(".tif", "_resampled.tif")
+            rp_name = src.name.replace(".tif", "_reprojected.tif")
+            rs_dst = src.parent.joinpath(rs_name)
+            rp_dst = src.parent.joinpath(rp_name)
+            rs_args = [src, rs_dst, "epsg:4326", resolution, -resolution]
+            rp_args = [rs_dst, rp_dst, "epsg:5070", None, None]
+            resample_list.append(rs_args)
+            reproject_list.append(rp_args)
+
+        # Resample
+        with ThreadPool(os.cpu_count() - 1) as pool:
+            for _ in pool.starmap(self._warp, resample_list):
+                pass
+
+        # Reproject
+        with ThreadPool(os.cpu_count() - 1) as pool:
+            for _ in pool.starmap(self._warp, reproject_list):
+                pass
+
+    def _get(self, ftp, path, write=False):
+        """Download path from an FTP server. Add error logging.""" 
+        if not write:
+            memory_file = []
+            def appendline(line):
+                memory_file.append(line)
+            try:
+                ftp.retrlines(f"RETR {path}", appendline)
+            except:
+                ftp.retrlines(f"RETR {path}", appendline)
+
+            return memory_file
+
+        else:
+            dst = self.target_dir.joinpath(path.name)
+            def writeline(line):
+                file.write(line + "\n")
+
+            with open(dst, "w") as file:
+                try:
+                    ftp.retrlines(f"RETR {path}", writeline)
+                except:
+                    ftp.retrlines(f"RETR {path}", writeline)
+
+
+class PRISM(EDDI):
+    """Methods fordownloading and formatting PRISM datasets."""
+
+    def __init__(self, index):
+        """Initialize PRISM Object."""
+        super().__init__(index)
+        self.con_args = [
+            "prism.nacse.org",
+            "anonymous"
+        ]
+
+    
+
+class Data_Builder(PRISM):
+    """Methods for downloading and formatting data from various sources."""
+
+    def __init__(self, index, resolution=0.25, template=None):
+        """Initialize Data_Builder object.
+
+        Parameters
+        ----------
+        index : str
+            Index key. Must be in prf.options.INDEX_NAMES.
+        resolution : float
+            Resolution of target drought index NetCDF4 file in decimal degrees.
+        template : str
+            Path to file to use as template for georeferencing.
+        """
+        super().__init__(index)
+        self.host = HOSTS[index]
+        self.resolution = resolution
+        self.template = template
+        self._set_index(index)
+        self._set_logger(index)
+
+    def build(self, overwrite=False):
+        """Download and combine multiple NetCDF files from WWDT into one."""
+        dsts = [
+            self.final_path(percentile=False, projected=False),
+            self.final_path(percentile=False, projected=True),
+            self.final_path(percentile=True, projected=False),
+            self.final_path(percentile=True, projected=True)
+        ]
+        if all(map(os.path.exists, dsts)) and not overwrite:
+            logger.info("%s exists, skipping.", dsts[0])
+        else:
+            start = time.time()
+            logger.info("Building %s...", dsts[0])
+
+            # Different download methods for different data sources
+            if self.index.startswith("eddi"):
+                self.download_eddi()
+                self.format_eddi()
+            else:
+                self.download_all(self.download_paths)
+                self._adjust_wwdt()
+
+            # Combine into single files for each index
+            self._combine()
+
+            end = time.time()
+            duration = round((end - start) / 60, 2)
+            logger.info("%s completed in %f minutes.", dsts[0], duration)
+
+    @property
+    def download_paths(self):
+        """Return appropriate remote and local paths for downloading."""
+        if self.host == "ftp://ftp2.psl.noaa.gov/Projects/EDDI/CONUS_archive":
+            return self.paths_eddi
+        if self.host == "https://wrcc.dri.edu/wwdt/data/PRISM":
+            return self.paths_wwdt
+
+    @property
+    def paths_eddi(self):
+        """Return list of remote urls and local destination paths."""
+        paths = []
+        host = self.host
+        index = self.index
+        for i in range(1, 13):
+            url = os.path.join(host, f"{index}/{index}_{i}_PRISM.nc")
+            fname = f"{self.index}_{i:02d}_temp.nc"
+            dst = self.home.joinpath(f"originals/{fname}")
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            entry = {"remote": url, "local": dst}
+            paths.append(entry)
+
+
+    @property
+    def paths_wwdt(self):
+        """Return list of remote urls and local destination paths."""
+        paths = []
+        host = self.host
+        index = self.index
+        for i in range(1, 13):
+            url = os.path.join(host, f"{index}/{index}_{i}_PRISM.nc")
+            fname = f"{self.index}_{i:02d}_temp.nc"
+            dst = self.home.joinpath(f"originals/{fname}")
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            entry = {"remote": url, "local": dst}
+            paths.append(entry)
+
+    @property
+    def paths_wwdt(self):
+        """Return list of remote urls and local destination paths."""
+        paths = []
+        host = self.host
+        index = self.index
+        for i in range(1, 13):
+            url = os.path.join(host, f"{index}/{index}_{i}_PRISM.nc")
+            fname = f"{self.index}_{i:02d}_temp.nc"
+            dst = self.home.joinpath(f"originals/{fname}")
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            entry = {"remote": url, "local": dst}
+            paths.append(entry)
+
+        return paths
+
+    def _adjust_wwdt(self):
+        """Resample all downloaded monthly files to target resolution."""
+        # Collect all needed arguments
+        resample_list = []
+        reproject_list = []
+        resolution = self.resolution
+        for entry in self.download_paths:
+            src = entry["local"]
+            rs_name = src.name.replace(".nc", "_resampled.tif")
+            rp_name = src.name.replace(".nc", "_reprojected.tif")
+            rs_dst = src.parent.joinpath(rs_name)
+            rp_dst = src.parent.joinpath(rp_name)
+            rs_args = [src, rs_dst, "epsg:4326", resolution, -resolution]
+            rp_args = [rs_dst, rp_dst, "epsg:5070", None, None]
+            resample_list.append(rs_args)
+            reproject_list.append(rp_args)
+
+        # Resample
+        with ThreadPool(os.cpu_count() - 1) as pool:
+            for _ in pool.starmap(self._warp, resample_list):
+                pass
+
+        # Reproject
+        with ThreadPool(os.cpu_count() - 1) as pool:
+            for _ in pool.starmap(self._warp, reproject_list):
+                pass
+
+    def _combine(self):
+        """Combine all data into required data set."""
+        main_paths = self.home.joinpath("originals").glob("*resampled.tif")
+        proj_paths = self.home.joinpath("originals").glob("*reprojected.tif")
+        self.combine(main_paths)
+        self.combine(proj_paths)
+
+    def _set_index(self, index):
+        """Set the index key and index name.
+
+        Parameters
+        ----------
+        index : str
+            Index key. Must be in prf.options.INDEX_NAMES.
+        """
+        if index not in INDEX_NAMES:
+            available_keys = ", ".join(list(INDEX_NAMES.keys()))
+            msg = (f"{index} key is not avaiable. Available keys: "
+                   f"{available_keys}")
+            logger.error(msg)
+            raise KeyError(msg)
+        self.index = index
+        self.index_name = INDEX_NAMES[index]
+
+    def _set_logger(self, index):
+        """Create logging file handler for this process."""
+        filename = self.home.joinpath("logs", index + ".log")
+        set_handler(logger, filename)
+
+
 
 if __name__ == "__main__":
-    timedim = aggdim = "day"
-    datadim = "data"
-    self = NetCDF("pdsi")
-    paths = list(self.home.glob("drip/data/indices/pdsi/pdsi*nc"))
-    dst = paths[0].parent.joinpath("temp.nc")
-    self.build(paths, dst)
+    index = "eddi1"
+    self = Data_Builder(index)
+    # self.build()

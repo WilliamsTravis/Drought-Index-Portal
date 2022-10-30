@@ -45,7 +45,8 @@ class Paths:
     @property
     def indices(cls):
         """Return list of paths to index netcdfs."""
-        paths = list(cls.paths["indices"].glob("*.nc"))
+        paths = list(cls.paths["indices"].glob("*/*.nc"))
+        paths = [path for path in paths if "_" not in path.name]
         paths.sort()
         indices = {}
         for path in paths:
