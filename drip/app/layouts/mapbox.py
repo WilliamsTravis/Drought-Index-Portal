@@ -14,7 +14,7 @@ DEFAULT_MAP_EXTENT = {
 }
 
 MAPBOX_LAYOUT = dict(
-    height=500,
+    height=600,
     font=dict(
         color="#CCCCCC",
         fontweight="bold"
@@ -28,8 +28,8 @@ MAPBOX_LAYOUT = dict(
     margin=dict(
         l=55,
         r=35,
-        b=65,
-        t=90,
+        b=90,
+        t=75,
         pad=4
     ),
     hovermode="closest",

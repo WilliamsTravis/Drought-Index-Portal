@@ -12,7 +12,15 @@ from drip.app.options.styles import STYLES
 
 # Dynamic Elements
 def divMaker(id_num, index="noaa"):
-    div = html.Div([
+    div = html.Div(
+        style={
+            "position": "relative",
+            "margin-top": "-1px",
+            "border-radius": "5px",
+            "box-shadow": ("0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 "
+                           "rgba(0, 0, 0, 0.19)")
+        },
+        children=[
         html.Div([
 
             # Tabs and dropdowns
@@ -151,6 +159,42 @@ def divMaker(id_num, index="noaa"):
                 id="map_{}".format(id_num),
                 config={"showSendToCloud": True}
             ),
+            html.Div(
+                  style={
+                    "border": "3px solid black",
+                },
+                children=html.Div(
+                    style={
+                        "width": "94%",
+                        "border-top": "0px",
+                        "margin-top": "5px",
+                        "margin-bottom": "-1px",
+                        "margin-left": "40px"
+                    },
+                    children=[
+                        dcc.RangeSlider(
+                            id=f"color_slider_{id_num}",
+                            min=0,
+                            max=1,
+                            step=.01,
+                            marks=None,
+                            tooltip={
+                                "placement": "bottom",
+                                "always_visible": True
+                            },
+                            className="margin20"
+                        ),
+                        html.P(
+                            id=f"color_slider_print_{id_num}",
+                            children="Color Sider",
+                            style={
+                                "text-align": "center",
+                                "margin-top": "-10px"
+                            }
+                        )
+                    ]
+                )
+            ),
             html.Div([
                 html.Div([
                     html.P(
@@ -203,23 +247,24 @@ def divMaker(id_num, index="noaa"):
                         }
                     ),
                 ], className="row",
-                    style={"border": "3.10px solid lightgrey",
-                           "margin-top": "-7"
-                           }),
+                   style={"margin-top": "10px"} 
+            ),
             ], className="row", style={
                 "border": "3px solid black",
-                "border-top": "0px",
-                "border-radius": "4px",
-                "margin-top": "-5"
             }),
         ]),
 
         # Graph
         html.Div([
-            dcc.Graph(id="series_{}".format(id_num),
-                      config={"showSendToCloud": True})]),
-        html.Div(id="coverage_div_{}".format(id_num),
-                 style={"margin-bottom": "25"}),
+            dcc.Graph(
+                id="series_{}".format(id_num),
+                config={"showSendToCloud": True}
+            )
+        ]),
+        html.Div(
+            id="coverage_div_{}".format(id_num),
+            style={"margin-bottom": "25"}
+        ),
         html.Button(
             id="dsci_button_{}".format(id_num),
             children=["Show DSCI: Off"],
@@ -237,7 +282,7 @@ def divMaker(id_num, index="noaa"):
                 "font-family": "Times New Roman",
                 "border-bottom": "2px solid gray",
                 "margin-top": "100px",
-                "margin-bottom": "35px"
+                "margin-bottom": "-15px"
             }
         ),
         html.Hr(),
@@ -251,7 +296,10 @@ def divMaker(id_num, index="noaa"):
                 "This csv includes data resulting from the selections made "
                 f"for the element above and is titled timeseries_{id_num}.csv"
             ),
-            href="", target="_blank"),
+            href="",
+            target="_blank",
+            style={"margin-left": "10px"}
+        ),
         html.A(
             id="download_all_link_{}".format(id_num),
             children="Download Selected Data (All Indicators)",
@@ -267,14 +315,21 @@ def divMaker(id_num, index="noaa"):
 
         # Storage
         dcc.Store(id="download_store_{}".format(id_num)),
-        html.Div(id="key_{}".format(id_num),
-                 children="{}".format(id_num),
-                 style={"display": "none"}),
-        html.Div(id="label_store_{}".format(id_num),
-                 style={"display": "none"}),
-        html.Div(id="shape_store_{}".format(id_num),
-                 style={"display": "none"})],
-        className="six columns")
+        html.Div(
+            id="key_{}".format(id_num),
+            children="{}".format(id_num),
+            style={"display": "none"}
+        ),
+        html.Div(
+            id="label_store_{}".format(id_num),
+            style={"display": "none"}
+        ),
+        html.Div(
+            id="shape_store_{}".format(id_num),
+            style={"display": "none"}
+        )],
+        className="six columns"
+    )
 
     return div
 
@@ -695,10 +750,12 @@ LAYOUT = html.Div([
     )
 
 ],
-    className="twelve columns",
+    className="eleven columns",
     style={
         "width": "98%",
         "margin-bottom": "50px",
-        "margin-top": "100px"
+        "margin-top": "100px",
+        "margin-left": "25px",
+        "margin-right": "100px"
     }
 )

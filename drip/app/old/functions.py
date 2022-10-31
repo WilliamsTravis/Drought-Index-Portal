@@ -1881,17 +1881,17 @@ class Index_Maps(Paths):
 
         # Filter if needed and generate timeseries
         if flag == "all":
-            timeseries = data.mean(dim=("latitude", "longitude"), skipna=True)
-            timeseries = timeseries.index.values
+            timeseries = data.value.mean(dim=("latitude", "longitude"), skipna=True)
+            timeseries = timeseries.values
         else:
             y = json.loads(y)
             x = json.loads(x)
             if flag == "grid":
-                timeseries = data.index[:, y, x].values
+                timeseries = data.value[:, y, x].values
             else:
                 data = data.where(self.mask == 1)
-                timeseries = data.mean(dim=("latitude", "longitude"), skipna=True)
-                timeseries = timeseries.index.values
+                timeseries = data.value.mean(dim=("latitude", "longitude"), skipna=True)
+                timeseries = timeseries.values
 
         # print("Area fitlering complete.")
         return timeseries
@@ -2024,6 +2024,7 @@ class Index_Maps(Paths):
 
         return function()
 
+
 class Location_Builder:
     """
     This takes a location selection determined to be the triggering choice,
@@ -2108,8 +2109,8 @@ class Location_Builder:
 
         # 2: Selection is a single grid IDs
         elif "clickData" in trig_id:
-            lon = trig_val["points"][0]["longitude"]
-            lat = trig_val["points"][0]["latitude"]
+            lon = trig_val["points"][0]["lon"]
+            lat = trig_val["points"][0]["lat"]
             x = crdict.londict[lon]
             y = crdict.latdict[lat]
             gridid = crdict.grid[y, x]
@@ -2122,8 +2123,9 @@ class Location_Builder:
         elif "selectedData" in trig_id:
             if trig_val is not None:
                 selections = trig_val["points"]
-                y = list([crdict.latdict[d["latitude"]] for d in selections])
-                x = list([crdict.londict[d["longitude"]] for d in selections])
+                print(selections)
+                y = list([crdict.latdict[d["lat"]] for d in selections])
+                x = list([crdict.londict[d["lon"]] for d in selections])
                 counties = np.array([d["text"][:d["text"].index("<")] for
                                      d in selections])
                 local_df = admin_df[admin_df["place"].isin(

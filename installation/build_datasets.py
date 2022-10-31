@@ -9,13 +9,13 @@ logger = init_logger(__name__)
 
 def get_wwdt():
     """Download all WWDT datasets specified in drip.options."""
-    for index in INDEX_NAMES:
-        if not index.startswith("ri") or index.startswith("eddi"):
-            logger.info("Building %s ...", index)
-            print(f"Building {index}...")
-            builder = Data_Builder(index)
-            builder.build(overwrite=False)
-
+    for index, desc in INDEX_NAMES.items():
+        if not index.startswith("ri"):
+            if "Index" in desc:
+                logger.info("Building %s ...", index)
+                print(f"Building {index}...")
+                builder = Data_Builder(index)
+                builder.build(overwrite=False)
 
 
 

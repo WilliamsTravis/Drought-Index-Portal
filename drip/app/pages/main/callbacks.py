@@ -1,17 +1,27 @@
 """Callbacks for main Drip page."""
+import base64
 import copy
 import gc
 import json
+import os
 import psutil
+import tempfile
+import urllib
 
 import dash
+import dash_table
+import datetime as dt
+import fiona
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from collections import OrderedDict
-from dash import Input, Output, State
+from dash import Input, Output, State, html
 from dash.exceptions import PreventUpdate
+from osgeo import gdal, osr
+from tqdm import tqdm
 
 from drip import calls, Paths
 from drip.app.app import app, cache
@@ -19,8 +29,11 @@ from drip.app.layouts.mapbox import DEFAULT_MAP_EXTENT, MAPBOX_LAYOUT
 from drip.app.old.functions import (
     Admin_Elements,
     Index_Maps,
-    Location_Builder
+    Location_Builder,
+    shapeReproject,
+    unit_map
 )
+from drip.app.options.indices import INDEX_NAMES
 from drip.app.options.options import Options
 from drip.app.options.styles import ON_COLOR, OFF_COLOR
 from drip.loggers import init_logger, set_handler
@@ -35,9 +48,25 @@ admin = Admin_Elements(resolution)
 [state_array, county_array, grid, mask,
  source, albers_source, crdict, admin_df] = admin.getElements()  # <----------- remove albers ource here (carefully)
 
-# Using an existing dataset for source
-source_path = Paths.paths["indices"].joinpath("pdsi/pdsi.nc")
-source = xr.open_dataset(source_path)
+
+function_options_perc = [{"label": "Mean", "value": "pmean"},
+                         {"label": "Maximum", "value": "pmax"},
+                         {"label": "Minimum", "value": "pmin"},
+                         {"label": "Correlation", "value": "pcorr"}]
+function_options_orig = [{"label": "Mean", "value": "omean"},
+                         {"label": "Maximum", "value": "omax"},
+                         {"label": "Minimum", "value": "omin"},
+                         {"label": "Drought Severity Area", "value":"oarea"},
+                         {"label": "Correlation", "value": "ocorr"}]
+function_names = {"pmean": "Average Percentiles",
+                  "pmax": "Maxmium Percentiles",
+                  "pmin": "Minimum Percentiles",
+                  "omean": "Average Values",
+                  "omax": "Maximum Values",
+                  "omin": "Minimum Values",
+                  "oarea": "Average Values",
+                  "pcorr": "Pearson's Correlation ",
+                  "ocorr": "Pearson's Correlation "}
 
 
 # For singular elements
@@ -54,6 +83,7 @@ source = xr.open_dataset(source_path)
 def adjustDatePrint1(year_range, month_a,  month_b, month_check, sync):
     """If users select one year, only print it once."""
     # If not syncing, these need numbers
+    months = [int(m) for m in range(1, 13)]
     if not sync:
         sync = 0
     if sync % 2 == 0:
@@ -118,6 +148,7 @@ def adjustDatePrint1(year_range, month_a,  month_b, month_check, sync):
 def adjustDatePrint2(year_range, month_a,  month_b, month_check, sync):
     """If users select one year, only print it once."""
     # If not syncing, these need numbers
+    months = [int(m) for m in range(1, 13)]
     if not sync:
         sync = 0
     if sync % 2 == 0:
@@ -540,7 +571,7 @@ for i in range(1, 3):
             if it is a   location. It"s still much nicer than setting up a
             dozen hidden divs, timing callbacks, and writing long lines of
             logic to determine which was most recently updated.
-            
+
             I need to incorporate the reset button here, it is not currently
             persistent...
             """
@@ -763,7 +794,7 @@ for i in range(1, 3):
             tif = gdal.Translate("data/shapefiles/temp/temp.tif",
                                  "data/shapefiles/temp/temp1.tif",
                                  projWin=[-130, 50, -55, 20])
-            tif = None
+            del tif
 
             return basename
 
@@ -900,6 +931,7 @@ for i in range(1, 3):
         Input("map_type", "value"),
         Input("signal", "children"),
         Input("point_size_{}".format(i), "value"),
+        Input(f"color_slider_{i}", "value"),
         Input("location_store_{}".format(i), "children"),
         State("function_choice", "value"),
         State("key_{}".format(i), "children"),
@@ -910,9 +942,9 @@ for i in range(1, 3):
         State("map_{}".format(i), "relayoutData")
     )
     @calls.log
-    def makeMap(choice1, choice2, map_type, signal, point_size, location,
-                function, key, sync, date_sync, date_print_1, date_print_2,
-                map_extent):
+    def makeMap(choice1, choice2, map_type, signal, point_size, color_slider,
+                location, function, key, sync, date_sync, date_print_1,
+                date_print_2, map_extent):
         """Build plotly scatter mapbox figure."""
         # Catch Trigger
         trigger = dash.callback_context.triggered[0]["prop_id"]
@@ -973,8 +1005,12 @@ for i in range(1, 3):
         array = data.getFunction(function).compute() #* data.mask.data
 
         # Individual array min/max
-        amax = np.nanmax(array)
-        amin = np.nanmin(array)
+        if color_slider:
+            amin = color_slider[0]
+            amax = color_slider[1]
+        else:
+            amax = np.nanmax(array)
+            amin = np.nanmin(array)
 
         # Now, we want to use the same value range for colors for both maps
         nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
@@ -1036,9 +1072,6 @@ for i in range(1, 3):
                      ": " + date_print)
             title_size = 20
 
-        # Replace the source array with the data from above
-        # source.value[0] = array #* mask
-
         # Create a data frame of coordinates, index values, labels, etc
         dfs = xr.DataArray(array, name="value")
         pdf = dfs.to_dataframe()
@@ -1054,7 +1087,7 @@ for i in range(1, 3):
         grid2[np.isnan(grid2)] = 0
         pdf["grid"] = grid2[pdf["gridy"], pdf["gridx"]]
         pdf = pd.merge(pdf, admin_df, how="inner")
-        pdf["data"] = pdf["data"].astype(float)
+        pdf["data"] = pdf["value"].astype(float)
         pdf["printdata"] = (pdf["place"] + "<br>  lat/lon: "
                             + pdf["latbin"].apply(str) + ", "
                             + pdf["lonbin"].astype(str) + "<br>     <b>"
@@ -1071,17 +1104,22 @@ for i in range(1, 3):
                   hoverinfo="text",
                   hovermode="closest",
                   showlegend=False,
-                  marker=dict(colorscale=data.color_scale,
-                              reversescale=reverse,
-                              color=df["data"],
-                              cmax=amax,
-                              cmin=amin,
-                              opacity=1.0,
-                              size=point_size,
-                              colorbar=dict(textposition="auto",
-                                            orientation="h",
-                                            font=dict(size=15,
-                                                      fontweight="bold"))))
+                  marker=dict(
+                      colorscale=data.color_scale,
+                      reversescale=reverse,
+                      color=df["data"],
+                      cmax=amax,
+                      cmin=amin,
+                      opacity=1.0,
+                      size=point_size,
+                      colorbar=dict(
+                          y=-.15,
+                          textposition="bottom",
+                          orientation="h",
+                          font=dict(size=15, fontweight="bold")
+                    )
+                )
+            )
 
         # Add an outline to help see when zoomed in
         d2 = dict(type="scattermapbox",
@@ -1102,6 +1140,8 @@ for i in range(1, 3):
         layout_copy["mapbox"]["zoom"] = map_extent["mapbox.zoom"]
         layout_copy["mapbox"]["bearing"] = map_extent["mapbox.bearing"]
         layout_copy["mapbox"]["pitch"] = map_extent["mapbox.pitch"]
+        # layout_copy["coloraxis_colorbar_y"] = -1
+        # layout_copy["coloraxis_colorbar_x"] = 0
         layout_copy["titlefont"]=dict(
             color="#CCCCCC",
             size=title_size,
@@ -1121,242 +1161,246 @@ for i in range(1, 3):
         return figure
 
 
-    # @app.callback(
-    #     Output("series_{}".format(i), "figure"),
-    #     Output("download_link_{}".format(i), "href"),
-    #     Output("area_store_{}".format(i), "children"),
-    #     Input("submit", "n_clicks"),
-    #     Input("signal", "children"),
-    #     Input("choice_{}".format(i), "value"),
-    #     Input("choice_store", "children"),
-    #     Input("location_store_{}".format(i), "children"),
-    #     Input("dsci_button_{}".format(i), "n_clicks"),
-    #     State("key_{}".format(i), "children"),
-    #     State("click_sync", "children"),
-    #     State("date_sync", "children"),
-    #     State("function_choice", "value"),
-    #     State("area_store_{}".format(i), "children")
-    # )
-    # @calls.log
-    # def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
-    #                key, sync, date_sync, function, area_store):
-    #     """
-    #     This makes the time series graph below the map.
-    #     Sample arguments:
-    #         signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], "Viridis", "no"]
-    #         choice = "pdsi"
-    #         function = "oarea"
-    #         location =  ["all", "y", "x", "Contiguous United States", 0]
-    #     """
-    #     # Identify element number
-    #     key = int(key)
+    @app.callback(
+        Output("series_{}".format(i), "figure"),
+        Output("download_link_{}".format(i), "href"),
+        Output("area_store_{}".format(i), "children"),
+        Input("submit", "n_clicks"),
+        Input("signal", "children"),
+        Input("choice_{}".format(i), "value"),
+        Input("choice_store", "children"),
+        Input("location_store_{}".format(i), "children"),
+        Input("dsci_button_{}".format(i), "n_clicks"),
+        State("key_{}".format(i), "children"),
+        State("click_sync", "children"),
+        State("date_sync", "children"),
+        State("function_choice", "value"),
+        State("area_store_{}".format(i), "children")
+    )
+    @calls.log
+    def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
+                   key, sync, date_sync, function, area_store):
+        """
+        This makes the time series graph below the map.
+        Sample arguments:
+            signal = [[[2000, 2017], [1, 12], [5, 6, 7, 8]], "Viridis", "no"]
+            choice = "pdsi"
+            function = "oarea"
+            location =  ["all", "y", "x", "Contiguous United States", 0]
+        """
+        # Identify element number
+        key = int(key)
 
-    #     # Prevent update from location unless it is a state filter
-    #     trig = dash.callback_context.triggered[0]["prop_id"]
+        # Prevent update from location unless it is a state filter
+        trig = dash.callback_context.triggered[0]["prop_id"]
 
-    #     # If we aren"t syncing or changing the function or color
-    #     if trig == "location_store_{}.children".format(key):
-    #         triggered_element = location[-1]
-    #         if "On" not in sync:
-    #             if triggered_element != key:
-    #                 raise PreventUpdate
+        # If we aren"t syncing or changing the function or color
+        if trig == "location_store_{}.children".format(key):
+            triggered_element = location[-1]
+            if "On" not in sync:
+                if triggered_element != key:
+                    raise PreventUpdate
 
-    #     # Create signal for the global_store
-    #     choice_store = json.loads(choice_store)
-    #     signal = json.loads(signal)
+        # Create signal for the global_store
+        location = json.loads(location)
+        choice_store = json.loads(choice_store)
+        signal = json.loads(signal)
 
-    #     # If we are syncing times, use the key to find the right signal
-    #     if "On" in date_sync:
-    #         signal = signal[0]
-    #     else:
-    #         signal = signal[key - 1]
+        # If we are syncing times, use the key to find the right signal
+        if "On" in date_sync:
+            signal = signal[0]
+        else:
+            signal = signal[key - 1]
 
-    #     # Collect signals
-    #     [year_range, [month1, month2], month_filter] = signal[0]
-    #     [colorscale, reverse] = signal[1:]
+        # Collect signals
+        [year_range, [month1, month2], month_filter] = signal[0]
+        [colorscale, reverse] = signal[1:]
 
-    #     # DASH doesn"t seem to like passing True/False as values
-    #     verity = {"no": False, "yes": True}
-    #     reverse = verity[reverse]
+        # DASH doesn"t seem to like passing True/False as values
+        verity = {"no": False, "yes": True}
+        reverse = verity[reverse]
 
-    #     # Get/cache data
-    #     data = retrieveData(signal, function, choice, location)
-    #     choice_reverse = data.reverse
-    #     if choice_reverse:
-    #         reverse = not reverse
-    #     dates = data.dataset_interval.day.values
-    #     dates = [pd.to_datetime(str(d)).strftime("%Y-%m") for d in dates]
-    #     dmin = data.data_min
-    #     dmax = data.data_max
+        # Get/cache data
+        data = retrieveData(signal, function, choice, location)
+        choice_reverse = data.reverse
+        if choice_reverse:
+            reverse = not reverse
+        dates = data.dataset_interval.time.values
+        dates = [pd.to_datetime(str(d)).strftime("%Y-%m") for d in dates]
+        dmin = data.data_min
+        dmax = data.data_max
 
-    #     # Now, before we calculate the time series, there is some area business
-    #     area_store_key = str(signal) + "_" + choice + "_" + str(location)
-    #     area_store = json.loads(area_store)
+        # Now, before we calculate the time series, there is some area business
+        area_store_key = str(signal) + "_" + choice + "_" + str(location)
+        area_store = json.loads(area_store)
 
-    #     # If the function is oarea, we plot five overlapping timeseries
-    #     label = location[3]
-    #     nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
-    #                   "vpdmin", "vpdmean"]
-    #     if function != "oarea" or choice in nonindices:
-    #         # Get the time series from the data object
-    #         timeseries = data.getSeries(location, crdict)
+        # If the function is oarea, we plot five overlapping timeseries
+        label = location[3]
+        nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
+                      "vpdmin", "vpdmean"]
+        if function != "oarea" or choice in nonindices:
+            # Get the time series from the data object
+            timeseries = data.getSeries(location, crdict)
 
-    #         # Create data frame as string for download option
-    #         columns = OrderedDict({"month": dates,
-    #                                "value": list(timeseries),
-    #                                "function": function_names[function],  # <-- This doesn"t always make sense
-    #                                "location": location[-2],
-    #                                "index": indexnames[choice]})
-    #         df = pd.DataFrame(columns)
-    #         df_str = df.to_csv(encoding="utf-8", index=False)
-    #         href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
-    #         bar_type = "bar"
-    #         area_store = ["", ""]
+            # Create data frame as string for download option
+            columns = OrderedDict({
+                "month": dates,
+                "value": list(timeseries),
+                "function": function_names[function],  # <-- This doesn"t always make sense
+                "location": location[-2],
+                "index": INDEX_NAMES[choice]
+            })
+            df = pd.DataFrame(columns)
+            df_str = df.to_csv(encoding="utf-8", index=False)
+            href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
+            bar_type = "bar"
+            area_store = ["", ""]
 
-    #         if choice in nonindices and function == "oarea":
-    #             label = "(Drought Severity Categories Not Available)"
+            if choice in nonindices and function == "oarea":
+                label = "(Drought Severity Categories Not Available)"
 
-    #     else:
-    #         bar_type = "overlay"
-    #         label = location[3]
+        else:
+            bar_type = "overlay"
+            label = location[3]
 
-    #         # I cannot get this thing to cache! We are storing it in a Div
-    #         if area_store_key == area_store[0]:
-    #             ts_series, ts_series_ninc, dsci = area_store[1]
-    #         else:
-    #             ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+            # I cannot get this thing to cache! We are storing it in a Div
+            if area_store_key == area_store[0]:
+                ts_series, ts_series_ninc, dsci = area_store[1]
+            else:
+                ts_series, ts_series_ninc, dsci = data.getArea(crdict)
 
-    #         # This needs to be returned either way
-    #         series = [ts_series, ts_series_ninc, dsci]
-    #         area_store = [area_store_key, series, dates]
+            # This needs to be returned either way
+            series = [ts_series, ts_series_ninc, dsci]
+            area_store = [area_store_key, series, dates]
 
-    #         # Save to file for download option
-    #         columns = OrderedDict({
-    #             "month": dates,
-    #             "d0": ts_series_ninc[0],
-    #             "d1": ts_series_ninc[1],
-    #             "d2": ts_series_ninc[2],
-    #             "d3": ts_series_ninc[3],
-    #             "d4": ts_series_ninc[4],
-    #             "dsci": dsci,
-    #             "function": "Percent Area",
-    #             "location":  label,
-    #             "index": indexnames[choice]
-    #         })
-    #         df = pd.DataFrame(columns)
-    #         df_str = df.to_csv(encoding="utf-8", index=False)
-    #         href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
+            # Save to file for download option
+            columns = OrderedDict({
+                "month": dates,
+                "d0": ts_series_ninc[0],
+                "d1": ts_series_ninc[1],
+                "d2": ts_series_ninc[2],
+                "d3": ts_series_ninc[3],
+                "d4": ts_series_ninc[4],
+                "dsci": dsci,
+                "function": "Percent Area",
+                "location":  label,
+                "index": INDEX_NAMES[choice]
+            })
+            df = pd.DataFrame(columns)
+            df_str = df.to_csv(encoding="utf-8", index=False)
+            href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
 
-    #     # Set up y-axis depending on selection
-    #     if function != "oarea" or choice in nonindices:
-    #         if "p" in function:
-    #             yaxis = dict(title="Percentiles", range=[0, 100])
-    #         elif "o" in function:
-    #             yaxis = dict(range=[dmin, dmax], title=unit_map[choice])
+        # Set up y-axis depending on selection
+        if function != "oarea" or choice in nonindices:
+            if "p" in function:
+                yaxis = dict(title="Percentiles", range=[0, 100])
+            elif "o" in function:
+                yaxis = dict(range=[dmin, dmax], title=unit_map[choice])
 
-    #             # Center the color scale
-    #             xmask = data.mask
-    #             sd = data.dataset_interval.where(xmask == 1).std()
-    #             sd = float(sd.compute().value) # Sheesh
-    #             if "eddi" in choice:
-    #                 sd = sd * -1
-    #             dmin = 3 * sd
-    #             dmax = 3 * sd * -1
+                # Center the color scale
+                xmask = data.mask
+                sd = data.dataset_interval.where(xmask == 1).std()
+                sd = float(sd.compute().value) # Sheesh
+                if "eddi" in choice:
+                    sd = sd * -1
+                dmin = 3 * sd
+                dmax = 3 * sd * -1
 
-    #     # A few pieces to incorporate in to Index_Maps later
-    #     if "corr" in function:
-    #         reverse = not reverse
-    #         if "p" in function:
-    #             dmin = 0
-    #             dmax = 100
+        # A few pieces to incorporate in to Index_Maps later
+        if "corr" in function:
+            reverse = not reverse
+            if "p" in function:
+                dmin = 0
+                dmax = 100
 
-    #     # The drought area graphs have there own configuration
-    #     elif function == "oarea" and choice not in nonindices:
-    #         yaxis = dict(title="Percent Area (%)",
-    #                      range=[0, 100],
-    #                      # family="Time New Roman",
-    #                      hovermode="y")
+        # The drought area graphs have there own configuration
+        elif function == "oarea" and choice not in nonindices:
+            yaxis = dict(title="Percent Area (%)",
+                          range=[0, 100],
+                          # family="Time New Roman",
+                          hovermode="y")
 
-    #     # Build the plotly readable dictionaries (Two types)
-    #     if function != "oarea" or choice in nonindices:
-    #         data = [dict(type="bar",
-    #                      x=dates,
-    #                      y=timeseries,
-    #                      marker=dict(color=timeseries,
-    #                                  colorscale=data.color_scale,
-    #                                  reversescale=reverse,
-    #                                  autocolorscale=False,
-    #                                  cmin=dmin,
-    #                                  cmax=dmax,
-    #                                  line=dict(width=0.2,
-    #                                            color="#000000")))]
+        # Build the plotly readable dictionaries (Two types)
+        if function != "oarea" or choice in nonindices:
+            data = [dict(type="bar",
+                          x=dates,
+                          y=timeseries,
+                          marker=dict(color=timeseries,
+                                      colorscale=data.color_scale,
+                                      reversescale=reverse,
+                                      autocolorscale=False,
+                                      cmin=dmin,
+                                      cmax=dmax,
+                                      line=dict(width=0.2,
+                                                color="#000000")))]
 
-    #     else:
-    #         # The drought area data
-    #         colors = ["rgb(255, 255, 0)","rgb(252, 211, 127)",
-    #                   "rgb(255, 170, 0)", "rgb(230, 0, 0)", "rgb(115, 0, 0)"]
-    #         if year_range[0] != year_range[1]:
-    #             line_width = 1 + ((1/(year_range[1] - year_range[0])) * 25)
-    #         else:
-    #             line_width = 12
-    #         data = []
-    #         for i in range(5):
-    #             trace = dict(type="scatter",
-    #                          fill="tozeroy",
-    #                          mode="none",
-    #                          showlegend=False,
-    #                          x=dates,
-    #                          y=ts_series[i],
-    #                          hoverinfo="x",
-    #                          fillcolor=colors[i])
-    #             data.append(trace)
+        else:
+            # The drought area data
+            colors = ["rgb(255, 255, 0)","rgb(252, 211, 127)",
+                      "rgb(255, 170, 0)", "rgb(230, 0, 0)", "rgb(115, 0, 0)"]
+            if year_range[0] != year_range[1]:
+                line_width = 1 + ((1/(year_range[1] - year_range[0])) * 25)
+            else:
+                line_width = 12
+            data = []
+            for i in range(5):
+                trace = dict(type="scatter",
+                              fill="tozeroy",
+                              mode="none",
+                              showlegend=False,
+                              x=dates,
+                              y=ts_series[i],
+                              hoverinfo="x",
+                              fillcolor=colors[i])
+                data.append(trace)
 
-    #         # Toggle the DSCI
-    #         if show_dsci % 2 != 0:
-    #             data.insert(5, dict(x=dates,
-    #                                 y=dsci,
-    #                                 yaxis="y2",
-    #                                 hoverinfo="x",
-    #                                 showlegend=False,
-    #                                 line=dict(color="rgba(39, 57, 127, 0.85)",
-    #                                           width=line_width)))
+            # Toggle the DSCI
+            if show_dsci % 2 != 0:
+                data.insert(5, dict(x=dates,
+                                    y=dsci,
+                                    yaxis="y2",
+                                    hoverinfo="x",
+                                    showlegend=False,
+                                    line=dict(color="rgba(39, 57, 127, 0.85)",
+                                              width=line_width)))
 
-    #     # Copy and customize Layout
-    #     if label is None:
-    #         label = "Existing Shapefile"
-    #     layout_copy = copy.deepcopy(layout)
-    #     layout_copy["title"] = indexnames[choice] + "<Br>" + label
-    #     layout_copy["plot_bgcolor"] = "white"
-    #     layout_copy["paper_bgcolor"] = "white"
-    #     layout_copy["height"] = 300
-    #     layout_copy["yaxis"] = yaxis
-    #     layout_copy["font"] = dict(family="Time New Roman")
-    #     if function == "oarea":
-    #         if type(location[0]) is int:
-    #             layout_copy["title"] = (indexnames[choice] +
-    #                                     "<Br>" + "Contiguous US " +
-    #                                     "(point estimates not available)")
-    #         layout_copy["xaxis"] = dict(type="date",
-    #                                     font=dict(family="Times New Roman"))
-    #         layout_copy["yaxis2"] = dict(title="<br>DSCI",
-    #                                      range=[0, 500],
-    #                                      anchor="x",
-    #                                      overlaying="y",
-    #                                      side="right",
-    #                                      position=0.15)
-    #         layout_copy["margin"] = dict(l=55, r=55, b=25, t=90, pad=10)
-    #     layout_copy["hovermode"] = "x"
-    #     layout_copy["barmode"] = bar_type
-    #     layout_copy["legend"] = dict(orientation="h",
-    #                                  y=-.5,
-    #                                  markers=dict(size=10),
-    #                                  font=dict(size=10))
-    #     layout_copy["titlefont"]["color"] = "#636363"
-    #     layout_copy["font"]["color"] = "#636363"
+        # Copy and customize Layout
+        if label is None:
+            label = "Existing Shapefile"
+        layout_copy = copy.deepcopy(MAPBOX_LAYOUT)
+        layout_copy["title"] = INDEX_NAMES[choice] + "<Br>" + label
+        layout_copy["plot_bgcolor"] = "white"
+        layout_copy["paper_bgcolor"] = "white"
+        layout_copy["margin"]["b"] = 20
+        layout_copy["height"] = 300
+        layout_copy["yaxis"] = yaxis
+        layout_copy["font"] = dict(family="Time New Roman")
+        if function == "oarea":
+            if type(location[0]) is int:
+                layout_copy["title"] = (INDEX_NAMES[choice] +
+                                        "<Br>" + "Contiguous US " +
+                                        "(point estimates not available)")
+            layout_copy["xaxis"] = dict(type="date",
+                                        font=dict(family="Times New Roman"))
+            layout_copy["yaxis2"] = dict(title="<br>DSCI",
+                                          range=[0, 500],
+                                          anchor="x",
+                                          overlaying="y",
+                                          side="right",
+                                          position=0.15)
+            layout_copy["margin"] = dict(l=55, r=55, b=25, t=90, pad=10)
+        layout_copy["hovermode"] = "x"
+        layout_copy["barmode"] = bar_type
+        layout_copy["legend"] = dict(orientation="h",
+                                      y=-.5,
+                                      markers=dict(size=10),
+                                      font=dict(size=10))
+        layout_copy["titlefont"]["color"] = "#636363"
+        layout_copy["font"]["color"] = "#636363"
 
-    #     figure = dict(data=data, layout=layout_copy)
+        figure = dict(data=data, layout=layout_copy)
 
-    #     return figure, href, json.dumps(area_store)
+        return figure, href, json.dumps(area_store)
 
     @app.callback(
         Output("download_all_link_{}".format(i), "href"),
@@ -1395,6 +1439,41 @@ for i in range(1, 3):
                                        key)
         return "/download?value=" + path
 
+
+    @app.callback(
+        Output(f"color_slider_{i}", "min"),
+        Output(f"color_slider_{i}", "max"),
+        Output(f"color_slider_{i}", "marks"),
+        Input(f"choice_{i}", "value"),
+        Input("signal", "children"),
+        State(f"location_store_{i}", "children"),
+        State(f"key_{i}", "children"),
+        State("function_choice", "value"),
+        State("date_sync", "children")
+    )
+    def update_color_slider(choice, signal, location, key, function,
+                            date_sync):
+        """Update color slider with chosen index value ranges."""
+        signal = json.loads(signal)
+        if isinstance(location, str):
+            location = json.loads(location)
+        if "On" in date_sync:
+            signal = signal[0]
+        else:
+            signal = signal[key - 1]
+        data = retrieveData(signal, function, choice, location)
+        dmin = data.data_min
+        dmax = data.data_max
+        mmin = str(round(dmin, 2))
+        mmax = str(round(dmax, 2))
+        marks = {
+            dmin: mmin,
+            dmax: mmax
+        }
+    
+        return dmin, dmax, marks
+
+
 def make_csv(arg):
     signal, function, index, location, choice = arg
     data = retrieveData(signal, function, index, location)
@@ -1419,7 +1498,7 @@ def make_csv(arg):
                                 "value": list(timeseries),
                                 "function": function_names[function],  # <-- This doesn"t always make sense
                                 "location": location[-2],
-                                "index": indexnames[index]})
+                                "index": INDEX_NAMES[index]})
         df = pd.DataFrame(columns)
 
     else:
@@ -1436,7 +1515,7 @@ def make_csv(arg):
                                 "dsci": dsci,
                                 "function": "Percent Area",
                                 "location":  label,
-                                "index": indexnames[index]})
+                                "index": INDEX_NAMES[index]})
         df = pd.DataFrame(columns)
     return df
 
@@ -1451,7 +1530,7 @@ def make_csvs(path):
     # Get data
     dfs = []
     args = []
-    for index in tqdm(list(indexnames.keys())):
+    for index in tqdm(list(INDEX_NAMES.keys())):
         arg = [signal, function, index, location, choice]
         args.append(arg)
         df = make_csv(arg)

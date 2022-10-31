@@ -1,6 +1,10 @@
 """Drip main page options."""
+import datetime as dt
+import dateutil.parser
 import pandas as pd
 import xarray as xr
+
+from netCDF4 import Dataset
 
 from drip.app.options.colors import COLORS
 from drip.app.options.indices import INDEX_NAMES, INDEX_OPTIONS
@@ -89,9 +93,10 @@ class Options(Paths):
     @property
     def dates(cls):
         """Return minimum and maxmium dates in sample dataset."""
-        with xr.open_dataset(cls.sample_path) as data:
-            min_date = data.time.data[0]
-            max_date = data.time.data[-1]
+        base = dateutil.parser.parse("19000101")
+        with Dataset(cls.sample_path) as data:
+            min_date = base + dt.timedelta(days=data["time"][:].min())
+            max_date = base + dt.timedelta(days=data["time"][:].max())
         dates = {}
         dates["max_year"] = pd.Timestamp(max_date).year
         dates["min_year"] = pd.Timestamp(min_date).year + 1  # for 12 month indices

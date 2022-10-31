@@ -5,14 +5,12 @@ Methods to help download and format drought indices from source.
 date: Sun Mar 27th, 2022
 author: Travis Williams
 """
-import datetime as dt
-import dateutil.parser
-import json
 import os
-import shutil
+import pathlib
 import socket
 import time
 import urllib
+
 
 from ftplib import FTP
 from multiprocessing.pool import ThreadPool
@@ -21,6 +19,8 @@ from socket import timeout
 from statistics import mode
 from urllib.error import HTTPError, URLError
 
+import datetime as dt
+import dateutil.parser
 import netCDF4
 import numpy as np
 import pandas as pd
@@ -43,6 +43,7 @@ socket.setdefaulttimeout(20)
 
 POSSIBLE_LATS = ["latitude", "lat", "lati", "y"]
 POSSIBLE_LONS = ["longitude", "lon", "long", "longi", "x"]
+TEMPLATE = drip.Paths.paths["rasters"].joinpath("grid_0_25.tif")
 
 
 def isint(x):
@@ -73,9 +74,9 @@ class Downloader(drip.Paths):
             source and local destination, respectively.
         """
         # We have a set of different methods here
-        logger.info("Downloading %d files...", len(self.download_paths))
+        logger.info("Downloading %d files...", len(download_paths))
         with ThreadPool(os.cpu_count() - 1) as pool:
-            for _ in pool.imap(self.download, self.download_paths):
+            for _ in pool.imap(self.download, download_paths):
                 pass
 
     def download(self, entry):
@@ -161,7 +162,7 @@ class NetCDF(Adjustments):
         index : str
             DrIP key for target index. Available keys can be found in
         directory : str | pathlib.PosixPath
-            Path to directory in which to write files. Defaults to 
+            Path to directory in which to write files. Defaults to
             ~/.drip/datasets
             drip.app.options.indices.INDEX_NAMES.
         percentile : boolean
@@ -221,8 +222,8 @@ class NetCDF(Adjustments):
         # Use the index positions of the original to track the data positions
         idxs = []
         for st in sorted_time:
-          idx = int(np.where(time == st)[0])
-          idxs.append(idx)
+            idx = int(np.where(time == st)[0])
+            idxs.append(idx)
 
         # Sort data array (way to do this out of memory?)
         sorted_array = np.rollaxis(arrays, 0)[idxs]
@@ -285,7 +286,7 @@ class NetCDF(Adjustments):
             f"Monthly gridded data at {xres} decimal degrees (15 "
             "arc-minute resolution, calibrated to 1895-2010 for the "
             "continental United States."
-        ),
+        )
         nco.original_author = "John Abatzoglou - University of Idaho"
         nco.adjusted_by = "Travis Williams - University of Colorado"
         nco.date = pd.to_datetime(str(self.today)).strftime("%Y-%m-%d")
@@ -365,15 +366,13 @@ class NetCDF(Adjustments):
 
     def _get_geometry(self, data):
         """Get spatial geometric information from netcdf object or file.
-        
+
         Parameters
         ---------
         data : str | posix.PosixPath | netCDF4._netCDF4.MFDataset | netCDF4._netCDF4.Dataset
         """
-        import pathlib
-
         # Open data set if path
-        if isinstance(data, pathlib.PosixPath) or isinstance(data, str):
+        if isinstance(data, (pathlib.PosixPath, str)):
             data = netCDF4.Dataset(data)
 
         # There are many coordinate names that could be used
@@ -417,8 +416,8 @@ class NetCDF(Adjustments):
             # Log it here
             raise KeyError("Could not find latitude dimension. Add latitude "
                            "key to POSSIBLE_LATS.")
-        return dims[0]     
-        
+        return dims[0]
+
     def _guess_lon(self, data):
         """Guess longitude dimension in netCDF4 dataset."""
         dims = [d for d in data.dimensions.keys() if d in POSSIBLE_LONS]
@@ -426,7 +425,7 @@ class NetCDF(Adjustments):
             # Log it here
             raise KeyError("Could not find longitude dimension. Add longitude "
                            "key to POSSIBLE_LONS.")
-        return dims[0]     
+        return dims[0]
 
     def _get_percentiles(self, array):
         """Return an array of time-ranked percentiles in parallel.
@@ -495,23 +494,25 @@ class NetCDF(Adjustments):
         # Read in tiff array,
         # Reset (or better use before setting) geometry using tiff array
         # Continue along
-        from osgeo import gdal
 
         # Get geographic information
         na = -9999 # Infer from datatype
 
         # Resample
         if xres and yres:
+            template = rio.open(TEMPLATE)
             warped = gdal.Warp(
                 srcDSOrSrcDSTab=str(src),
                 destNameOrDestDS=str(dst),
                 dstNodata=float(na),
+                outputBounds=list(template.bounds),
                 dstSRS=dst_srs,
                 format="GTiff",
                 targetAlignedPixels=True,  # test this
                 xRes=xres,
                 yRes=yres
             )
+            del warped
 
         # Reproject
         else:
@@ -522,6 +523,7 @@ class NetCDF(Adjustments):
                 dstNodata=float(na),
                 format="GTiff"
             )
+            del warped
 
 
 class EDDI(NetCDF):
@@ -533,7 +535,7 @@ class EDDI(NetCDF):
         self.period = int(index.replace("eddi", ""))
         self.target_dir = self.home.joinpath("originals")
         self.target_dir.mkdir(exist_ok=True, parents=True)
-        self.con_args = [
+        self.eddi_ftp_args = [
             "ftp.cdc.noaa.gov",
             "anonymous",
             "anonymous@cdc.noaa.gov"
@@ -543,9 +545,9 @@ class EDDI(NetCDF):
         """Download an EDDI dataset."""
         logger.info(f"Downloading datasets for {self.index}...")
         paths = self.eddi_paths
-        with FTP(*self.con_args) as ftp:
+        with FTP(*self.eddi_ftp_args) as ftp:
             for path in paths:
-                self._get(ftp, path, write=True)
+                self._get(ftp, path)
 
     def format_eddi(self, time_tag="NETCDF_DIM_day"):
         """Reformat EDDI asc files to geotiff for use in DataBuilder."""
@@ -592,7 +594,7 @@ class EDDI(NetCDF):
         """Get the last day of the month."""
         pattern = f"{self.period:02d}mn_"
         paths = []
-        with FTP(*self.con_args) as ftp:
+        with FTP(*self.eddi_ftp_args) as ftp:
             ftp.cwd("/Projects/EDDI/CONUS_archive/data/")
             years = [item for item in ftp.nlst() if isint(item)]
             for year in years:
@@ -607,12 +609,12 @@ class EDDI(NetCDF):
 
         return paths
 
-    def _adjust_eddi(self):
+    def _adjust_eddi(self, resolution=0.25):
         """Resample all downloaded monthly files to target resolution."""
         # Collect all needed arguments
         resample_list = []
         reproject_list = []
-        resolution = self.resolution
+        resolution = resolution
         monthlies = list(self.home.joinpath("originals").glob("*tif"))
         monthlies.sort()
         for src in monthlies:
@@ -635,45 +637,31 @@ class EDDI(NetCDF):
             for _ in pool.starmap(self._warp, reproject_list):
                 pass
 
-    def _get(self, ftp, path, write=False):
-        """Download path from an FTP server. Add error logging.""" 
-        if not write:
-            memory_file = []
-            def appendline(line):
-                memory_file.append(line)
+    def _get(self, ftp, path):
+        """Download path from an FTP server. Add error logging."""
+        dst = self.target_dir.joinpath(path.name)
+        def writeline(line):
+            file.write(line + "\n")
+        with open(dst, "w") as file:
             try:
-                ftp.retrlines(f"RETR {path}", appendline)
+                ftp.retrlines(f"RETR {path}", writeline)
             except:
-                ftp.retrlines(f"RETR {path}", appendline)
-
-            return memory_file
-
-        else:
-            dst = self.target_dir.joinpath(path.name)
-            def writeline(line):
-                file.write(line + "\n")
-
-            with open(dst, "w") as file:
-                try:
-                    ftp.retrlines(f"RETR {path}", writeline)
-                except:
-                    ftp.retrlines(f"RETR {path}", writeline)
+                ftp.retrlines(f"RETR {path}", writeline)
 
 
-class PRISM(EDDI):
+class PRISM(NetCDF):
     """Methods fordownloading and formatting PRISM datasets."""
 
     def __init__(self, index):
         """Initialize PRISM Object."""
         super().__init__(index)
-        self.con_args = [
+        self.prism_ftp_args = [
             "prism.nacse.org",
             "anonymous"
         ]
 
-    
 
-class Data_Builder(PRISM):
+class Data_Builder(NetCDF):
     """Methods for downloading and formatting data from various sources."""
 
     def __init__(self, index, resolution=0.25, template=None):
@@ -711,8 +699,9 @@ class Data_Builder(PRISM):
 
             # Different download methods for different data sources
             if self.index.startswith("eddi"):
-                self.download_eddi()
-                self.format_eddi()
+                eddi = EDDI(self.index)
+                eddi.download_eddi()
+                eddi.format_eddi()
             else:
                 self.download_all(self.download_paths)
                 self._adjust_wwdt()
@@ -727,25 +716,9 @@ class Data_Builder(PRISM):
     @property
     def download_paths(self):
         """Return appropriate remote and local paths for downloading."""
-        if self.host == "ftp://ftp2.psl.noaa.gov/Projects/EDDI/CONUS_archive":
-            return self.paths_eddi
         if self.host == "https://wrcc.dri.edu/wwdt/data/PRISM":
             return self.paths_wwdt
 
-    @property
-    def paths_eddi(self):
-        """Return list of remote urls and local destination paths."""
-        paths = []
-        host = self.host
-        index = self.index
-        for i in range(1, 13):
-            url = os.path.join(host, f"{index}/{index}_{i}_PRISM.nc")
-            fname = f"{self.index}_{i:02d}_temp.nc"
-            dst = self.home.joinpath(f"originals/{fname}")
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            entry = {"remote": url, "local": dst}
-            paths.append(entry)
-
 
     @property
     def paths_wwdt(self):
@@ -760,21 +733,6 @@ class Data_Builder(PRISM):
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             entry = {"remote": url, "local": dst}
             paths.append(entry)
-
-    @property
-    def paths_wwdt(self):
-        """Return list of remote urls and local destination paths."""
-        paths = []
-        host = self.host
-        index = self.index
-        for i in range(1, 13):
-            url = os.path.join(host, f"{index}/{index}_{i}_PRISM.nc")
-            fname = f"{self.index}_{i:02d}_temp.nc"
-            dst = self.home.joinpath(f"originals/{fname}")
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            entry = {"remote": url, "local": dst}
-            paths.append(entry)
-
         return paths
 
     def _adjust_wwdt(self):
@@ -835,7 +793,7 @@ class Data_Builder(PRISM):
 
 
 
-if __name__ == "__main__":
-    index = "eddi1"
-    self = Data_Builder(index)
+# if __name__ == "__main__":
+#     index = "pdsi"
+    # self = Data_Builder(index)
     # self.build()
