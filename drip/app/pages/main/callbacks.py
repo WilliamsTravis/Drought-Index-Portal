@@ -9,7 +9,6 @@ import tempfile
 import urllib
 
 import dash
-import dash_table
 import datetime as dt
 import fiona
 import geopandas as gpd
@@ -18,7 +17,7 @@ import pandas as pd
 import xarray as xr
 
 from collections import OrderedDict
-from dash import Input, Output, State, html
+from dash import dash_table, html, Input, Output, State
 from dash.exceptions import PreventUpdate
 from osgeo import gdal, osr
 from tqdm import tqdm
@@ -104,16 +103,16 @@ def adjustDatePrint1(year_range, month_a,  month_b, month_check, sync):
     # Don"t print months included if all are included
     if not month_check[0]:
         month_check = month_check[1:]
-    
+
     if len(month_check) == 12 or len(month_check) == 0:
         month_incl_print = ""
     else:
         month_check.sort()
         if months[0]:
             month_incl_print = "".join(
-                [Options.date_marks["months"][a][0].upper() for a in month_check]
+                [Options.date_marks["months"][i - 1]["label"].upper() for i in month_check]
             )
-            month_incl_print = " (" + month_incl_print + ")"
+            month_incl_print = f" ({month_incl_print})"
         else:
             month_incl_print = ""
 
@@ -176,7 +175,8 @@ def adjustDatePrint2(year_range, month_a,  month_b, month_check, sync):
         month_check.sort()
         if months[0]:
             month_incl_print = "".join(
-                [Options.date_marks["months"][a][0].upper() for a in month_check])
+                [Options.date_marks["months"][i - 1]["label"].upper() for i in month_check]
+            )
             month_incl_print = " (" + month_incl_print + ")"
         else:
             month_incl_print = ""
@@ -285,6 +285,7 @@ def retrieveData(signal, function, choice, location):
 
     # Set mask (also sets coordinate dictionary)
     data.setMask(location, crdict)
+
     return data
 
 
@@ -535,6 +536,9 @@ def toggleDateSyncButton(click, old_style):
     return style, children
 
 
+
+
+
 # For multiple instances
 for i in range(1, 3):
     @app.callback(
@@ -578,6 +582,7 @@ for i in range(1, 3):
             # Find which input triggered this callback
             context = dash.callback_context
             triggered_value = context.triggered[0]["value"]
+            print(f"triggered_value={triggered_value}")
             trigger = context.triggered[0]["prop_id"]
 
             # Figure out which element we are working with
@@ -931,7 +936,8 @@ for i in range(1, 3):
         Input("map_type", "value"),
         Input("signal", "children"),
         Input("point_size_{}".format(i), "value"),
-        Input(f"color_slider_{i}", "value"),
+        Input(f"color_min_{i}", "value"),
+        Input(f"color_max_{i}", "value"),
         Input("location_store_{}".format(i), "children"),
         State("function_choice", "value"),
         State("key_{}".format(i), "children"),
@@ -942,9 +948,9 @@ for i in range(1, 3):
         State("map_{}".format(i), "relayoutData")
     )
     @calls.log
-    def makeMap(choice1, choice2, map_type, signal, point_size, color_slider,
-                location, function, key, sync, date_sync, date_print_1,
-                date_print_2, map_extent):
+    def makeMap(choice1, choice2, map_type, signal, point_size, color_min,
+                color_max, location, function, key, sync, date_sync,
+                date_print_1, date_print_2, map_extent):
         """Build plotly scatter mapbox figure."""
         # Catch Trigger
         trigger = dash.callback_context.triggered[0]["prop_id"]
@@ -1005,12 +1011,15 @@ for i in range(1, 3):
         array = data.getFunction(function).compute() #* data.mask.data
 
         # Individual array min/max
-        if color_slider:
-            amin = color_slider[0]
-            amax = color_slider[1]
-        else:
-            amax = np.nanmax(array)
-            amin = np.nanmin(array)
+        amin = np.nanmin(array)
+        amax = np.nanmax(array)
+        if color_min and not color_max:
+            amin = color_min        
+        if color_max and not color_min:
+            amax = color_max
+        if color_max and color_min:
+            amax = color_max
+            amin = color_min
 
         # Now, we want to use the same value range for colors for both maps
         nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
@@ -1096,52 +1105,60 @@ for i in range(1, 3):
         df = df_flat[np.isfinite(df_flat["data"])]
 
         # Create the scattermapbox object
-        d1 = dict(type="scattermapbox",
-                  lon=df["lonbin"],
-                  lat=df["latbin"],
-                  text=df["printdata"],
-                  mode="markers",
-                  hoverinfo="text",
-                  hovermode="closest",
-                  showlegend=False,
-                  marker=dict(
-                      colorscale=data.color_scale,
-                      reversescale=reverse,
-                      color=df["data"],
-                      cmax=amax,
-                      cmin=amin,
-                      opacity=1.0,
-                      size=point_size,
-                      colorbar=dict(
-                          y=-.15,
-                          textposition="bottom",
-                          orientation="h",
-                          font=dict(size=15, fontweight="bold")
+        d1 = dict(
+            type="scattermapbox",
+            lon=df["lonbin"],
+            lat=df["latbin"],
+            text=df["printdata"],
+            mode="markers",
+            hoverinfo="text",
+            hovermode="closest",
+            showlegend=False,
+            marker=dict(
+                colorscale=data.color_scale,
+                reversescale=reverse,
+                color=df["data"],
+                cmax=amax,
+                cmin=amin,
+                opacity=1.0,
+                size=point_size,
+                colorbar=dict(
+                    y=-.15,
+                    textposition="bottom",
+                    orientation="h",
+                    font=dict(
+                        size=15,
+                        fontweight="bold"
                     )
                 )
             )
+        )
 
         # Add an outline to help see when zoomed in
-        d2 = dict(type="scattermapbox",
-                  lon=df["lonbin"],
-                  lat=df["latbin"],
-                  mode="markers",
-                  hovermode="closest",
-                  showlegend=False,
-                  marker=dict(color="#000000",
-                              size=point_size * 1.05))
+        d2 = dict(
+            type="scattermapbox",
+            lon=df["lonbin"],
+            lat=df["latbin"],
+            mode="markers",
+            hovermode="closest",
+            showlegend=False,
+            marker=dict(
+                color="#000000",
+                size=point_size * 1.05
+            )
+        )
 
         # package these in a list
         data = [d2, d1]
 
         # Set up layout
         layout_copy = copy.deepcopy(MAPBOX_LAYOUT)
+        layout_copy["mapbox"]["style"] = map_type
         layout_copy["mapbox"]["center"] = map_extent["mapbox.center"]
         layout_copy["mapbox"]["zoom"] = map_extent["mapbox.zoom"]
         layout_copy["mapbox"]["bearing"] = map_extent["mapbox.bearing"]
         layout_copy["mapbox"]["pitch"] = map_extent["mapbox.pitch"]
-        # layout_copy["coloraxis_colorbar_y"] = -1
-        # layout_copy["coloraxis_colorbar_x"] = 0
+        layout_copy["hoverlabel"] = dict(font=dict(size=20))
         layout_copy["titlefont"]=dict(
             color="#CCCCCC",
             size=title_size,
@@ -1155,31 +1172,36 @@ for i in range(1, 3):
         gc.collect()
 
         # Check on Memory
-        print("\nCPU: {}% \nMemory: {}%\n".format(psutil.cpu_percent(),
-                                        psutil.virtual_memory().percent))
+        print("\nCPU: {}% \nMemory: {}%\n".format(
+            psutil.cpu_percent(),
+            psutil.virtual_memory().percent)
+        )
 
         return figure
 
 
     @app.callback(
-        Output("series_{}".format(i), "figure"),
-        Output("download_link_{}".format(i), "href"),
-        Output("area_store_{}".format(i), "children"),
+        Output(f"series_{i}", "figure"),
+        Output(f"download_link_{i}", "href"),
+        Output(f"area_store_{i}", "children"),
         Input("submit", "n_clicks"),
         Input("signal", "children"),
-        Input("choice_{}".format(i), "value"),
+        Input(f"choice_{i}", "value"),
         Input("choice_store", "children"),
-        Input("location_store_{}".format(i), "children"),
-        Input("dsci_button_{}".format(i), "n_clicks"),
-        State("key_{}".format(i), "children"),
+        Input(f"location_store_{i}", "children"),
+        Input(f"dsci_button_{i}", "n_clicks"),
+        Input(f"color_min_{i}", "value"),
+        Input(f"color_max_{i}", "value"),
+        State(f"key_{i}", "children"),
         State("click_sync", "children"),
         State("date_sync", "children"),
         State("function_choice", "value"),
-        State("area_store_{}".format(i), "children")
+        State(f"area_store_{i}", "children")
     )
     @calls.log
     def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
-                   key, sync, date_sync, function, area_store):
+                   color_min, color_max, key, sync, date_sync, function,
+                   area_store):
         """
         This makes the time series graph below the map.
         Sample arguments:
@@ -1190,19 +1212,20 @@ for i in range(1, 3):
         """
         # Identify element number
         key = int(key)
+        print(key)
 
         # Prevent update from location unless it is a state filter
-        trig = dash.callback_context.triggered[0]["prop_id"]
+        trigger = dash.callback_context.triggered[0]["prop_id"]
+        location = json.loads(location)
 
         # If we aren"t syncing or changing the function or color
-        if trig == "location_store_{}.children".format(key):
+        if trigger == "location_store_{}.children".format(key):
             triggered_element = location[-1]
             if "On" not in sync:
                 if triggered_element != key:
                     raise PreventUpdate
 
         # Create signal for the global_store
-        location = json.loads(location)
         choice_store = json.loads(choice_store)
         signal = json.loads(signal)
 
@@ -1313,26 +1336,44 @@ for i in range(1, 3):
                 dmin = 0
                 dmax = 100
 
+        # Individual array min/max
+        if color_min and not color_max:
+            dmin = color_min        
+        if color_max and not color_min:
+            dmax = color_max
+        if color_max and color_min:
+            dmax = color_max
+            dmin = color_min
+
         # The drought area graphs have there own configuration
         elif function == "oarea" and choice not in nonindices:
-            yaxis = dict(title="Percent Area (%)",
-                          range=[0, 100],
-                          # family="Time New Roman",
-                          hovermode="y")
+            yaxis = dict(
+                title="Percent Area (%)",
+                range=[0, 100],
+                hovermode="y"
+            )
 
         # Build the plotly readable dictionaries (Two types)
         if function != "oarea" or choice in nonindices:
-            data = [dict(type="bar",
-                          x=dates,
-                          y=timeseries,
-                          marker=dict(color=timeseries,
-                                      colorscale=data.color_scale,
-                                      reversescale=reverse,
-                                      autocolorscale=False,
-                                      cmin=dmin,
-                                      cmax=dmax,
-                                      line=dict(width=0.2,
-                                                color="#000000")))]
+            data = [
+                dict(
+                    type="bar",
+                    x=dates,
+                    y=timeseries,
+                    marker=dict(
+                        color=timeseries,
+                        colorscale=data.color_scale,
+                        reversescale=reverse,
+                        autocolorscale=False,
+                        cmin=dmin,
+                        cmax=dmax,
+                        line=dict(
+                            width=0.2,
+                            color="#000000"
+                        )
+                    )
+                )
+            ]
 
         else:
             # The drought area data
@@ -1371,30 +1412,37 @@ for i in range(1, 3):
         layout_copy["title"] = INDEX_NAMES[choice] + "<Br>" + label
         layout_copy["plot_bgcolor"] = "white"
         layout_copy["paper_bgcolor"] = "white"
-        layout_copy["margin"]["b"] = 20
+        layout_copy["margin"]["b"] = 40
         layout_copy["height"] = 300
         layout_copy["yaxis"] = yaxis
         layout_copy["font"] = dict(family="Time New Roman")
+        layout_copy["hoverlabel"] = dict(font=dict(size=24))
         if function == "oarea":
             if type(location[0]) is int:
                 layout_copy["title"] = (INDEX_NAMES[choice] +
                                         "<Br>" + "Contiguous US " +
                                         "(point estimates not available)")
-            layout_copy["xaxis"] = dict(type="date",
-                                        font=dict(family="Times New Roman"))
-            layout_copy["yaxis2"] = dict(title="<br>DSCI",
-                                          range=[0, 500],
-                                          anchor="x",
-                                          overlaying="y",
-                                          side="right",
-                                          position=0.15)
+            layout_copy["xaxis"] = dict(
+                type="date",
+                font=dict(family="Times New Roman")
+            )
+            layout_copy["yaxis2"] = dict(
+                title="<br>DSCI",
+                range=[0, 500],
+                anchor="x",
+                overlaying="y",
+                side="right",
+                position=0.15
+            )
             layout_copy["margin"] = dict(l=55, r=55, b=25, t=90, pad=10)
         layout_copy["hovermode"] = "x"
         layout_copy["barmode"] = bar_type
-        layout_copy["legend"] = dict(orientation="h",
-                                      y=-.5,
-                                      markers=dict(size=10),
-                                      font=dict(size=10))
+        layout_copy["legend"] = dict(
+            orientation="h",
+            y=-.5,
+            markers=dict(size=10),
+            font=dict(size=10)
+        )
         layout_copy["titlefont"]["color"] = "#636363"
         layout_copy["font"]["color"] = "#636363"
 
@@ -1440,38 +1488,38 @@ for i in range(1, 3):
         return "/download?value=" + path
 
 
-    @app.callback(
-        Output(f"color_slider_{i}", "min"),
-        Output(f"color_slider_{i}", "max"),
-        Output(f"color_slider_{i}", "marks"),
-        Input(f"choice_{i}", "value"),
-        Input("signal", "children"),
-        State(f"location_store_{i}", "children"),
-        State(f"key_{i}", "children"),
-        State("function_choice", "value"),
-        State("date_sync", "children")
-    )
-    def update_color_slider(choice, signal, location, key, function,
-                            date_sync):
-        """Update color slider with chosen index value ranges."""
-        signal = json.loads(signal)
-        if isinstance(location, str):
-            location = json.loads(location)
-        if "On" in date_sync:
-            signal = signal[0]
-        else:
-            signal = signal[key - 1]
-        data = retrieveData(signal, function, choice, location)
-        dmin = data.data_min
-        dmax = data.data_max
-        mmin = str(round(dmin, 2))
-        mmax = str(round(dmax, 2))
-        marks = {
-            dmin: mmin,
-            dmax: mmax
-        }
+    # @app.callback(
+    #     Output(f"color_slider_{i}", "min"),
+    #     Output(f"color_slider_{i}", "max"),
+    #     Output(f"color_slider_{i}", "marks"),
+    #     Input(f"choice_{i}", "value"),
+    #     Input("signal", "children"),
+    #     State(f"location_store_{i}", "children"),
+    #     State(f"key_{i}", "children"),
+    #     State("function_choice", "value"),
+    #     State("date_sync", "children")
+    # )
+    # def update_color_slider(choice, signal, location, key, function,
+    #                         date_sync):
+    #     """Update color slider with chosen index value ranges."""
+    #     signal = json.loads(signal)
+    #     if isinstance(location, str):
+    #         location = json.loads(location)
+    #     if "On" in date_sync:
+    #         signal = signal[0]
+    #     else:
+    #         signal = signal[key - 1]
+    #     data = retrieveData(signal, function, choice, location)
+    #     dmin = data.data_min
+    #     dmax = data.data_max
+    #     mmin = str(round(dmin, 2))
+    #     mmax = str(round(dmax, 2))
+    #     marks = {
+    #         dmin: mmin,
+    #         dmax: mmax
+    #     }
     
-        return dmin, dmax, marks
+    #     return dmin, dmax, marks
 
 
 def make_csv(arg):

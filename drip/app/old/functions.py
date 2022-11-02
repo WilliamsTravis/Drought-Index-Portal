@@ -1748,7 +1748,8 @@ class Index_Maps(Paths):
                              [0.75, "rgb(62, 165, 157)"],
                              [0.85, "rgb(52,150,142)"],
                              [0.90, "rgb(1,102,94)"],
-                             [1.00, "rgb(0, 73, 68)"]]}
+                             [1.00, "rgb(0, 73, 68)"]]
+        }
 
         # Default color schemes
         defaults = {"percentile": options["RdWhBu"],

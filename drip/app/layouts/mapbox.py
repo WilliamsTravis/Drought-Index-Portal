@@ -6,9 +6,9 @@ TOKEN = (
 DEFAULT_MAP_EXTENT = {
     "mapbox.center": {
         "lon": -92,
-        "lat": 40
+        "lat": 38
     },
-    "mapbox.zoom": 2.2,
+    "mapbox.zoom": 3.2,
     "mapbox.bearing": 0,
     "mapbox.pitch": 0
 }

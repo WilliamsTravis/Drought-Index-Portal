@@ -21,136 +21,157 @@ def divMaker(id_num, index="noaa"):
                            "rgba(0, 0, 0, 0.19)")
         },
         children=[
-        html.Div([
-
-            # Tabs and dropdowns
-            html.Div([
-                dcc.Tabs(id="choice_tab_{}".format(id_num),
-                         value="index",
-                         style=STYLES["tab"],
-                         children=dcc.Tab(value="index",
-                                          label="Drought Index/Indicator",
-                                          style=STYLES["tab"],
-                                          selected_style=STYLES["tab"])),
-                dcc.Dropdown(id="choice_{}".format(id_num),
-                             options=Options.index_options,
-                             value=index,
-                             clearable=False)],
-                     style={"width": "25%", "float": "left"},
-                     title="Select a drought index for this element"),
-            html.Div([
-                dcc.Tabs(id="location_tab_{}".format(id_num),
-                         value="county",
-                         style=STYLES["tab"],
-                         children=[
-                    dcc.Tab(value="county",
-                            label="County",
-                            style=STYLES["tab"],
-                            selected_style=STYLES["tab"]
+            html.Div(
+                className="row",
+                children=[
+                    # Tabs and dropdowns
+                    html.Div(
+                        style={"width": "25%", "float": "left"},
+                        title="Select a drought index for this element",
+                        children=[
+                            dcc.Tabs(
+                                id="choice_tab_{}".format(id_num),
+                                value="index",
+                                style=STYLES["tab"],
+                                children=dcc.Tab(
+                                    value="index",
+                                    label="Drought Index/Indicator",
+                                    style=STYLES["tab"],
+                                    selected_style=STYLES["tab"]
+                                )
                             ),
-                    dcc.Tab(value="state",
-                            label="State/States",
-                            style=STYLES["tab"],
-                            selected_style=STYLES["tab"]),
-                    dcc.Tab(value="shape",
-                            label="Shapefile",
-                            style=STYLES["tab"],
-                            selected_style=STYLES["tab"])
-                ]),
-                html.Div(id="location_div_{}".format(id_num),
-                         children=[
-                    html.Div(
-                        id="county_div_{}".format(id_num),
-                        children=[
                             dcc.Dropdown(
-                                id="county_{}".format(id_num),
-                                clearable=False,
-                                options=Options.counties,
-                                multi=False,
-                                value=24098)]),
+                                id="choice_{}".format(id_num),
+                                options=Options.index_options,
+                                value=index,
+                                clearable=False
+                            )
+                        ],
+                    ),
                     html.Div(
-                        id="state_div_{}".format(id_num),
+                        style={
+                            "height": "34px",
+                            "width": "60%",
+                            "float": "left"
+                        },
                         children=[
-                            dcc.Dropdown(
-                                id="state_{}".format(id_num),
-                                options=Options.states,
-                                clearable=False,
-                                multi=True,
-                                placeholder=("Contiguous United States"),
-                                value=None)],
-                        style={"display": "none"}),
-                    html.Div(
-                        id="shape_div_{}".format(id_num),
-                        title=(
-                            "To use a shapefile as an area filter, upload " 
-                            "one as either a zipfile or a grouped selection "
-                            "that includes the .shp, .shx, .sbn, .sbx, "
-                            ".proj, and .sbx files. Make sure the file is "
-                            "unprojected for now."
-                        ),
-                        children=[
-                            dcc.Upload(
-                                id="shape_{}".format(id_num),
+                            dcc.Tabs(id="location_tab_{}".format(id_num),
+                                     value="county",
+                                     style=STYLES["tab"],
+                                     children=[
+                                dcc.Tab(value="county",
+                                        label="County",
+                                        style=STYLES["tab"],
+                                        selected_style=STYLES["tab"]
+                                        ),
+                                dcc.Tab(value="state",
+                                        label="State/States",
+                                        style=STYLES["tab"],
+                                        selected_style=STYLES["tab"]),
+                                dcc.Tab(value="shape",
+                                        label="Shapefile",
+                                        style=STYLES["tab"],
+                                        selected_style=STYLES["tab"])
+                            ]),
+                            html.Div(
+                                id="location_div_{}".format(id_num),
                                 children=[
-                                    "Drag and drop or ",
-                                    html.A("select files")
-                                ],
-                                multiple=True,
+                                    html.Div(
+                                        id="county_div_{}".format(id_num),
+                                        children=[
+                                            dcc.Dropdown(
+                                                id="county_{}".format(id_num),
+                                                clearable=False,
+                                                options=Options.counties,
+                                                multi=False,
+                                                value=24098
+                                            )
+                                        ]
+                                    ),
+                                    html.Div(
+                                        id="state_div_{}".format(id_num),
+                                        style={"display": "none"},
+                                        children=[
+                                            dcc.Dropdown(
+                                                id="state_{}".format(id_num),
+                                                options=Options.states,
+                                                clearable=False,
+                                                multi=True,
+                                                placeholder="Contiguous United States",
+                                                value=None
+                                            )
+                                        ],
+                                    ),
+                                    html.Div(
+                                        id="shape_div_{}".format(id_num),
+                                        title=(
+                                            "To use a shapefile as an area filter, upload " 
+                                            "one as either a zipfile or a grouped selection "
+                                            "that includes the .shp, .shx, .sbn, .sbx, "
+                                            ".proj, and .sbx files. Make sure the file is "
+                                            "unprojected for now."
+                                        ),
+                                        children=[
+                                            dcc.Upload(
+                                                id="shape_{}".format(id_num),
+                                                children=[
+                                                    "Drag and drop or ",
+                                                    html.A("select files")
+                                                ],
+                                                multiple=True,
+                                                style={
+                                                    "borderWidth": "2px",
+                                                    "borderStyle": "dashed",
+                                                    "borderRadius": "3px",
+                                                    "borderColor": "#CCCCCC",
+                                                    "textAlign": "center",
+                                                    "margin": "2px",
+                                                    "padding": "2px"
+                                                }
+                                            )
+                                        ]
+                                    )
+                                ]
+                            )
+                        ],
+                    ),
+        
+                    html.Div(
+                        children=[
+                            html.Button(
+                                id="reset_map_{}".format(id_num),
+                                children="Reset",
+                                title="Remove area filters.",
                                 style={
-                                    "borderWidth": "2px",
-                                    "borderStyle": "dashed",
-                                    "borderRadius": "3px",
-                                    "borderColor": "#CCCCCC",
-                                    "textAlign": "center",
-                                    "margin": "2px",
-                                    "padding": "2px"
+                                    "width": "15%",
+                                    "font-size": "10",
+                                    "height": "30px",
+                                    "line-height": "4px",
+                                    "background-color": "#ffff",
+                                    "font-family": "Times New Roman"
+                                }
+                            ),
+                            html.Button(
+                                id="update_graphs_{}".format(id_num),
+                                children="Update",
+                                title=(
+                                    "Update the map and  graphs with location choices "
+                                    "(state selections do not update automatically)."
+                                ),
+                                style={
+                                    "width": "15%",
+                                    "height": "30px",
+                                    "font-size": "11",
+                                    "line-height": "6px",
+                                    "background-color": "#F9F9F9",
+                                    "border-bottom": "2px solid gray",
+                                    "border-top": "0px solid gray",
+                                    "font-family": "Times New Roman"
                                 }
                             )
                         ]
                     )
-                ])],
-                style={
-                    "width": "60%",
-                    "float": "left"
-                }
-            ),
-
-            html.Div(
-                children=[
-                    html.Button(
-                        id="reset_map_{}".format(id_num),
-                        children="Reset",
-                        title="Remove area filters.",
-                        style={
-                            "width": "15%",
-                            "font-size": "10",
-                            "height": "30px",
-                            "line-height": "4px",
-                            "background-color": "#ffff",
-                            "font-family": "Times New Roman"
-                        }
-                    ),
-                    html.Button(
-                        id="update_graphs_{}".format(id_num),
-                        children="Update",
-                        title=(
-                            "Update the map and  graphs with location choices "
-                            "(state selections do not update automatically)."
-                        ),
-                        style={
-                            "width": "15%",
-                            "height": "34px",
-                            "font-size": "11",
-                            "line-height": "6px",
-                            "background-color": "#F9F9F9",
-                            "border-bottom": "2px solid gray",
-                            "border-top": "0px solid gray",
-                            "font-family": "Times New Roman"
-                        }
-                    )
-                ]
-            )],
-            className="row"
+                ],
         ),
 
         # Maps
@@ -163,63 +184,33 @@ def divMaker(id_num, index="noaa"):
                   style={
                     "border": "3px solid black",
                 },
-                children=html.Div(
-                    style={
-                        "width": "94%",
-                        "border-top": "0px",
-                        "margin-top": "5px",
-                        "margin-bottom": "-1px",
-                        "margin-left": "40px"
-                    },
-                    children=[
-                        dcc.RangeSlider(
-                            id=f"color_slider_{id_num}",
-                            min=0,
-                            max=1,
-                            step=.01,
-                            marks=None,
-                            tooltip={
-                                "placement": "bottom",
-                                "always_visible": True
-                            },
-                            className="margin20"
-                        ),
-                        html.P(
-                            id=f"color_slider_print_{id_num}",
-                            children="Color Sider",
-                            style={
-                                "text-align": "center",
-                                "margin-top": "-10px"
-                            }
-                        )
-                    ]
-                )
             ),
             html.Div([
                 html.Div([
                     html.P(
                         children="Point Size:",
-                        className="two columns",
+                        className="one column",
                         style={
                             "margin-top": 5.5,
-                            "margin-left": 2,
-                            "padding": 0,
-                            "float": "left",
+                            "margin-left": 50,
+                            "width": "100px",
+                            "float": "left"
                         }
                     ),
                     dcc.Input(
                         id="point_size_{}".format(id_num),
                         type="number",
-                        value=4,
-                        size="3",
-                        className="two columns",
+                        value=7,
+                        size="7",
+                        className="one columns",
                         style={
                             "background-color": "white",
                             "font-family": "Times New Roman",
                             "float": "left",
-                            "margin-left": "-20px",
+                            "margin-left": "-10px",
                             "jutifyContent": "center",
-                            "height": "80%"
+                            "height": "80%",
+                            "width": "80px"
                         }
                     ),
                     html.P(
@@ -227,14 +218,15 @@ def divMaker(id_num, index="noaa"):
                         className="three columns",
                         style={
                             "margin-top": 5.5,
-                            "padding": 0,
-                            "float": "left"
+                            "padding-left": 25,
+                            "float": "left",
+                            # "border-left": "1px solid"
                         }
                     ),
                     dcc.Input(
                         id="bbox_{}".format(id_num),
                         type="text",
-                        className="five columns",
+                        className="three columns",
                         placeholder="lon min, lat min, lon max, lat max",
                         debounce=True,
                         style={
@@ -243,8 +235,59 @@ def divMaker(id_num, index="noaa"):
                             "float": "left",
                             "margin-left": "-55px",
                             "jutifyContent": "center",
-                            "height": "80%"
+                            "height": "80%",
+                            "margin-right": "65px"
                         }
+                    ),
+
+                    html.Div(
+                        className="row",
+                        children=[
+                            dcc.Input(
+                                id=f"color_min_{id_num}",
+                                type="number",
+                                className="one column",
+                                placeholder="-abs",
+                                debounce=True,
+                                style={
+                                    "background-color": "white",
+                                    "font-family": "Times New Roman",
+                                    "jutifyContent": "center",
+                                    "height": "80%",
+                                    "width": "70px"
+                                }
+                            ),
+                            html.P(
+                                children="Color Range",
+                                title=(
+                                    "Override color range from default "
+                                    "(absolute min/max) with custom min and "
+                                    "max data values."
+                                ),
+                                className="two columns",
+                                style={
+                                    "margin-top": 5.5,
+                                    "padding": 0,
+                                    "margin-left": "10px",
+                                    "margin-right": "-65px"
+                                }
+                            ),
+                            dcc.Input(
+                                id=f"color_max_{id_num}",
+                                type="number",
+                                className="one column",
+                                placeholder="abs",
+                                debounce=True,
+                                style={
+                                    "background-color": "white",
+                                    "font-family": "Times New Roman",
+                                    "jutifyContent": "center",
+                                    "height": "80%",
+                                    "width": "70px",
+                                    "margin-right": "20px"
+                                }
+                            )
+                        ]
                     ),
                 ], className="row",
                    style={"margin-top": "10px"} 
@@ -432,6 +475,7 @@ LAYOUT = html.Div([
                                 value=[1980, Options.dates["max_year"]],
                                 min=Options.dates["min_year"],
                                 max=Options.dates["max_year"],
+                                step=1,
                                 updatemode="drag",
                                 marks=Options.date_marks["years"]
                             )
@@ -459,6 +503,7 @@ LAYOUT = html.Div([
                                  marks=Options.date_marks["months_slanted"],
                                  min=1,
                                  max=12,
+                                 step=1,
                                  updatemode="drag",
                                  included=False
                              )],
@@ -469,13 +514,14 @@ LAYOUT = html.Div([
                              html.H5(
                                   id="month_end_print_1",
                                   children="End Month"
-                                  ),
+                             ),
                              dcc.Slider(
                                  id="month_slider_1b",
                                  value=1,
                                  marks=Options.date_marks["months_slanted"],
                                  min=1,
                                  max=12,
+                                 step=1,
                                  updatemode="drag",
                                  included=False
                              )],
@@ -611,7 +657,7 @@ LAYOUT = html.Div([
                                  html.H3("Map Type"),
                                  dcc.Dropdown(
                                      id="map_type",
-                                     value="light",
+                                     value="dark",
                                      options=Options.base_maps
                                  )],
                                  className="two columns"
