@@ -5,16 +5,16 @@ TOKEN = (
 )
 DEFAULT_MAP_EXTENT = {
     "mapbox.center": {
-        "lon": -92,
-        "lat": 38
+        "lon": -96,
+        "lat": 38.5
     },
-    "mapbox.zoom": 3.2,
+    "mapbox.zoom": 3.15,
     "mapbox.bearing": 0,
     "mapbox.pitch": 0
 }
 
 MAPBOX_LAYOUT = dict(
-    height=600,
+    height=625,
     font=dict(
         color="#CCCCCC",
         fontweight="bold"

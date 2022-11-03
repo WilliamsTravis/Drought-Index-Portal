@@ -1,6 +1,9 @@
 """Navigation bar HTML Layout."""
 from dash import html
 
+from drip.app.pseudo_css import CSS
+
+
 
 ACRONYM_TEXT = """
     INDEX/INDICATOR ACRONYMS
@@ -36,19 +39,20 @@ ACRONYM_TEXT = """
 """
 
 BUTTON_STYLE = {
-    "height": "55px",
-    "padding": "9px",
+    "height": "45px",
+    "padding": "7px",
     "background-color": "#cfb87c",
     "border-radius": "4px",
     "font-family": "Times New Roman",
-    "font-size": "12px",
+    "font-size": "10px",
     "margin-top": "-5px",
-    "margin-left": "10px",
+    "margin-left": "5px",
     "float": "left"
 }
 
 NAVBAR = html.Nav(
     className="top-bar fixed",
+    style=CSS["navbar"]["container"],
     children=[
         html.Div(
             children=[
@@ -58,7 +62,7 @@ NAVBAR = html.Nav(
                         className="one columns",
                         style={
                             "height": "100%",
-                            "width": "130px",
+                            "width": "110px",
                             "float": "right",
                             "position": "static"
                         }
@@ -72,7 +76,7 @@ NAVBAR = html.Nav(
                         className="one columns",
                         style={
                             "height": "100%",
-                            "width": "150px",
+                            "width": "130px",
                             "float": "right",
                             "position": "static"
                         }
@@ -86,7 +90,7 @@ NAVBAR = html.Nav(
                         className="one columns",
                         style={
                             "height": "100%",
-                            "width": "150px",
+                            "width": "130px",
                             "float": "right",
                             "position": "relative"
                         }
@@ -100,7 +104,7 @@ NAVBAR = html.Nav(
                         className="one columns",
                         style={
                             "height": "100%",
-                            "width": "80px",
+                            "width": "70px",
                             "float": "right",
                             "position": "relative",
                             "margin-right": "20"
@@ -115,7 +119,7 @@ NAVBAR = html.Nav(
                         className="one columns",
                         style={
                             "height": "100%",
-                            "width": "60px",
+                            "width": "50px",
                             "float": "right",
                             "border-bottom-left-radius": "3px"
                         }
@@ -124,45 +128,27 @@ NAVBAR = html.Nav(
                     target="_blank"
                 )
             ],
-            style={
-                "background-color": "white",
-                "height": "55px",
-                "width": "570px",
-                "position": "center",
-                "float": "right",
-                "margin-right": "10px",
-                "margin-top": "-5px",
-                "border": "3px solid #cfb87c",
-                "border-radius": "5px",
-            },
+            style=CSS["navbar"]["link-container"],
             className="row"
         ),
         html.Button(
             children="ACRONYMS (HOVER)",
             type="button",
             title=ACRONYM_TEXT,
-            style={
-                "height": "55px",
-                "padding": "9px",
-                "background-color": "#cfb87c",
-                "border-radius": "4px",
-                "font-family": "Times New Roman",
-                "font-size": "12px",
-                "margin-top": "-5px",
-                "margin-left": "10px",
-                "float": "left",
-            }
+            style=CSS["navbar"]["button"]
         ),
 
         html.Div(
             children=[
                 html.Button(
                     id="toggle_options",
-                    children="Toggle Options: Off",
+                    children="Options: Off",
                     n_clicks=0,
                     type="button",
                     title="Display/hide options that apply to each map below.",
-                    style={**BUTTON_STYLE, **{"margin-left": "25px"}}
+                    style={
+                        **CSS["navbar"]["button"], **{"margin-left": "25px"}
+                    }
                 ),
                 html.Button(
                     id="desc_button",
@@ -172,7 +158,9 @@ NAVBAR = html.Nav(
                         "Display/hide a description of the application with "
                         "instructions."
                     ),
-                    style={**BUTTON_STYLE, **{"margin-left": "25px"}}
+                    style={
+                        **CSS["navbar"]["button"], **{"margin-left": "25px"}
+                    }
                 ),
                 html.Button(
                     id="other_button",
@@ -182,7 +170,9 @@ NAVBAR = html.Nav(
                         "Display/hide a list of links to other drought data "
                         "portals."
                     ),
-                    style={**BUTTON_STYLE, **{"margin-left": "-2px"}}
+                    style={
+                        **CSS["navbar"]["button"], **{"margin-left": "-2px"}
+                    }
                 ),
                 html.Button(
                     id="click_sync",
@@ -191,7 +181,9 @@ NAVBAR = html.Nav(
                         "Sync/unsync the location of the time series between "
                         "each map."
                     ),
-                    style={**BUTTON_STYLE, **{"margin-left": "25px"}}
+                    style={
+                        **CSS["navbar"]["button"], **{"margin-left": "25px"}
+                    }
                 ),
                 html.Button(
                     id="date_sync",
@@ -200,26 +192,13 @@ NAVBAR = html.Nav(
                         "Sync/unsync the years of the time series between each"
                         " map."
                     ),
-                    style={**BUTTON_STYLE, **{"margin-left": "-2px"}}
+                    style={
+                        **CSS["navbar"]["button"], **{"margin-left": "-2px"}
+                    }
                 ),
             ],
             style={"float": "left", "margin-left": "15px"}
         )
     ],
-    style={
-        "background-color": "black",
-        "position": "fixed",
-        "margin-left": "-10px",
-        "margin-right": "-20px",
-        "margin-top": "-10px",
-        "border-radius": "5px",
-        "height": "70px",
-        "width": "100.1%",
-        "zIndex": "9999",
-        "border-bottom": "7px solid #cfb87c",
-        "box-shadow": (
-            "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)"
-        ),
-    }
 )
 

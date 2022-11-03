@@ -4,22 +4,15 @@ import json
 
 from dash import html, dcc
 
-from drip import Paths
+from drip.app.pseudo_css import CSS
 from drip.app.options.options import Options, DEFAULT_LOCATION, DEFAULT_SIGNAL
 from drip.app.options.styles import STYLES
-
 
 
 # Dynamic Elements
 def divMaker(id_num, index="noaa"):
     div = html.Div(
-        style={
-            "position": "relative",
-            "margin-top": "-1px",
-            "border-radius": "5px",
-            "box-shadow": ("0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 "
-                           "rgba(0, 0, 0, 0.19)")
-        },
+        style=CSS["graph"]["container"],
         children=[
             html.Div(
                 className="row",
@@ -180,47 +173,39 @@ def divMaker(id_num, index="noaa"):
                 id="map_{}".format(id_num),
                 config={"showSendToCloud": True}
             ),
-            html.Div(
-                  style={
-                    "border": "3px solid black",
-                },
-            ),
             html.Div([
                 html.Div([
                     html.P(
                         children="Point Size:",
                         className="one column",
                         style={
-                            "margin-top": 5.5,
-                            "margin-left": 50,
-                            "width": "100px",
-                            "float": "left"
+                            "font-size": "15px",
+                            "margin-top": 2.5,
+                            "margin-left": 20,
+                            "width": "90px",
                         }
                     ),
                     dcc.Input(
                         id="point_size_{}".format(id_num),
                         type="number",
-                        value=7,
-                        size="7",
+                        value=8,
                         className="one columns",
                         style={
                             "background-color": "white",
                             "font-family": "Times New Roman",
-                            "float": "left",
-                            "margin-left": "-10px",
+                            "font-size": "15px",
+                            "margin-left": "-1px",
                             "jutifyContent": "center",
-                            "height": "80%",
-                            "width": "80px"
+                            "height": "30px",
+                            "width": "60px"
                         }
                     ),
                     html.P(
-                        children="Bounding Box:",
+                        children="Bounds:",
                         className="three columns",
                         style={
-                            "margin-top": 5.5,
-                            "padding-left": 25,
-                            "float": "left",
-                            # "border-left": "1px solid"
+                            "font-size": "15px",
+                            "margin-top": 2.5,
                         }
                     ),
                     dcc.Input(
@@ -230,13 +215,15 @@ def divMaker(id_num, index="noaa"):
                         placeholder="lon min, lat min, lon max, lat max",
                         debounce=True,
                         style={
+                            "font-size": "15px",
                             "background-color": "white",
                             "font-family": "Times New Roman",
                             "float": "left",
-                            "margin-left": "-55px",
+                            "margin-left": "-125px",
                             "jutifyContent": "center",
-                            "height": "80%",
-                            "margin-right": "65px"
+                            "height": "30px",
+                            "width": "225px",
+                            "margin-right": "45px"
                         }
                     ),
 
@@ -250,6 +237,8 @@ def divMaker(id_num, index="noaa"):
                                 placeholder="-abs",
                                 debounce=True,
                                 style={
+                                    "font-size": "15px",
+                                    "height": "30px",
                                     "background-color": "white",
                                     "font-family": "Times New Roman",
                                     "jutifyContent": "center",
@@ -266,7 +255,8 @@ def divMaker(id_num, index="noaa"):
                                 ),
                                 className="two columns",
                                 style={
-                                    "margin-top": 5.5,
+                                    "font-size": "15px",
+                                    "margin-top": 2.5,
                                     "padding": 0,
                                     "margin-left": "10px",
                                     "margin-right": "-65px"
@@ -279,6 +269,8 @@ def divMaker(id_num, index="noaa"):
                                 placeholder="abs",
                                 debounce=True,
                                 style={
+                                    "font-size": "15px",
+                                    "height": "30px",
                                     "background-color": "white",
                                     "font-family": "Times New Roman",
                                     "jutifyContent": "center",
@@ -328,7 +320,7 @@ def divMaker(id_num, index="noaa"):
                 "margin-bottom": "-15px"
             }
         ),
-        html.Hr(),
+        html.Hr(style={"margin-bottom": "-3px"}),
 
         # Download link
         html.A(
@@ -378,430 +370,421 @@ def divMaker(id_num, index="noaa"):
 
 
 # Static Elements
-LAYOUT = html.Div([
-
-    # Title
-    html.Div(
-        id="title_div",
-        children=[
-            html.H1("Drought Index Portal (DrIP)"),
-            html.H4(
-                "A tool to display, compare, and extract time series for "
-                "various indicators of drought in the Contiguous United States"
-            ),
-            html.Hr()
-        ],
-        className="twelve columns",
-        style={
-            "font-weight": "bolder",
-            "text-align": "center",
-            "font-size": "50px",
-            "font-family": "Times New Roman",
-            "margin-top": "100"
-        }
-    ),
-
-    # Description
-    html.Div(
-        children=[
-            html.Div(
-                [
-                    dcc.Markdown(id="description")
-                ],
-                style={
-                    "text-align": "center",
-                    "width": "70%",
-                    "margin": "0px auto"
-                }
-            ),
-            html.Hr(style={"margin-bottom": "1px"})
-        ],
-        style={
-            "text-align": "center",
-            "margin": "0 auto",
-            "width": "100%"
-        }
-    ),
-
-    # Other Portal Links
-    html.Div([
+LAYOUT = html.Div(
+    className="eleven columns",
+    style=CSS["body"]["container"],
+    children=[
+    
+        # Title
+        html.Div(
+            id="title_div",
+            children=[
+                html.H1(
+                    children="Drought Index Portal (DrIP)",
+                    style={"font-size": "99.9%"}
+                ),
+                html.H5(
+                    "A tool to display, compare, and extract time series for "
+                    "various indicators of drought in the Contiguous United States"
+                ),
+                html.Hr(style={"margin-top": "-7px"})
+            ],
+            className="twelve columns",
+            style=CSS["body"]["text-large"]
+        ),
+    
+        # Description
+        html.Div(
+            children=[
+                html.Div(
+                    [
+                        dcc.Markdown(id="description")
+                    ],
+                    style={
+                        "text-align": "center",
+                        "width": "70%",
+                        "margin": "0px auto"
+                    }
+                ),
+                html.Hr(style={"margin-bottom": "1px"})
+            ],
+            style={
+                "text-align": "center",
+                "margin": "0 auto",
+                "width": "100%"
+            }
+        ),
+    
+        # Other Portal Links
         html.Div([
-             dcc.Markdown(id="other_links")],
+            html.Div([
+                 dcc.Markdown(id="other_links")],
+                style={"text-align": "center",
+                       "width": "70%",
+                       "margin": "0px auto"}),
+            html.Hr(style={"margin-bottom": "1px"})],
             style={"text-align": "center",
-                   "width": "70%",
-                   "margin": "0px auto"}),
-        html.Hr(style={"margin-bottom": "1px"})],
-        style={"text-align": "center",
-               "margin": "0 auto",
-               "width": "100%"}
-    ),
-
-    # Options
-    html.Div(id="options",
-             children=[
-
-                 # Year Sliders
-                 html.Div([
-                     html.H3(
-                        id="date_range_1",
-                        children="Date Range"
-                    ),
-                    html.Div(
-                        children=[
-                            dcc.RangeSlider(
-                                id="year_slider_1",
-                                value=[1980, Options.dates["max_year"]],
-                                min=Options.dates["min_year"],
-                                max=Options.dates["max_year"],
-                                updatemode="drag",
-                                step=1,
-                                marks=Options.date_marks["years"]
-                            )
-                        ],
-                        style={
-                            "margin-top": "0",
-                            "margin-bottom": "80px"
-                        }
-                    ),
-                    html.Div(
-                        id="year_div2",
-                        children=[
-                            html.H3(
-                                id="date_range_2",
-                                children="Date Range #2"
-                            ),
-                            dcc.RangeSlider(
-                                id="year_slider_2",
-                                value=[1980, Options.dates["max_year"]],
-                                min=Options.dates["min_year"],
-                                max=Options.dates["max_year"],
-                                step=1,
-                                updatemode="drag",
-                                marks=Options.date_marks["years"]
-                            )
-                        ],
-                        style={
-                            "display": "none",
-                            "margin-top": "0",
-                            "margin-bottom": "80px"
-                        }
-                    )
-                ]
-            ),
-
-                 # Month Options #1
-                 html.Div(
-                     children=[
-                         html.Div([
-                             html.H5(
-                                  id="month_start_print_1",
-                                  children="Start Month"
-                                  ),
-                             dcc.Slider(
-                                 id="month_slider_1a",
-                                 value=1,
-                                 marks=Options.date_marks["months_slanted"],
-                                 min=1,
-                                 max=12,
-                                 step=1,
-                                 updatemode="drag",
-                                 included=False
-                             )],
-                             className="three columns",
-                             title=("Choose the first month of the first " +
-                                    "year of the study period.")),
-                         html.Div([
-                             html.H5(
-                                  id="month_end_print_1",
-                                  children="End Month"
-                             ),
-                             dcc.Slider(
-                                 id="month_slider_1b",
-                                 value=1,
-                                 marks=Options.date_marks["months_slanted"],
-                                 min=1,
-                                 max=12,
-                                 step=1,
-                                 updatemode="drag",
-                                 included=False
-                             )],
-                             className="three columns",
-                             title=("Choose the last month of the last year " +
-                                    "of the study period.")),
-                         html.Div(
-                             children=[
+                   "margin": "0 auto",
+                   "width": "100%"}
+        ),
+    
+        # Options
+        html.Div(id="options",
+                 children=[
+    
+                     # Year Sliders
+                     html.Div([
+                         html.H3(
+                            id="date_range_1",
+                            children="Date Range"
+                        ),
+                        html.Div(
+                            children=[
+                                dcc.RangeSlider(
+                                    id="year_slider_1",
+                                    value=[1980, Options.dates["max_year"]],
+                                    min=Options.dates["min_year"],
+                                    max=Options.dates["max_year"],
+                                    updatemode="drag",
+                                    step=1,
+                                    marks=Options.date_marks["years"]
+                                )
+                            ],
+                            style={
+                                "margin-top": "0",
+                                "margin-bottom": "80px"
+                            }
+                        ),
+                        html.Div(
+                            id="year_div2",
+                            children=[
+                                html.H3(
+                                    id="date_range_2",
+                                    children="Date Range #2"
+                                ),
+                                dcc.RangeSlider(
+                                    id="year_slider_2",
+                                    value=[1980, Options.dates["max_year"]],
+                                    min=Options.dates["min_year"],
+                                    max=Options.dates["max_year"],
+                                    step=1,
+                                    updatemode="drag",
+                                    marks=Options.date_marks["years"]
+                                )
+                            ],
+                            style={
+                                "display": "none",
+                                "margin-top": "0",
+                                "margin-bottom": "80px"
+                            }
+                        )
+                    ]
+                ),
+    
+                     # Month Options #1
+                     html.Div(
+                         children=[
+                             html.Div([
                                  html.H5(
-                                     id="month_filter_print_1",
-                                     children="Included Months"
+                                      id="month_start_print_1",
+                                      children="Start Month"
+                                      ),
+                                 dcc.Slider(
+                                     id="month_slider_1a",
+                                     value=1,
+                                     marks=Options.date_marks["months_slanted"],
+                                     min=1,
+                                     max=12,
+                                     step=1,
+                                     updatemode="drag",
+                                     included=False
+                                 )],
+                                 className="three columns",
+                                 title=("Choose the first month of the first " +
+                                        "year of the study period.")),
+                             html.Div([
+                                 html.H5(
+                                      id="month_end_print_1",
+                                      children="End Month"
                                  ),
-                                 dcc.Checklist(
-                                     className="check_blue",
-                                     id="month_check_1",
-                                     value=list(range(1, 13)),
-                                     options=Options.date_marks["months"],
-                                     labelStyle={"display": "inline-block"}
-                                 ),
-                                 html.Button(
-                                    id="all_months_1", type="button",
+                                 dcc.Slider(
+                                     id="month_slider_1b",
+                                     value=1,
+                                     marks=Options.date_marks["months_slanted"],
+                                     min=1,
+                                     max=12,
+                                     step=1,
+                                     updatemode="drag",
+                                     included=False
+                                 )],
+                                 className="three columns",
+                                 title=("Choose the last month of the last year " +
+                                        "of the study period.")),
+                             html.Div(
+                                 children=[
+                                     html.H5(
+                                         id="month_filter_print_1",
+                                         children="Included Months"
+                                     ),
+                                     dcc.Checklist(
+                                         className="check_blue",
+                                         id="month_check_1",
+                                         value=list(range(1, 13)),
+                                         options=Options.date_marks["months"],
+                                         labelStyle={"display": "inline-block"}
+                                     ),
+                                     html.Button(
+                                        id="all_months_1", type="button",
+                                        children="All",
+                                        style={
+                                            "height": "25px",
+                                            "line-height": "25px",
+                                            "background-color": "#C7D4EA",
+                                            "border-radius": "2px",
+                                            "font-family": "Times New Roman",
+                                            "border-bottom": "2px solid gray",
+                                        }
+                                    ),
+                                     html.Button(
+                                        id="no_months_1",
+                                        type="button",
+                                        children="None",
+                                        style={
+                                            "height": "25px",
+                                            "line-height": "25px",
+                                            "background-color": "#C7D4EA",
+                                            "border-radius": "2px",
+                                            "font-family": "Times New Roman",
+                                            "border-bottom": "2px solid gray",
+                                        }
+                                    )
+                                ],
+                                className="six columns",
+                                title=(
+                                    "Choose which months of the year to be "
+                                    "included."
+                                )
+                            )
+                        ],
+                         className="row"),
+    
+                     # Month Options  #2
+                     html.Div(
+                         id="month_div2",
+                         children=[
+                             html.Div([
+                                 html.H5("Start Month #2"),
+                                 dcc.Slider(
+                                      id="month_slider_2a",
+                                      value=1,
+                                      marks=Options.date_marks["months_slanted"],
+                                      min=1,
+                                      max=12,
+                                      updatemode="drag",
+                                      included=False
+                                      )],
+                                      className="three columns",
+                                      title=("Choose the first month of the first " +
+                                             "year of the study period.")),
+                            html.Div([
+                                html.H5("End Month #2"),
+                                dcc.Slider(
+                                    id="month_slider_2b",
+                                    value=1,
+                                    marks=Options.date_marks["months_slanted"],
+                                    min=1,
+                                    max=12,
+                                    updatemode="drag",
+                                    included=False
+                                )
+                            ],
+                            className="three columns",
+                            title=(
+                                "Choose the last month of the last year of the "
+                                "study period."
+                            )
+                        ),
+                        html.Div(
+                            children=[
+                                html.H5("Included Months #2"),
+                                dcc.Checklist(
+                                    className="check_blue",
+                                    id="month_check_2",
+                                    value=list(range(1, 13)),
+                                    options=Options.date_marks["months"],
+                                    labelStyle={"display": "inline-block"}
+                                ),
+                                html.Button(
+                                    id="all_months_2",
+                                    type="button",
                                     children="All",
                                     style={
                                         "height": "25px",
-                                        "line-height": "25px",
-                                        "background-color": "#C7D4EA",
-                                        "border-radius": "2px",
-                                        "font-family": "Times New Roman",
-                                        "border-bottom": "2px solid gray",
+                                        "line-height": "25px"
                                     }
                                 ),
-                                 html.Button(
-                                    id="no_months_1",
+                                html.Button(
+                                    id="no_months_2",
                                     type="button",
                                     children="None",
                                     style={
                                         "height": "25px",
-                                        "line-height": "25px",
-                                        "background-color": "#C7D4EA",
-                                        "border-radius": "2px",
-                                        "font-family": "Times New Roman",
-                                        "border-bottom": "2px solid gray",
+                                        "line-height": "25px"
                                     }
                                 )
                             ],
                             className="six columns",
-                            title=(
-                                "Choose which months of the year to be "
-                                "included."
-                            )
-                        )
-                    ],
-                     className="row"),
-
-                 # Month Options  #2
-                 html.Div(
-                     id="month_div2",
-                     children=[
-                         html.Div([
-                             html.H5("Start Month #2"),
-                             dcc.Slider(
-                                  id="month_slider_2a",
-                                  value=1,
-                                  marks=Options.date_marks["months_slanted"],
-                                  min=1,
-                                  max=12,
-                                  updatemode="drag",
-                                  included=False
-                                  )],
-                                  className="three columns",
-                                  title=("Choose the first month of the first " +
-                                         "year of the study period.")),
-                        html.Div([
-                            html.H5("End Month #2"),
-                            dcc.Slider(
-                                id="month_slider_2b",
-                                value=1,
-                                marks=Options.date_marks["months_slanted"],
-                                min=1,
-                                max=12,
-                                updatemode="drag",
-                                included=False
-                            )
-                        ],
-                        className="three columns",
-                        title=(
-                            "Choose the last month of the last year of the "
-                            "study period."
-                        )
-                    ),
-                    html.Div(
-                        children=[
-                            html.H5("Included Months #2"),
-                            dcc.Checklist(
-                                className="check_blue",
-                                id="month_check_2",
-                                value=list(range(1, 13)),
-                                options=Options.date_marks["months"],
-                                labelStyle={"display": "inline-block"}
-                            ),
-                            html.Button(
-                                id="all_months_2",
-                                type="button",
-                                children="All",
-                                style={
-                                    "height": "25px",
-                                    "line-height": "25px"
-                                }
-                            ),
-                            html.Button(
-                                id="no_months_2",
-                                type="button",
-                                children="None",
-                                style={
-                                    "height": "25px",
-                                    "line-height": "25px"
-                                }
-                            )
-                        ],
-                        className="six columns",
-                        title=("Choose which months of the year to " +
-                            "be included."))],
-                style={"display": "none", "margin-top": "30",
-                    "margin-bottom": "30"},
-                className="row"),
-
-                 # Rendering Options
-                html.Div(id="options_div",
-                         children=[
-
-                             # Map type
-                             html.Div([
-                                 html.H3("Map Type"),
-                                 dcc.Dropdown(
-                                     id="map_type",
-                                     value="dark",
-                                     options=Options.base_maps
-                                 )],
-                                 className="two columns"
-                             ),
-
-                             # Functions
-                             html.Div([
-                                 html.H3("Function"),
-                                 dcc.Tabs(
-                                     id="function_type",
-                                     value="index",
-                                     style=STYLES["tab"],
-                                     children=[
-                                         dcc.Tab(
-                                           label="Index Values",
-                                           value="index",
-                                           style=STYLES["tab"],
-                                           selected_style=STYLES["tab"]
-                                         ),
-                                         dcc.Tab(
-                                             label="Percentiles",
-                                             value="perc",
-                                             style=STYLES["tab"],
-                                             selected_style=STYLES["tab"]
-                                         )]
+                            title=("Choose which months of the year to " +
+                                "be included."))],
+                    style={"display": "none", "margin-top": "30",
+                        "margin-bottom": "30"},
+                    className="row"),
+    
+                     # Rendering Options
+                    html.Div(id="options_div",
+                             children=[
+    
+                                 # Map type
+                                 html.Div([
+                                     html.H3("Map Type"),
+                                     dcc.Dropdown(
+                                         id="map_type",
+                                         value="dark",
+                                         options=Options.base_maps
+                                     )],
+                                     className="two columns"
                                  ),
-                                 dcc.Dropdown(
-                                     id="function_choice",
-                                     options=Options.functions["percentile"],
-                                     value="pmean"
-                                 )],
-                                className="three columns"),
-
-                             # Color Scales
-                             html.Div([
-                                 html.H3("Color Gradient"),
-                                 dcc.Tabs(
-                                     id="reverse",
-                                     value="no",
-                                     style=STYLES["tab"],
-                                     children=[
-                                         dcc.Tab(value="no",
-                                                 label="Not Reversed",
+    
+                                 # Functions
+                                 html.Div([
+                                     html.H3("Function"),
+                                     dcc.Tabs(
+                                         id="function_type",
+                                         value="index",
+                                         style=STYLES["tab"],
+                                         children=[
+                                             dcc.Tab(
+                                               label="Index Values",
+                                               value="index",
+                                               style=STYLES["tab"],
+                                               selected_style=STYLES["tab"]
+                                             ),
+                                             dcc.Tab(
+                                                 label="Percentiles",
+                                                 value="perc",
                                                  style=STYLES["tab"],
-                                                 selected_style=STYLES["tab"]),
-                                         dcc.Tab(value="yes",
-                                                 label="Reversed",
-                                                 style=STYLES["tab"],
-                                                 selected_style=STYLES["tab"])]),
-                                 dcc.Dropdown(id="colors",
-                                              options=Options.colors,
-                                              value="Default")],
-                                      className="three columns")],
-
-                         style={"margin-bottom": "50",
-                                "margin-top": "50",
-                                "text-align": "center"})],
-             style={"text-align": "center"},
-             className="row"),
-
-    # Submission Button
-    html.Div(
-        children=[
-            html.Button(
-                id="submit",
-                title=(
-                    "Submit the option settings above and update the graphs "
-                    "below."
-                ),
-                children="Submit Options",
-                type="button",
-                style={
-                    "background-color": "#C7D4EA",
-                    "border-radius": "2px",
-                    "font-family": "Times New Roman",
-                    "border-bottom": "2px solid gray",
-                    "margin-top": "100px",
-                    "margin-bottom": "35px"
-                }
-            )
-        ],
-        style={"text-align": "center"}
-    ),
-
-    # Break line
-    html.Hr(style={"margin-top": "1px"}),
-
-    # The Map divs
-    html.Div(
-        children=[
-            divMaker(1, Options.index_keys[0]),
-            divMaker(2, Options.index_keys[1])
-        ],
-        className="row"
-    ),
-
-    # Signals
-    html.Div(
-      id="signal",
-      children=json.dumps(DEFAULT_SIGNAL),
-      style={"display": "none"}
-    ),
-    html.Div(
-      id="date_print_1",
-      children=f"1980 - {Options.dates['max_year']}",
-      style={"display": "none"}
-    ),
-    html.Div(
-      id="date_print_2",
-      children=f"1980 - {Options.dates['max_year']}",
-      style={"display": "none"}
-    ),
-    html.Div(
-      id="location_store_1",
-      children=DEFAULT_LOCATION,
-      style={"display": "none"}
-    ),
-    html.Div(
-      id="location_store_2",
-      children=DEFAULT_LOCATION,
-      style={"display": "none"}
-    ),
-    html.Div(
-      id="choice_store",
-      style={"display": "none"}
-    ),
-    html.Div(
-      id="area_store_1",
-      children="[0, 0]",
-      style={"display": "none"}
-    ),
-    html.Div(
-      id="area_store_2",
-      children="[0, 0]",          
-      style={"display": "none"}
-    )
-
-],
-    className="eleven columns",
-    style={
-        "width": "98%",
-        "margin-bottom": "50px",
-        "margin-top": "100px",
-        "margin-left": "25px",
-        "margin-right": "100px"
-    }
+                                                 selected_style=STYLES["tab"]
+                                             )]
+                                     ),
+                                     dcc.Dropdown(
+                                         id="function_choice",
+                                         options=Options.functions["percentile"],
+                                         value="pmean"
+                                     )],
+                                    className="three columns"),
+    
+                                 # Color Scales
+                                 html.Div([
+                                     html.H3("Color Gradient"),
+                                     dcc.Tabs(
+                                         id="reverse",
+                                         value="no",
+                                         style=STYLES["tab"],
+                                         children=[
+                                             dcc.Tab(value="no",
+                                                     label="Not Reversed",
+                                                     style=STYLES["tab"],
+                                                     selected_style=STYLES["tab"]),
+                                             dcc.Tab(value="yes",
+                                                     label="Reversed",
+                                                     style=STYLES["tab"],
+                                                     selected_style=STYLES["tab"])]),
+                                     dcc.Dropdown(id="colors",
+                                                  options=Options.colors,
+                                                  value="Default")],
+                                          className="three columns")],
+    
+                             style={"margin-bottom": "50",
+                                    "margin-top": "50",
+                                    "text-align": "center"})],
+                 style={"text-align": "center"},
+                 className="row"),
+    
+        # Submission Button
+        html.Div(
+            children=[
+                html.Button(
+                    id="submit",
+                    title=(
+                        "Submit the option settings above and update the graphs "
+                        "below."
+                    ),
+                    children="Submit Options",
+                    type="button",
+                    style={
+                        "background-color": "#C7D4EA",
+                        "border-radius": "2px",
+                        "font-family": "Times New Roman",
+                        "border-bottom": "2px solid gray",
+                        "margin-top": "100px",
+                        "margin-bottom": "35px"
+                    }
+                )
+            ],
+            style={"text-align": "center"}
+        ),
+    
+        # Break line
+        html.Hr(style={"margin-top": "1px"}),
+    
+        # The Map divs
+        html.Div(
+            children=[
+                divMaker(1, Options.index_keys[0]),
+                divMaker(2, Options.index_keys[1])
+            ],
+            className="row"
+        ),
+    
+        # Signals
+        html.Div(
+          id="signal",
+          children=json.dumps(DEFAULT_SIGNAL),
+          style={"display": "none"}
+        ),
+        html.Div(
+          id="date_print_1",
+          children=f"1980 - {Options.dates['max_year']}",
+          style={"display": "none"}
+        ),
+        html.Div(
+          id="date_print_2",
+          children=f"1980 - {Options.dates['max_year']}",
+          style={"display": "none"}
+        ),
+        html.Div(
+          id="location_store_1",
+          children=DEFAULT_LOCATION,
+          style={"display": "none"}
+        ),
+        html.Div(
+          id="location_store_2",
+          children=DEFAULT_LOCATION,
+          style={"display": "none"}
+        ),
+        html.Div(
+          id="choice_store",
+          style={"display": "none"}
+        ),
+        html.Div(
+          id="area_store_1",
+          children="[0, 0]",
+          style={"display": "none"}
+        ),
+        html.Div(
+          id="area_store_2",
+          children="[0, 0]",          
+          style={"display": "none"}
+        )
+    ],
 )

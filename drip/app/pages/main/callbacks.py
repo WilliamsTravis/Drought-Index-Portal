@@ -401,16 +401,18 @@ def toggleOptions(click, old_style):
         div_style = {"display": "none"}
         button_style = {**old_style, **{"background-color": OFF_COLOR}}
         submit_style = {"display": "none"}
-        children = "Display Options: Off"
+        children = "Options: Off"
     else:
         div_style = {}
         button_style = {**old_style, **{"background-color": ON_COLOR}}
-        submit_style = {"background-color": "#C7D4EA",
-                        "border-radius": "2px",
-                        "font-family": "Times New Roman",
-                        "margin-top": "100px",
-                        "margin-bottom": "35px"}
-        children = "Display Options: On"
+        submit_style = {
+            "background-color": "#C7D4EA",
+            "border-radius": "2px",
+            "font-family": "Times New Roman",
+            "margin-top": "100px",
+            "margin-bottom": "35px"
+        }
+        children = "Options: On"
     return div_style, button_style, submit_style, children
 
 
@@ -426,11 +428,11 @@ def toggleLocationSyncButton(click, old_style):
     if not click:
         click = 0
     if click % 2 == 0:
-        children = "Location Syncing: On"
+        children = "Location Syncing: Off"
         style = {**old_style, **{"background-color": OFF_COLOR}}
     else:
-        children = "Location Syncing: Off"
         style = {**old_style, **{"background-color": ON_COLOR}}
+        children = "Location Syncing: On"
     return style, children
 
 

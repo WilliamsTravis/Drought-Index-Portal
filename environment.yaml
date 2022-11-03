@@ -14,7 +14,7 @@ dependencies:
     - numpy
     - pandas
     - pytest
-    - python
+    - python=3.9
     - rasterio
     - rioxarray
     - salem
