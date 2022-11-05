@@ -28,16 +28,23 @@ def divMaker(id_num, index="noaa"):
                                 style=STYLES["tab"],
                                 children=dcc.Tab(
                                     value="index",
-                                    label="Drought Index/Indicator",
-                                    style=STYLES["tab"],
-                                    selected_style=STYLES["tab"]
+                                    label="Index/Indicator",
+                                    style={
+                                        **STYLES["tab"],
+                                        **{"border-top-left-radius": "5px"}
+                                    },
+                                    selected_style={
+                                        **STYLES["tab"],
+                                        **{"border-top-left-radius": "5px"}
+                                    }
                                 )
                             ),
                             dcc.Dropdown(
                                 id="choice_{}".format(id_num),
                                 options=Options.index_options,
                                 value=index,
-                                clearable=False
+                                clearable=False,
+                                style={"border-radius": "0px"}
                             )
                         ],
                     ),
@@ -48,39 +55,34 @@ def divMaker(id_num, index="noaa"):
                             "float": "left"
                         },
                         children=[
-                            dcc.Tabs(id="location_tab_{}".format(id_num),
-                                     value="county",
-                                     style=STYLES["tab"],
-                                     children=[
-                                dcc.Tab(value="county",
+                            dcc.Tabs(
+                                id="location_tab_{}".format(id_num),
+                                value="state",
+                                style=STYLES["tab"],
+                                children=[
+                                    dcc.Tab(
+                                        value="state",
+                                        label="State/States",
+                                        style=STYLES["tab"],
+                                        selected_style=STYLES["tab"]
+                                    ),
+                                    dcc.Tab(
+                                        value="county",
                                         label="County",
                                         style=STYLES["tab"],
                                         selected_style=STYLES["tab"]
-                                        ),
-                                dcc.Tab(value="state",
-                                        label="State/States",
-                                        style=STYLES["tab"],
-                                        selected_style=STYLES["tab"]),
-                                dcc.Tab(value="shape",
+                                    ),
+                                    dcc.Tab(
+                                        value="shape",
                                         label="Shapefile",
                                         style=STYLES["tab"],
-                                        selected_style=STYLES["tab"])
-                            ]),
+                                        selected_style=STYLES["tab"]
+                                    )
+                                ]
+                            ),
                             html.Div(
                                 id="location_div_{}".format(id_num),
                                 children=[
-                                    html.Div(
-                                        id="county_div_{}".format(id_num),
-                                        children=[
-                                            dcc.Dropdown(
-                                                id="county_{}".format(id_num),
-                                                clearable=False,
-                                                options=Options.counties,
-                                                multi=False,
-                                                value=24098
-                                            )
-                                        ]
-                                    ),
                                     html.Div(
                                         id="state_div_{}".format(id_num),
                                         style={"display": "none"},
@@ -90,10 +92,24 @@ def divMaker(id_num, index="noaa"):
                                                 options=Options.states,
                                                 clearable=False,
                                                 multi=True,
+                                                style={"border-radius": "0px"},
                                                 placeholder="Contiguous United States",
-                                                value=None
+                                                value=None,
                                             )
                                         ],
+                                    ),
+                                    html.Div(
+                                        id="county_div_{}".format(id_num),
+                                        children=[
+                                            dcc.Dropdown(
+                                                id="county_{}".format(id_num),
+                                                clearable=False,
+                                                options=Options.counties,
+                                                multi=False,
+                                                style={"border-radius": "0px"},
+                                                value=24098
+                                            )
+                                        ]
                                     ),
                                     html.Div(
                                         id="shape_div_{}".format(id_num),
@@ -119,7 +135,8 @@ def divMaker(id_num, index="noaa"):
                                                     "borderColor": "#CCCCCC",
                                                     "textAlign": "center",
                                                     "margin": "2px",
-                                                    "padding": "2px"
+                                                    "padding": "2px",
+                                                    "border-radius": "0px"
                                                 }
                                             )
                                         ]
@@ -130,6 +147,9 @@ def divMaker(id_num, index="noaa"):
                     ),
         
                     html.Div(
+                        style={
+                            "height": "60px",
+                        },
                         children=[
                             html.Button(
                                 id="reset_map_{}".format(id_num),
@@ -137,11 +157,13 @@ def divMaker(id_num, index="noaa"):
                                 title="Remove area filters.",
                                 style={
                                     "width": "15%",
-                                    "font-size": "10",
-                                    "height": "30px",
-                                    "line-height": "4px",
+                                    "height": "31px",
+                                    "font-size": "11",
+                                    "border": "1px solid #c6c6c6",
+                                    "border-bottom": "2px solid #c6c6c6",
                                     "background-color": "#ffff",
-                                    "font-family": "Times New Roman"
+                                    "font-family": "Times New Roman",
+                                    "border-top-right-radius": "5px"
                                 }
                             ),
                             html.Button(
@@ -153,13 +175,12 @@ def divMaker(id_num, index="noaa"):
                                 ),
                                 style={
                                     "width": "15%",
-                                    "height": "30px",
+                                    "height": "36px",
                                     "font-size": "11",
-                                    "line-height": "6px",
-                                    "background-color": "#F9F9F9",
-                                    "border-bottom": "2px solid gray",
-                                    "border-top": "0px solid gray",
-                                    "font-family": "Times New Roman"
+                                    "border": "1px solid #c6c6c6",
+                                    "font-family": "Times New Roman",
+                                    "margin-bottom": "0px",
+                                    "margin-top": "-5px"
                                 }
                             )
                         ]
@@ -242,7 +263,6 @@ def divMaker(id_num, index="noaa"):
                                     "background-color": "white",
                                     "font-family": "Times New Roman",
                                     "jutifyContent": "center",
-                                    "height": "80%",
                                     "width": "70px"
                                 }
                             ),
@@ -274,7 +294,6 @@ def divMaker(id_num, index="noaa"):
                                     "background-color": "white",
                                     "font-family": "Times New Roman",
                                     "jutifyContent": "center",
-                                    "height": "80%",
                                     "width": "70px",
                                     "margin-right": "20px"
                                 }
