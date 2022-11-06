@@ -11,7 +11,6 @@ import socket
 import time
 import urllib
 
-
 from ftplib import FTP
 from multiprocessing.pool import ThreadPool
 from pathlib import Path
@@ -38,7 +37,7 @@ from drip.downloaders.index_info import HOSTS, SPATIAL_REFERENCES
 from drip.loggers import init_logger, set_handler
 
 logger = init_logger(__name__)
-socket.setdefaulttimeout(20)
+socket.setdefaulttimeout(120)
 
 
 POSSIBLE_LATS = ["latitude", "lat", "lati", "y"]
@@ -182,6 +181,7 @@ class NetCDF(Adjustments):
         self.percentile = percentile
         self.projected = projected
         self.today = np.datetime64(dt.datetime.today())
+        self._set_logger()
 
     def __repr__(self):
         """Return representation string."""
@@ -474,6 +474,10 @@ class NetCDF(Adjustments):
         """Calcuate the percentile value for each item in a 1D vector."""
         return (rankdata(vector) / len(vector)) * 100
 
+    def _set_logger(self):
+        """Create logging file handler for this process."""
+        filename = self.home.joinpath("logs", self.index + ".log")
+        set_handler(logger, filename)
 
     def _warp(self, src, dst, dst_srs="epsg:4326", xres=None, yres=None):
         """Reproject array to epsg:5070.
@@ -545,9 +549,10 @@ class EDDI(NetCDF):
         """Download an EDDI dataset."""
         logger.info(f"Downloading datasets for {self.index}...")
         paths = self.eddi_paths
-        with FTP(*self.eddi_ftp_args) as ftp:
+        with FTP(*self.eddi_ftp_args, timeout=60*5) as ftp:
             for path in paths:
                 self._get(ftp, path)
+                time.sleep(3)
 
     def format_eddi(self, time_tag="NETCDF_DIM_day"):
         """Reformat EDDI asc files to geotiff for use in DataBuilder."""
@@ -638,15 +643,26 @@ class EDDI(NetCDF):
                 pass
 
     def _get(self, ftp, path):
-        """Download path from an FTP server. Add error logging."""
+        """Download path from an FTP server. Add error handling/logging."""
         dst = self.target_dir.joinpath(path.name)
         def writeline(line):
             file.write(line + "\n")
         with open(dst, "w") as file:
             try:
+                print(f"downloading {path}...")
+                logger.info("downloading %s...", path)
                 ftp.retrlines(f"RETR {path}", writeline)
-            except:
-                ftp.retrlines(f"RETR {path}", writeline)
+            except Exception as e:
+                print(e)
+                print(f"Download failed, trying again: {path}...")
+                logger.error("Download failed (%s), retrying: %s...", e, path)
+                try:
+                    ftp.retrlines(f"RETR {path}", writeline)
+                except Exception as e:
+                    print(e)
+                    print(f"{path} totally failed")
+                    logger.error("%s totally failed: %s", path, e)
+                    raise
 
 
 class PRISM(NetCDF):
@@ -681,7 +697,6 @@ class Data_Builder(NetCDF):
         self.resolution = resolution
         self.template = template
         self._set_index(index)
-        self._set_logger(index)
 
     def build(self, overwrite=False):
         """Download and combine multiple NetCDF files from WWDT into one."""
@@ -785,12 +800,6 @@ class Data_Builder(NetCDF):
             raise KeyError(msg)
         self.index = index
         self.index_name = INDEX_NAMES[index]
-
-    def _set_logger(self, index):
-        """Create logging file handler for this process."""
-        filename = self.home.joinpath("logs", index + ".log")
-        set_handler(logger, filename)
-
 
 
 # if __name__ == "__main__":

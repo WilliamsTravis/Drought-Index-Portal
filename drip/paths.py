@@ -29,6 +29,7 @@ class Paths:
         """Return posix path objects for package data items."""
         contents = resources.files(drip.__name__)
         data = [file for file in contents.iterdir() if file.name == "data"][0]
+        data.joinpath("indices").mkdir(exist_ok=True)
         paths = {}
         for folder in data.iterdir():
             name = os.path.splitext(folder.name)[0].lower()
