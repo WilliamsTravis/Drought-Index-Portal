@@ -23,7 +23,7 @@ dependencies:
     - spyder-kernels
     - tqdm
     - xarray
-    - werkzeug
+    - werkzeug=2.0.3
     - yaml
     - pip
     - pip:

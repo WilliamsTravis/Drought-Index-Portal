@@ -14,13 +14,12 @@ from flask_caching import Cache
 
 from drip.app.pages.main.view import LAYOUT
 from drip.app.layouts.navbar import NAVBAR
-from drip import Paths
 
 
 app = dash.Dash(
     __name__,
     suppress_callback_exceptions=True,
-    server_locally=True
+    serve_locally=True
 )
 server = app.server
 cache = Cache(
