@@ -436,16 +436,23 @@ LAYOUT = html.Div(
     
         # Other Portal Links
         html.Div([
-            html.Div([
-                 dcc.Markdown(id="other_links")],
-                style={"text-align": "center",
-                       "width": "70%",
-                       "margin": "0px auto"}),
-            html.Hr(style={"margin-bottom": "1px"})],
-            style={"text-align": "center",
-                   "margin": "0 auto",
-                   "width": "100%"}
-        ),
+            html.Div(
+                children=[
+                    dcc.Markdown(id="other_links")
+                ],
+                style={
+                    "text-align": "center",
+                    "width": "70%",
+                    "margin": "0px auto"
+                }
+            ),
+            html.Hr(style={"margin-bottom": "1px"})
+        ],
+        style={
+            "text-align": "center",
+            "margin": "0 auto",
+            "width": "100%"
+        }),
     
         # Options
         html.Div(id="options",
@@ -718,14 +725,22 @@ LAYOUT = html.Div(
                                                      label="Reversed",
                                                      style=STYLES["tab"],
                                                      selected_style=STYLES["tab"])]),
-                                     dcc.Dropdown(id="colors",
-                                                  options=Options.colors,
-                                                  value="Default")],
-                                          className="three columns")],
+                                     dcc.Dropdown(
+                                         id="colors",
+                                         options=Options.colors,
+                                         value="Default"
+                                     )
+                                ],
+                                className="three columns")
+                            ],
     
-                             style={"margin-bottom": "50",
-                                    "margin-top": "50",
-                                    "text-align": "center"})],
+                            style={
+                                "margin-bottom": "50",
+                                "margin-top": "50",
+                                "text-align": "center"
+                            }
+                        )
+                ],
                  style={"text-align": "center"},
                  className="row"),
     

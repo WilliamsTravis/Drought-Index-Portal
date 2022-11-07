@@ -427,7 +427,7 @@ def toggleLocationSyncButton(click, old_style):
     """Change the color of on/off location syncing button - for css"""
     if not click:
         click = 0
-    if click % 2 == 0:
+    if click % 2 != 0:
         children = "Location Syncing: Off"
         style = {**old_style, **{"background-color": OFF_COLOR}}
     else:
@@ -584,7 +584,6 @@ for i in range(1, 3):
             # Find which input triggered this callback
             context = dash.callback_context
             triggered_value = context.triggered[0]["value"]
-            print(f"triggered_value={triggered_value}")
             trigger = context.triggered[0]["prop_id"]
 
             # Figure out which element we are working with
@@ -606,9 +605,12 @@ for i in range(1, 3):
 
             # The outline points will also be in selected trigger values
             if "selectedData" in trigger:
-                plen = len(triggered_value["points"])
-                tv = triggered_value["points"][int(plen/2):]
-                triggered_value["points"]  = tv
+                if triggered_value:
+                    plen = len(triggered_value["points"])
+                    tv = triggered_value["points"][int(plen/2):]
+                    triggered_value["points"] = tv
+                else:
+                    location =  ["all", "y", "x", "Contiguous United States"]
 
             # Two cases, if syncing return a copy, if not split
             if "On" in sync:
@@ -956,6 +958,7 @@ for i in range(1, 3):
         """Build plotly scatter mapbox figure."""
         # Catch Trigger
         trigger = dash.callback_context.triggered[0]["prop_id"]
+        print(f"Map trigger = {trigger}")
 
         # Reformat/unpack signals from user
         location = json.loads(location)
@@ -1010,7 +1013,7 @@ for i in range(1, 3):
             reverse = not reverse
 
         # Pull array into memory
-        array = data.getFunction(function).compute() #* data.mask.data
+        array = data.getFunction(function).compute()
 
         # Individual array min/max
         amin = np.nanmin(array)
@@ -1099,30 +1102,32 @@ for i in range(1, 3):
         pdf["grid"] = grid2[pdf["gridy"], pdf["gridx"]]
         pdf = pd.merge(pdf, admin_df, how="inner")
         pdf["data"] = pdf["value"].astype(float)
-        pdf["printdata"] = (pdf["place"] + "<br>  lat/lon: "
-                            + pdf["latbin"].apply(str) + ", "
-                            + pdf["lonbin"].astype(str) + "<br>     <b>"
-                            + pdf["data"].round(3).apply(str) + "</b>")
+        pdf["printdata"] = (
+            pdf["place"] + "<br>  lat/lon: "
+            + pdf["latbin"].apply(str) + ", "
+            + pdf["lonbin"].astype(str) + "<br>     <b>"
+            + pdf["data"].round(3).apply(str) + "</b>"
+        )
         df_flat = pdf.drop_duplicates(subset=["latbin", "lonbin"])
         df = df_flat[np.isfinite(df_flat["data"])]
 
         # Create the scattermapbox object
+        colorscale = data.color_scale
         d1 = dict(
             type="scattermapbox",
             lon=df["lonbin"],
             lat=df["latbin"],
             text=df["printdata"],
-            mode="markers",
+            # mode="markers",
             hoverinfo="text",
             hovermode="closest",
             showlegend=False,
             marker=dict(
-                colorscale=data.color_scale,
-                reversescale=reverse,
                 color=df["data"],
+                colorscale=colorscale,
+                reversescale=reverse,
                 cmax=amax,
                 cmin=amin,
-                opacity=1.0,
                 size=point_size,
                 colorbar=dict(
                     y=-.15,
@@ -1151,7 +1156,7 @@ for i in range(1, 3):
         )
 
         # package these in a list
-        data = [d2, d1]
+        data_list = [d2, d1]
 
         # Set up layout
         layout_copy = copy.deepcopy(MAPBOX_LAYOUT)
@@ -1161,14 +1166,14 @@ for i in range(1, 3):
         layout_copy["mapbox"]["bearing"] = map_extent["mapbox.bearing"]
         layout_copy["mapbox"]["pitch"] = map_extent["mapbox.pitch"]
         layout_copy["hoverlabel"] = dict(font=dict(size=20))
-        layout_copy["titlefont"]=dict(
+        layout_copy["titlefont"] = dict(
             color="#CCCCCC",
             size=title_size,
             family="Time New Roman",
             fontweight="bold"
         )
         layout_copy["title"] = title
-        figure = dict(data=data, layout=layout_copy)
+        figure = dict(data=data_list, layout=layout_copy)
 
         # Clear memory space
         gc.collect()
@@ -1214,7 +1219,6 @@ for i in range(1, 3):
         """
         # Identify element number
         key = int(key)
-        print(key)
 
         # Prevent update from location unless it is a state filter
         trigger = dash.callback_context.triggered[0]["prop_id"]

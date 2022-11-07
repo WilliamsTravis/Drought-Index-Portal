@@ -17,13 +17,13 @@ MAPBOX_LAYOUT = dict(
     height=625,
     font=dict(
         color="#CCCCCC",
-        fontweight="bold"
+        # fontweight="bold"
     ),
     titlefont=dict(
         color="#CCCCCC",
         size="20",
         family="Time New Roman",
-        fontweight="bold"
+        # fontweight="bold"
     ),
     margin=dict(
         l=55,
@@ -38,7 +38,7 @@ MAPBOX_LAYOUT = dict(
     legend=dict(
         font=dict(
             size=10,
-            fontweight="bold"
+            # fontweight="bold"
         ),
         orientation="h"
     ),

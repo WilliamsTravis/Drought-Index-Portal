@@ -1,8 +1,11 @@
 """Color options for continuous and categorical data."""
 import plotly.colors as pcs
 
+DEFAULTS = pcs.PLOTLY_SCALES
+
 COLORS = {
-    **pcs.PLOTLY_SCALES,
+    "Default": DEFAULTS["Viridis"],
+    **DEFAULTS,
     "RdWhBu": [
         [0.00, "rgb(115,0,0)"],
         [0.10, "rgb(230,0,0)"],

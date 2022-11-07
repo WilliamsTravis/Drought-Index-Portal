@@ -33,8 +33,6 @@ from drip import Paths
 warnings.filterwarnings("ignore")
 
 
-
-# In[]: Variables
 title_map = {"noaa": "NOAA CPC-Derived Rainfall Index",
              "mdn1": "Mean Temperature Departure  (1981 - 2010) - 1 month",
              "pdsi": "Palmer Drought Severity Index",
@@ -150,27 +148,6 @@ unit_map = {"noaa": "%",
             "vpdmax": "hPa" ,
             "vpdmin": "hPa",
             "vpdmean": "hPa"}
-
-
-# In[]: Functions
-def print_args(func, *args, **kwargs):
-    """Print a functions key word argument inputs for easy assignment."""
-    # # Trying to get calling function, not working
-    # curframe = inspect.currentframe()
-    # calframe = inspect.getouterframes(curframe, 2)
-    # func_string = calframe[1][3]
-    # func = globals()[func_string]
-
-    print("\nARGUMENTS for " + func.__name__ + ":")
-    sig = inspect.signature(func)
-    keys = sig.parameters.keys()
-    first_kwargs = dict(zip(keys, args))
-    kwargs = {**first_kwargs, **kwargs}
-    for key, arg in kwargs.items():
-        if isinstance(arg, str):
-            arg = """ + arg + """
-        print("  {} = {}".format(key, arg))
-    print("\n")
 
 
 @jit(nopython=True)
@@ -1699,69 +1676,21 @@ class Index_Maps(Paths):
         a predefined plotly color scale, or an actual color scale, which is
         a list.
         """
-        options = {"Blackbody": "Blackbody", "Bluered": "Bluered",
-                   "Blues": "Blues", "Default": "Default", "Earth": "Earth",
-                   "Electric": "Electric", "Greens": "Greens",
-                   "Greys": "Greys", "Hot": "Hot", "Jet": "Jet",
-                   "Picnic": "Picnic", "Portland": "Portland",
-                   "Rainbow": "Rainbow", "RdBu": "RdBu",  "Viridis": "Viridis",
-                   "Reds": "Reds",
-                   "RdWhBu": [[0.00, "rgb(115,0,0)"],
-                              [0.10, "rgb(230,0,0)"],
-                              [0.20, "rgb(255,170,0)"],
-                              [0.30, "rgb(252,211,127)"],
-                              [0.40, "rgb(255, 255, 0)"],
-                              [0.45, "rgb(255, 255, 255)"],
-                              [0.55, "rgb(255, 255, 255)"],
-                              [0.60, "rgb(143, 238, 252)"],
-                              [0.70, "rgb(12,164,235)"],
-                              [0.80, "rgb(0,125,255)"],
-                              [0.90, "rgb(10,55,166)"],
-                              [1.00, "rgb(5,16,110)"]],
-                   "RdWhBu (Extreme Scale)":  [[0.00, "rgb(115,0,0)"],
-                                               [0.02, "rgb(230,0,0)"],
-                                               [0.05, "rgb(255,170,0)"],
-                                               [0.10, "rgb(252,211,127)"],
-                                               [0.20, "rgb(255, 255, 0)"],
-                                               [0.30, "rgb(255, 255, 255)"],
-                                               [0.70, "rgb(255, 255, 255)"],
-                                               [0.80, "rgb(143, 238, 252)"],
-                                               [0.90, "rgb(12,164,235)"],
-                                               [0.95, "rgb(0,125,255)"],
-                                               [0.98, "rgb(10,55,166)"],
-                                               [1.00, "rgb(5,16,110)"]],
-                   "RdYlGnBu":  [[0.00, "rgb(124, 36, 36)"],
-                                  [0.25, "rgb(255, 255, 48)"],
-                                  [0.5, "rgb(76, 145, 33)"],
-                                  [0.85, "rgb(0, 92, 221)"],
-                                   [1.00, "rgb(0, 46, 110)"]],
-                   "BrGn":  [[0.00, "rgb(91, 74, 35)"],
-                             [0.10, "rgb(122, 99, 47)"],
-                             [0.15, "rgb(155, 129, 69)"],
-                             [0.25, "rgb(178, 150, 87)"],
-                             [0.30, "rgb(223,193,124)"],
-                             [0.40, "rgb(237, 208, 142)"],
-                             [0.45, "rgb(245,245,245)"],
-                             [0.55, "rgb(245,245,245)"],
-                             [0.60, "rgb(198,234,229)"],
-                             [0.70, "rgb(127,204,192)"],
-                             [0.75, "rgb(62, 165, 157)"],
-                             [0.85, "rgb(52,150,142)"],
-                             [0.90, "rgb(1,102,94)"],
-                             [1.00, "rgb(0, 73, 68)"]]
-        }
+        from drip.app.options.colors import COLORS
 
         # Default color schemes
-        defaults = {"percentile": options["RdWhBu"],
-                    "original":  options["BrGn"],
-                    "area": options["RdWhBu"],
-                    "correlation_o": "Viridis",
-                    "correlation_p": "Viridis"}
+        defaults = {
+            "percentile": COLORS["RdWhBu"],
+            "original":  COLORS["BrGn (cb)"],
+            "area": COLORS["RdWhBu"],
+            "correlation_o": COLORS["Viridis"],
+            "correlation_p": COLORS["Viridis"]
+        }
 
         if value == "Default":
             scale = defaults[self.choice_type]
         else:
-            scale = options[value]
+            scale = COLORS[value]
 
         self.color_scale = scale
 
@@ -1829,11 +1758,17 @@ class Index_Maps(Paths):
         lats = np.arange(nlat) * geom[5] + geom[3]
 
         # Create mask xarray
-        xmask = xr.DataArray(mask,
-                             coords={"latitude": lats,
-                                     "longitude": lons},
-                             dims={"latitude": len(lats),
-                                   "longitude": len(lons)})
+        xmask = xr.DataArray(
+            mask,
+            coords={
+                "latitude": lats,
+                "longitude": lons
+            },
+            dims={
+                "latitude": len(lats),
+                "longitude": len(lons)
+            }
+        )
         self.mask = xmask
 
     def setReverse(self):
@@ -2124,7 +2059,6 @@ class Location_Builder:
         elif "selectedData" in trig_id:
             if trig_val is not None:
                 selections = trig_val["points"]
-                print(selections)
                 y = list([crdict.latdict[d["lat"]] for d in selections])
                 x = list([crdict.londict[d["lon"]] for d in selections])
                 counties = np.array([d["text"][:d["text"].index("<")] for
