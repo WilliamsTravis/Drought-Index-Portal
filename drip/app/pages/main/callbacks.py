@@ -110,7 +110,7 @@ def adjustDatePrint1(year_range, month_a,  month_b, month_check, sync):
         month_check.sort()
         if months[0]:
             month_incl_print = "".join(
-                [Options.date_marks["months"][i - 1]["label"].upper() for i in month_check]
+                [Options.date_marks["months"][i - 1]["label"].upper()[0] for i in month_check]
             )
             month_incl_print = f" ({month_incl_print})"
         else:
@@ -244,7 +244,7 @@ def optionsFunctions(function_type):
     if function_type == "perc":
         return Options.functions["percentile"], "pmean"
     else:
-        return Options.functions["percentile"], "omean"
+        return Options.functions["main"], "omean"
 
 
 @cache.memoize()
@@ -1064,9 +1064,11 @@ for i in range(1, 3):
             y = np.array(json.loads(y))
             x = np.array(json.loads(x))
             gridid = grid[y, x]
-            amin = -1
-            amax = 1
-            if type(gridid) is np.ndarray:
+            if not color_min:
+                amin = -1
+            if not color_max:    
+                amax = 1
+            if isinstance(gridid, np.ndarray):
                 grids = [np.nanmin(gridid), np.nanmax(gridid)]
                 title = (Options.index_names[choice] + "<br>" +
                          Options.function_names[function] + "With Grids " +
@@ -1217,11 +1219,11 @@ for i in range(1, 3):
             function = "oarea"
             location =  ["all", "y", "x", "Contiguous United States", 0]
         """
-        # Identify element number
-        key = int(key)
-
         # Prevent update from location unless it is a state filter
         trigger = dash.callback_context.triggered[0]["prop_id"]
+
+        # Identify element number
+        key = int(key)
         location = json.loads(location)
 
         # If we aren"t syncing or changing the function or color

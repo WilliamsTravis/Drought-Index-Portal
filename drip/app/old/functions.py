@@ -1135,9 +1135,11 @@ def wgsToAlbers(arrays, crdict, proj_sample):
     lats = np.unique(wgrid.xy_coordinates[1])
     lats = lats[::-1]
     lons = np.unique(wgrid.xy_coordinates[0])
-    data_array = xr.DataArray(data=arrays.index[0],
-                              coords=[lats, lons],
-                              dims=["latitude", "longitude"])
+    data_array = xr.DataArray(
+        data=arrays.value[0],
+        coords=[lats, lons],
+        dims=["latitude", "longitude"]
+    )
     wgs_data = xr.Dataset(data_vars={"value": data_array})
 
     # Albers Equal Area Conic North America (epsg not working)
@@ -1147,30 +1149,34 @@ def wgsToAlbers(arrays, crdict, proj_sample):
 
     # Create an albers grid
     geom = proj_sample.crs.GeoTransform
-    array = proj_sample.index[0].values
-    res = geom[1]
+    array = proj_sample.value[0].values
+    res = geom[0]
     x_length = array.shape[1]
     y_length = array.shape[0]
-    agrid = salem.Grid(nxny=(x_length, y_length), dxdy=(res, -res),
-                       x0y0=(geom[0], geom[3]), proj=albers_proj)
+    agrid = salem.Grid(
+        nxny=(x_length, y_length),
+        dxdy=(res, -res),
+        x0y0=(geom[2], geom[5]),
+        proj=albers_proj
+    )
     lats = np.unique(agrid.xy_coordinates[1])
     lats = lats[::-1]
     lons = np.unique(agrid.xy_coordinates[0])
-    data_array = xr.DataArray(data=array,
-                              coords=[lats, lons],
-                              dims=["latitude", "longitude"])
-    data_array = data_array
+    data_array = xr.DataArray(
+        data=array,
+        coords=[lats, lons],
+        dims=["latitude", "longitude"]
+    )
     albers_data = xr.Dataset(data_vars={"value": data_array})
     albers_data.salem.grid._proj = albers_proj
     projection = albers_data.salem.transform(wgs_data, "linear")
-    proj_mask = projection.index.data
+    proj_mask = projection.value.data
     proj_mask = proj_mask * 0 + 1
 
     # Set up grid info from coordinate dictionary
     nlat, nlon = proj_mask.shape
-    xs = np.arange(nlon) * geom[1] + geom[0]
-    ys = np.arange(nlat) * geom[5] + geom[3]
-
+    xs = np.arange(nlon) * geom[0] + geom[2]
+    ys = np.arange(nlat) * geom[4] + geom[5]
 
     # Create mask xarray
     proj_mask = xr.DataArray(proj_mask,
@@ -1181,7 +1187,7 @@ def wgsToAlbers(arrays, crdict, proj_sample):
     return(proj_mask)
 
 
-# In[]:Classes
+
 class Admin_Elements(Paths):
     def __init__(self, resolution):
         self.resolution = resolution
@@ -1838,10 +1844,12 @@ class Index_Maps(Paths):
         selection.
         """
         ts = self.getSeries(location, crdict)
-        arrays = self.dataset_interval.index.values
-        one_field = correlationField(ts, arrays)
+        arrays = self.dataset_interval.value.values
+        array = correlationField(ts, arrays)
+        template = self.mask.copy()
+        template.data = array
 
-        return one_field
+        return template
 
     def getArea(self, crdict):
         """

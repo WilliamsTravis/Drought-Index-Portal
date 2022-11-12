@@ -704,8 +704,8 @@ LAYOUT = html.Div(
                                      ),
                                      dcc.Dropdown(
                                          id="function_choice",
-                                         options=Options.functions["percentile"],
-                                         value="pmean"
+                                         options=Options.functions["main"],
+                                         value="omean"
                                      )],
                                     className="three columns"),
     
