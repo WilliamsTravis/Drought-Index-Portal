@@ -650,7 +650,6 @@ for i in range(1, 3):
             # Find which input triggered this callback
             context = dash.callback_context
             triggered_value = context.triggered[0]["value"]
-            print(f"triggered_value = {triggered_value}")
             trigger = context.triggered[0]["prop_id"]
 
             # Figure out which element we are working with
@@ -1045,7 +1044,6 @@ for i in range(1, 3):
         """Build plotly scatter mapbox figure."""
         # Catch Trigger
         trigger = dash.callback_context.triggered[0]["prop_id"]
-        print(f"Map trigger = {trigger}")
 
         # Reformat/unpack signals from user
         location = json.loads(location)

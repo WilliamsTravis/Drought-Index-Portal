@@ -613,18 +613,22 @@ LAYOUT = html.Div(
                                       marks=Options.date_marks["months_slanted"],
                                       min=1,
                                       max=12,
+                                      step=1,
                                       updatemode="drag",
                                       included=False
-                                      )],
-                                      className="three columns",
-                                      title=("Choose the first month of the first " +
-                                             "year of the study period.")),
+                                      )
+                                 ],
+                                 className="three columns",
+                                 title=("Choose the first month of the first "
+                                        "year of the study period.")
+                            ),
                             html.Div([
                                 html.H5("End Month #2"),
                                 dcc.Slider(
                                     id="month_slider_2b",
                                     value=1,
                                     marks=Options.date_marks["months_slanted"],
+                                    step=1,
                                     min=1,
                                     max=12,
                                     updatemode="drag",
