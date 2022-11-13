@@ -2086,7 +2086,9 @@ class Location_Builder:
         elif "shape" in trig_id:
             # We don"t have the x,y values just yet
             try:
-                shp = gdal.Open("data/shapefiles/temp/temp.tif").ReadAsArray()
+                src = str(Paths.paths["shapefiles"].joinpath("temp/temp1.tif"))
+                shp = gdal.Open(src).ReadAsArray()
+                shp = shp[::-1]
                 shp[shp == -9999] = np.nan
                 y, x = np.where(~np.isnan(shp))
                 location = ["shape", str(list(y)), str(list(x)), trig_val]

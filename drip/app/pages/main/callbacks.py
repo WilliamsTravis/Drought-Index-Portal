@@ -650,6 +650,7 @@ for i in range(1, 3):
             # Find which input triggered this callback
             context = dash.callback_context
             triggered_value = context.triggered[0]["value"]
+            print(f"triggered_value = {triggered_value}")
             trigger = context.triggered[0]["prop_id"]
 
             # Figure out which element we are working with
@@ -756,7 +757,6 @@ for i in range(1, 3):
 
             return json.dumps(location)
 
-
     @app.callback(
         Output("county_div_{}".format(i), "style"),
         Output("state_div_{}".format(i), "style"),
@@ -789,7 +789,6 @@ for i in range(1, 3):
             shape_style = {}
         return county_style, state_style, shape_style
 
-
     @app.callback(
         Output("shape_store_{}".format(i), "children"),
         Input("shape_{}".format(i), "contents"),
@@ -817,8 +816,9 @@ for i in range(1, 3):
                             content = archive.read(fname)
                             name, ext = os.path.splitext(fname)
                             fname = "temp" + ext
-                            fdir = "data/shapefiles/temp/"
-                            with open(fdir + fname, "wb") as f:
+                            fpath = Paths.paths["shapefiles"].joinpath("temp",
+                                                                      fname)
+                            with open(fpath, "wb") as f:
                                 f.write(content)
 
             elif len(filenames) > 1:
@@ -829,20 +829,20 @@ for i in range(1, 3):
                     fname = filenames[i]
                     name, ext = os.path.splitext(fname)
                     fname = "temp" + ext
-                    fname = os.path.join("data", "shapefiles", "temp", fname)
-                    with open(fname, "wb") as f:
+                    fpath = Paths.paths["shapefiles"].joinpath("temp", fname)
+                    with open(fpath, "wb") as f:
                         f.write(decoded)
 
             # Now let"s just rasterize it for a mask
-            shp = gpd.read_file("data/shapefiles/temp/temp.shp")
+            fpath = Paths.paths["shapefiles"].joinpath("temp/temp.shp")
+            shp = gpd.read_file(fpath)
 
             # Check CRS, reproject if needed
             crs = shp.crs
             try:
-                epsg = crs["init"]
-                epsg = int(epsg[epsg.index(":") + 1:])
+                epsg = crs.to_epsg()
             except:
-                fshp = fiona.open("data/shapefiles/temp/temp.shp")
+                fshp = fiona.open(fpath)
                 crs_wkt = fshp.crs_wkt
                 crs_ref = osr.SpatialReference()
                 crs_ref.ImportFromWkt(crs_wkt)
@@ -852,23 +852,36 @@ for i in range(1, 3):
                 fshp.close()
 
             if epsg != 4326:
-                shapeReproject(src="data/shapefiles/temp/temp.shp",
-                               dst="data/shapefiles/temp/temp.shp",
-                               src_epsg=epsg, dst_epsg=4326)
+                shapeReproject(
+                    src=fpath,
+                    dst=fpath,
+                    src_epsg=epsg,
+                    dst_epsg=4326
+                )
 
             # Find a column that is numeric
             #            numeric = shp._get_numeric_data()  # <---------------------------- I must"ve done this for a reason, probabyly looking for an id number
             attr = shp.columns[0]
 
             # Rasterize
-            src = "data/shapefiles/temp/temp.shp"
-            dst = "data/shapefiles/temp/temp1.tif"
-            admin.rasterize(src, dst, attribute=attr, all_touch=False)  # <---- All touch not working.
+            src = fpath
+            dst = str(fpath).replace(".shp", ".tif")
+            admin.rasterize(
+                src,
+                dst,
+                extent=[-130, 50, -55, 20],
+                attribute=attr,
+                all_touch=False
+            )  # <---- All touch not working.
 
             # Cut to extent
-            tif = gdal.Translate("data/shapefiles/temp/temp.tif",
-                                 "data/shapefiles/temp/temp1.tif",
-                                 projWin=[-130, 50, -55, 20])
+            src = str(dst)
+            dst = src.replace(".tif", "1.tif")
+            tif = gdal.Warp(
+                dst,
+                src,
+                outputBounds=[-130, 50, -55, 20]
+            )
             del tif
 
             return basename
@@ -1125,13 +1138,14 @@ for i in range(1, 3):
 
         # Filter for state filters
         flag, y, x, label, idx = location
-        if flag == "state" or flag == "county":
+        if flag in ["state", "county", "shape"]:
             array = array * data.mask
-        elif flag == "shape":
-            y = np.array(json.loads(y))
-            x = np.array(json.loads(x))
-            gridids = grid[y, x]
-            array[~np.isin(grid, gridids)] = np.nan
+        # elif flag == "shape":
+        #     array = array * data.mask
+            # y = np.array(json.loads(y))
+            # x = np.array(json.loads(x))
+            # gridids = grid[y, x]
+            # array.data[~np.isin(grid, gridids)] = np.nan
 
         # If it is a correlation recreate the map array
         if "corr" in function and flag != "all":
