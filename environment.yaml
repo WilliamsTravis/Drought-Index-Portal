@@ -1,37 +1,30 @@
 name: drip
 channels:
-  - conda-forge
-  - anaconda
-  - defaults
+    - conda-forge
+    - defaults
 dependencies:
-  - beautifulsoup4
-  - dash
- # - dask
-  - descartes
-  - distributed
-  - fiona
-  - flask-caching
-  - gdal
-  - geopandas
-  - gevent
-  - gunicorn
-  - joblib
-  - matplotlib
-  - netcdf4
-  - numpy
-  - numba
-  - pandas
-  - pip
-  - psutil
-  - pyproj
-  - rasterio
-  - scipy
-  - shapely
-  - spyder
-  - toolz
-  - tqdm
-  - xarray
- # - pip:
-  #  - salem
-   # - werkeug
-    #- dash_bootstrap_components
+    - dash=2.6.2
+    - dash-bootstrap-components
+    - dask
+    - flask-caching
+    - geopandas
+    - ipython
+    - netcdf4
+    - numba
+    - numpy
+    - pandas
+    - pathos
+    - pytest
+    - python=3.9
+    - rasterio
+    - rioxarray
+    - salem
+    - scipy
+    - spyder-kernels
+    - tqdm
+    - xarray
+    - werkzeug=2.0.3
+    - yaml
+    - pip
+    - pip:
+       - addfips
