@@ -40,5 +40,25 @@ STYLES = dict(
         "font-family": "Times New Roman",
         "font-size": "12px",
         "margin-top": "-5px"
+    },
+    on_button_app={
+        "height": "31px",
+        "font-size": "11",
+        "border": "1px solid black",
+        "background-color": "#ffff",
+        "font-family": "Times New Roman",
+        "border-radius": "5px",
+        "margin-left": "15px",
+        "margin-top": "10px"
+    },
+    off_button_app={
+        "height": "31px",
+        "font-size": "11",
+        "border": "1px solid black",
+        "background-color": "#c9d3e9",
+        "font-family": "Times New Roman",
+        "border-radius": "5px",
+        "margin-left": "15px",
+        "margin-top": "10px"
     }
 )

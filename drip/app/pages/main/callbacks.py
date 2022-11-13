@@ -34,7 +34,7 @@ from drip.app.old.functions import (
 )
 from drip.app.options.indices import INDEX_NAMES
 from drip.app.options.options import Options
-from drip.app.options.styles import ON_COLOR, OFF_COLOR
+from drip.app.options.styles import ON_COLOR, OFF_COLOR, STYLES
 from drip.loggers import init_logger, set_handler
 
 logger = init_logger(__name__)
@@ -48,24 +48,30 @@ admin = Admin_Elements(resolution)
  source, albers_source, crdict, admin_df] = admin.getElements()  # <----------- remove albers ource here (carefully)
 
 
-function_options_perc = [{"label": "Mean", "value": "pmean"},
-                         {"label": "Maximum", "value": "pmax"},
-                         {"label": "Minimum", "value": "pmin"},
-                         {"label": "Correlation", "value": "pcorr"}]
-function_options_orig = [{"label": "Mean", "value": "omean"},
-                         {"label": "Maximum", "value": "omax"},
-                         {"label": "Minimum", "value": "omin"},
-                         {"label": "Drought Severity Area", "value":"oarea"},
-                         {"label": "Correlation", "value": "ocorr"}]
-function_names = {"pmean": "Average Percentiles",
-                  "pmax": "Maxmium Percentiles",
-                  "pmin": "Minimum Percentiles",
-                  "omean": "Average Values",
-                  "omax": "Maximum Values",
-                  "omin": "Minimum Values",
-                  "oarea": "Average Values",
-                  "pcorr": "Pearson's Correlation ",
-                  "ocorr": "Pearson's Correlation "}
+function_options_perc = [
+    {"label": "Mean", "value": "pmean"},
+    {"label": "Maximum", "value": "pmax"},
+    {"label": "Minimum", "value": "pmin"},
+    {"label": "Correlation", "value": "pcorr"}
+]
+function_options_orig = [
+    {"label": "Mean", "value": "omean"},
+    {"label": "Maximum", "value": "omax"},
+    {"label": "Minimum", "value": "omin"},
+    {"label": "Drought Severity Area", "value":"oarea"},
+    {"label": "Correlation", "value": "ocorr"}
+]
+function_names = {
+    "pmean": "Average Percentiles",
+    "pmax": "Maxmium Percentiles",
+    "pmin": "Minimum Percentiles",
+    "omean": "Average Values",
+    "omax": "Maximum Values",
+    "omin": "Minimum Values",
+    "oarea": "Average Values",
+    "pcorr": "Pearson's Correlation ",
+    "ocorr": "Pearson's Correlation "
+}
 
 
 # For singular elements
@@ -208,7 +214,7 @@ def adjustDatePrint2(year_range, month_a,  month_b, month_check, sync):
 @calls.log
 def adjustMonthPrint1(sync):
     """If users turn date syncing off, print #1 after each month element."""
-    
+    # Text filter patterns
     start = "Start Month"
     end = "End Month"
     filters = "Included Months"
@@ -228,6 +234,70 @@ def adjustMonthPrint1(sync):
     return start, end, filters
 
 
+def make_csv(arg):
+    signal, function, index, location, choice = arg
+    data = retrieveData(signal, function, index, location)
+    dates = data.dataset_interval.time.values
+    dates = [pd.to_datetime(str(d)).strftime("%Y-%m") for d in dates]
+
+    # If the function is oarea, we plot five overlapping timeseries
+    label = location[3]
+    nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
+                  "vpdmin", "vpdmean"]
+
+
+    if function != "oarea" or choice in nonindices:
+        # Get the time series from the data object
+        try:
+            timeseries = data.getSeries(location, crdict)
+        except Exception as e:
+            print(e)
+
+        # Create data frame as string for download option
+        columns = OrderedDict({"month": dates,
+                                "value": list(timeseries),
+                                "function": function_names[function],  # <-- This doesn"t always make sense
+                                "location": location[-2],
+                                "index": INDEX_NAMES[index]})
+        df = pd.DataFrame(columns)
+
+    else:
+        label = location[3]
+        ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+
+        # Save to file for download option
+        columns = OrderedDict({"month": dates,
+                                "d0": ts_series_ninc[0],
+                                "d1": ts_series_ninc[1],
+                                "d2": ts_series_ninc[2],
+                                "d3": ts_series_ninc[3],
+                                "d4": ts_series_ninc[4],
+                                "dsci": dsci,
+                                "function": "Percent Area",
+                                "location":  label,
+                                "index": INDEX_NAMES[index]})
+        df = pd.DataFrame(columns)
+    return df
+
+
+def make_csvs(path):
+    """Take a path with query information and save a csv."""
+    # Separate Path
+    signal, function, choice, location, key = path.split("_")
+    location = json.loads(location)
+    signal = json.loads(signal)
+
+    # Get data
+    dfs = []
+    args = []
+    for index in tqdm(list(INDEX_NAMES.keys())):
+        arg = [signal, function, index, location, choice]
+        args.append(arg)
+        df = make_csv(arg)
+        dfs.append(df)
+    df = pd.concat(dfs)
+
+    return df, key
 
 
 @app.callback(
@@ -405,13 +475,9 @@ def toggleOptions(click, old_style):
     else:
         div_style = {}
         button_style = {**old_style, **{"background-color": ON_COLOR}}
-        submit_style = {
-            "background-color": "#C7D4EA",
-            "border-radius": "2px",
-            "font-family": "Times New Roman",
-            "margin-top": "100px",
-            "margin-bottom": "35px"
-        }
+        submit_style = STYLES["off_button_app"]
+        submit_style["margin-bottom"] = "25px"
+        submit_style["margin-top"] = "25px"
         children = "Options: On"
     return div_style, button_style, submit_style, children
 
@@ -839,16 +905,24 @@ for i in range(1, 3):
                 else:
                     ds = ["{0:.2f}".format(hover["points"][i]["y"]) for
                           i in range(6)]
-                    coverage_df = pd.DataFrame({"D0 - D4 (Dry)": ds[0],
-                                                "D1 - D4 (Moderate)": ds[1],
-                                                "D2 - D4 (Severe)": ds[2],
-                                                "D3 - D4 (Extreme)": ds[3],
-                                                "D4 (Exceptional)": ds[4],
-                                                "DSCI":ds[5]},
-                                               index=[0])
+                    coverage_df = pd.DataFrame(
+                        {
+                            "D0 - D4 (Dry)": ds[0],
+                            "D1 - D4 (Moderate)": ds[1],
+                            "D2 - D4 (Severe)": ds[2],
+                            "D3 - D4 (Extreme)": ds[3],
+                            "D4 (Exceptional)": ds[4],
+                            "DSCI":ds[5]
+                        },
+                        index=[0]
+                    )
                 children=[
-                    html.H6([date],
-                            style={"text-align": "left"}),
+                    html.H6(
+                        children=[date],
+                        style={
+                            "text-align": "left"
+                        }
+                    ),
                     dash_table.DataTable(
                       data=coverage_df.to_dict("rows"),
                         columns=[
@@ -860,8 +934,8 @@ for i in range(1, 3):
                                         "backgroundColor": "#ffff00",
                                         "color": "black"},
                                 {"if": {"column_id": "D1 - D4 (Moderate)"},
-                                            "backgroundColor": "#fcd37f",
-                                             "color": "black"},
+                                        "backgroundColor": "#fcd37f",
+                                         "color": "black"},
                                  {"if": {"column_id": "D2 - D4 (Severe)"},
                                         "backgroundColor": "#ffaa00",
                                         "color": "black"},
@@ -874,7 +948,8 @@ for i in range(1, 3):
                                         "color": "white"},
                                  {"if": {"column_id": "D4 (Exceptional)"},
                                          "backgroundColor": "#730000",
-                                         "color": "white"}],
+                                         "color": "white"}
+                         ],
                          style_data_conditional=[
                                  {"if": {"column_id": "D0 - D4 (Dry)"},
                                          "backgroundColor": "#ffffa5",
@@ -894,7 +969,10 @@ for i in range(1, 3):
                                          "color": "white"},
                                  {"if": {"column_id": "D4 (Exceptional)"},
                                          "backgroundColor": "#a35858",
-                                         "color": "white"}])]
+                                         "color": "white"}
+                        ]
+                    )
+                ]
             except:
                 raise PreventUpdate
         else:
@@ -916,20 +994,16 @@ for i in range(1, 3):
         Toggle the blue Drought Severity Coverage Index on and off for the
         drought area option.
         """
+        style = STYLES["off_button_app"].copy()
         if function == "oarea":
             if click2 % 2 == 0:
-                style = {"background-color": "#a8b3c4",
-                         "border-radius": "4px",
-                         "font-family": "Times New Roman"}
                 children = "Show DSCI: Off"
             else:
-                style = {"background-color": "#c7d4ea",
-                         "border-radius": "4px",
-                         "font-family": "Times New Roman"}
+                style["background-color"] = "#ffff"
                 children = "Show DSCI: On"
         else:
-            style = {"display": "none"}
             children = "Show DSCI: Off"
+            style = {"display": "none"}
 
         return style, children
 
@@ -1420,8 +1494,8 @@ for i in range(1, 3):
         layout_copy["title"] = INDEX_NAMES[choice] + "<Br>" + label
         layout_copy["plot_bgcolor"] = "white"
         layout_copy["paper_bgcolor"] = "white"
-        layout_copy["margin"]["b"] = 40
-        layout_copy["height"] = 300
+        layout_copy["margin"]["b"] = 50
+        layout_copy["height"] = 400
         layout_copy["yaxis"] = yaxis
         layout_copy["font"] = dict(family="Time New Roman")
         layout_copy["hoverlabel"] = dict(font=dict(size=24))
@@ -1442,7 +1516,7 @@ for i in range(1, 3):
                 side="right",
                 position=0.15
             )
-            layout_copy["margin"] = dict(l=55, r=55, b=25, t=90, pad=10)
+            layout_copy["margin"] = dict(l=55, r=55, b=50, t=90, pad=10)
         layout_copy["hovermode"] = "x"
         layout_copy["barmode"] = bar_type
         layout_copy["legend"] = dict(
@@ -1528,87 +1602,3 @@ for i in range(1, 3):
     #     }
     
     #     return dmin, dmax, marks
-
-
-def make_csv(arg):
-    signal, function, index, location, choice = arg
-    data = retrieveData(signal, function, index, location)
-    dates = data.dataset_interval.time.values
-    dates = [pd.to_datetime(str(d)).strftime("%Y-%m") for d in dates]
-
-    # If the function is oarea, we plot five overlapping timeseries
-    label = location[3]
-    nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
-                  "vpdmin", "vpdmean"]
-
-
-    if function != "oarea" or choice in nonindices:
-        # Get the time series from the data object
-        try:
-            timeseries = data.getSeries(location, crdict)
-        except Exception as e:
-            print(e)
-
-        # Create data frame as string for download option
-        columns = OrderedDict({"month": dates,
-                                "value": list(timeseries),
-                                "function": function_names[function],  # <-- This doesn"t always make sense
-                                "location": location[-2],
-                                "index": INDEX_NAMES[index]})
-        df = pd.DataFrame(columns)
-
-    else:
-        label = location[3]
-        ts_series, ts_series_ninc, dsci = data.getArea(crdict)
-
-        # Save to file for download option
-        columns = OrderedDict({"month": dates,
-                                "d0": ts_series_ninc[0],
-                                "d1": ts_series_ninc[1],
-                                "d2": ts_series_ninc[2],
-                                "d3": ts_series_ninc[3],
-                                "d4": ts_series_ninc[4],
-                                "dsci": dsci,
-                                "function": "Percent Area",
-                                "location":  label,
-                                "index": INDEX_NAMES[index]})
-        df = pd.DataFrame(columns)
-    return df
-
-
-def make_csvs(path):
-    """Take a path with query information and save a csv."""
-    # Separate Path
-    signal, function, choice, location, key = path.split("_")
-    location = json.loads(location)
-    signal = json.loads(signal)
-
-    # Get data
-    dfs = []
-    args = []
-    for index in tqdm(list(INDEX_NAMES.keys())):
-        arg = [signal, function, index, location, choice]
-        args.append(arg)
-        df = make_csv(arg)
-        dfs.append(df)
-    df = pd.concat(dfs)
-
-    return df, key
-
-
-# @server.route("/download")
-# def download_csv():
-#     path = flask.request.args.get("value")
-#     print("Sending csv: " + path)
-#     df, key = make_csvs(path)
-#     str_io = io.StringIO()
-#     df.to_csv(str_io)
-#     mem = io.BytesIO()
-#     mem.write(str_io.getvalue().encode("utf-8"))
-#     mem.seek(0)
-#     str_io.close()
-#     filename = "timeseries_all_{}.csv".format(key)
-#     return flask.send_file(mem,
-#                            mimetype="text/csv",
-#                            attachment_filename=filename,
-#                            as_attachment=True)

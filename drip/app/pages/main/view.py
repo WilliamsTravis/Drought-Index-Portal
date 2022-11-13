@@ -309,35 +309,36 @@ def divMaker(id_num, index="noaa"):
         ]),
 
         # Graph
-        html.Div([
-            dcc.Graph(
-                id="series_{}".format(id_num),
-                config={"showSendToCloud": True}
-            )
-        ]),
+        html.Div(
+            children=[
+                dcc.Graph(
+                    id="series_{}".format(id_num),
+                    config={"showSendToCloud": True}
+                )
+            ]
+        ),
         html.Div(
             id="coverage_div_{}".format(id_num),
-            style={"margin-bottom": "25"}
+            style={
+                "margin-bottom": "25px",
+                "width": "90%",
+                "margin-left": "15px",
+                "margin-right": "10px"
+            }
         ),
         html.Button(
             id="dsci_button_{}".format(id_num),
             children=["Show DSCI: Off"],
-            title=("The Drought Severity Coverage Index (DSCI) is a way to " +
-                   "aggregate the five drought severity classifications into a " +
-                   "single number. It is calculated by taking the percentage " +
-                   "of an area in each drought category, weighting each by " +
-                   "their severity, and adding them together:                 " +
-                   "%D0*1 + %D1*2 + %D2*3 + %D3*4 + %D4*5"),
+            title=(
+                "The Drought Severity Coverage Index (DSCI) is a way to "
+                "aggregate the five drought severity classifications into a "
+                "single number. It is calculated by taking the percentage "
+                "of an area in each drought category, weighting each by "
+                "their severity, and adding them together:                 "
+                "%D0*1 + %D1*2 + %D2*3 + %D3*4 + %D4*5"
+            ),
             type="button",
-            n_clicks=2,
-            style={
-                "background-color": "#C7D4EA",
-                "border-radius": "2px",
-                "font-family": "Times New Roman",
-                "border-bottom": "2px solid gray",
-                "margin-top": "100px",
-                "margin-bottom": "-15px"
-            }
+            n_clicks=2
         ),
         html.Hr(style={"margin-bottom": "-3px"}),
 
@@ -563,25 +564,31 @@ LAYOUT = html.Div(
                                         id="all_months_1", type="button",
                                         children="All",
                                         style={
+                                            "line-height": "15px",
                                             "height": "25px",
-                                            "line-height": "25px",
-                                            "background-color": "#C7D4EA",
-                                            "border-radius": "2px",
+                                            "font-size": "11",
+                                            "border": "1px solid black",
+                                            "background-color": "#c9d3e9",
                                             "font-family": "Times New Roman",
-                                            "border-bottom": "2px solid gray",
+                                            "background-color": "#c9d3e9",
+                                            "border-top-left-radius": "5px",
+                                            "border-bottom-left-radius": "5px"
                                         }
+
                                     ),
                                      html.Button(
                                         id="no_months_1",
                                         type="button",
                                         children="None",
                                         style={
+                                            "line-height": "15px",
                                             "height": "25px",
-                                            "line-height": "25px",
-                                            "background-color": "#C7D4EA",
-                                            "border-radius": "2px",
+                                            "font-size": "11",
+                                            "border": "1px solid black",
+                                            "background-color": "#c9d3e9",
                                             "font-family": "Times New Roman",
-                                            "border-bottom": "2px solid gray",
+                                            "border-top-right-radius": "5px",
+                                            "border-bottom-right-radius": "5px"
                                         }
                                     )
                                 ],
@@ -645,8 +652,15 @@ LAYOUT = html.Div(
                                     type="button",
                                     children="All",
                                     style={
+                                        "line-height": "15px",
                                         "height": "25px",
-                                        "line-height": "25px"
+                                        "font-size": "11",
+                                        "border": "1px solid black",
+                                        "background-color": "#c9d3e9",
+                                        "font-family": "Times New Roman",
+                                        "background-color": "#c9d3e9",
+                                        "border-top-left-radius": "5px",
+                                        "border-bottom-left-radius": "5px"
                                     }
                                 ),
                                 html.Button(
@@ -654,8 +668,15 @@ LAYOUT = html.Div(
                                     type="button",
                                     children="None",
                                     style={
+                                        "line-height": "15px",
                                         "height": "25px",
-                                        "line-height": "25px"
+                                        "font-size": "11",
+                                        "border": "1px solid black",
+                                        "background-color": "#c9d3e9",
+                                        "font-family": "Times New Roman",
+                                        "background-color": "#c9d3e9",
+                                        "border-top-right-radius": "5px",
+                                        "border-bottom-right-radius": "5px"
                                     }
                                 )
                             ],
@@ -755,14 +776,7 @@ LAYOUT = html.Div(
                     ),
                     children="Submit Options",
                     type="button",
-                    style={
-                        "background-color": "#C7D4EA",
-                        "border-radius": "2px",
-                        "font-family": "Times New Roman",
-                        "border-bottom": "2px solid gray",
-                        "margin-top": "100px",
-                        "margin-bottom": "35px"
-                    }
+                    style=STYLES["on_button_app"]
                 )
             ],
             style={"text-align": "center"}

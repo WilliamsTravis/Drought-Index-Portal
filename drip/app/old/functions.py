@@ -1121,71 +1121,40 @@ def toRasters(arraylist, path, geometry, srs):
         image.GetRasterBand(1).WriteArray(ray[1])
 
 
-def wgsToAlbers(arrays, crdict, proj_sample):
+def wgsToAlbers(proj_data, masked_arrays, crdict):
     """
     Takes an xarray dataset in WGS 84 (epsg: 4326) with a specified mask and
-    returns that mask projected to Alber"s North American Equal Area Conic
+    returns that mask projected to Alber's North American Equal Area Conic
     (epsg: 102008).
     """
-    wgs_proj = Proj(init="epsg:4326")
-    geom = crdict.source.transform
-    wgrid = salem.Grid(nxny=(crdict.x_length, crdict.y_length),
-                       dxdy=(crdict.res, -crdict.res),
-                       x0y0=(geom[0], geom[3]), proj=wgs_proj)
-    lats = np.unique(wgrid.xy_coordinates[1])
-    lats = lats[::-1]
-    lons = np.unique(wgrid.xy_coordinates[0])
-    data_array = xr.DataArray(
-        data=arrays.value[0],
-        coords=[lats, lons],
-        dims=["latitude", "longitude"]
+    from rasterio.enums import Resampling
+
+    # Get single dataset from masked arrays
+    wgs = masked_arrays.isel(time=0)
+    wgs = wgs.rio.write_crs("epsg:4326")
+    wgs.value.data[np.isnan(wgs.value.data)] = -9999
+
+    # Get the shape of the projected data
+    albers_shape = proj_data.dataset.value[0].shape
+    albers_proj = (
+        "+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 "
+        "+ellps=GRS80 +datum=NAD83 +units=m +no_defs"
     )
-    wgs_data = xr.Dataset(data_vars={"value": data_array})
 
-    # Albers Equal Area Conic North America (epsg not working)
-    albers_proj = Proj("+proj=aea +lat_1=20 +lat_2=60 +lat_0=40 \
-                        +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 \
-                        +datum=NAD83 +units=m +no_defs")
-
-    # Create an albers grid
-    geom = proj_sample.crs.GeoTransform
-    array = proj_sample.value[0].values
-    res = geom[0]
-    x_length = array.shape[1]
-    y_length = array.shape[0]
-    agrid = salem.Grid(
-        nxny=(x_length, y_length),
-        dxdy=(res, -res),
-        x0y0=(geom[2], geom[5]),
-        proj=albers_proj
+    # Reproject wgs array with rio xarray to build projected mask
+    mask = wgs.rio.reproject(
+        albers_proj,
+        shape=albers_shape,
+        resampling=Resampling.bilinear,
+        nodata=-9999
     )
-    lats = np.unique(agrid.xy_coordinates[1])
-    lats = lats[::-1]
-    lons = np.unique(agrid.xy_coordinates[0])
-    data_array = xr.DataArray(
-        data=array,
-        coords=[lats, lons],
-        dims=["latitude", "longitude"]
-    )
-    albers_data = xr.Dataset(data_vars={"value": data_array})
-    albers_data.salem.grid._proj = albers_proj
-    projection = albers_data.salem.transform(wgs_data, "linear")
-    proj_mask = projection.value.data
-    proj_mask = proj_mask * 0 + 1
+    mask.value.data[mask.value.data > -9999] = 1
+    mask.value.data[mask.value.data == -9999] = np.nan
 
-    # Set up grid info from coordinate dictionary
-    nlat, nlon = proj_mask.shape
-    xs = np.arange(nlon) * geom[0] + geom[2]
-    ys = np.arange(nlat) * geom[4] + geom[5]
+    # Mask projected data with projected mask
+    proj_data.dataset_interval.value.data *= mask.value.data
 
-    # Create mask xarray
-    proj_mask = xr.DataArray(proj_mask,
-                              coords={"latitude": ys.astype(np.float32),
-                                      "longitude": xs.astype(np.float32)},
-                              dims={"latitude": len(ys),
-                                    "longitude": len(xs)})
-    return(proj_mask)
-
+    return proj_data
 
 
 class Admin_Elements(Paths):
@@ -1877,12 +1846,12 @@ class Index_Maps(Paths):
 
         # Filter data by the mask (should be set already)
         masked_arrays = data.where(self.mask == 1)
-        albers_mask = wgsToAlbers(masked_arrays, crdict, proj_data.dataset)
-        arrays = proj_data.dataset_interval.where(albers_mask == 1).value
+        proj_data = wgsToAlbers(proj_data, masked_arrays, crdict)
+        arrays = proj_data.dataset_interval.value
 
         # Flip if this is EDDI
         if "eddi" in choice:
-            arrays = arrays*-1
+            arrays = arrays * -1
 
         # Drought Categories
         drought_cats = {"sp": {0: [-0.5, -0.8],
