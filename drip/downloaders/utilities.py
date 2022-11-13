@@ -544,18 +544,28 @@ class EDDI(NetCDF):
             "anonymous",
             "anonymous@cdc.noaa.gov"
         ]
+        self.missed = []
 
     def download_eddi(self):
         """Download an EDDI dataset."""
         logger.info(f"Downloading datasets for {self.index}...")
         paths = self.eddi_paths
-        with FTP(*self.eddi_ftp_args, timeout=60*5) as ftp:
-            for path in paths:
-                self._get(ftp, path)
-                time.sleep(3)
+        with mp.Pool(mp.cpu_count()) as pool:
+            for _ in pool.imap(self._get, paths):
+                pass
+            
+        if self.missed:
+            logger.error("%d missed downloads: ", len(self.missed))
+            for miss in self.missed:
+                logger.error("   %s", miss)
+        else:
+            logger.info("%d files successfully downloaded to %s",
+                        len(paths), str(self.target_dir))
 
     def format_eddi(self, time_tag="NETCDF_DIM_day"):
         """Reformat EDDI asc files to geotiff for use in DataBuilder."""
+        logger.info("Adjusting %s downloads to DrIP format", self.index)
+
         # Collect all paths
         paths = list(self.target_dir.glob("*asc"))
         paths.sort()
@@ -642,27 +652,30 @@ class EDDI(NetCDF):
             for _ in pool.starmap(self._warp, reproject_list):
                 pass
 
-    def _get(self, ftp, path):
+    def _get(self, path):
         """Download path from an FTP server. Add error handling/logging."""
-        dst = self.target_dir.joinpath(path.name)
-        def writeline(line):
-            file.write(line + "\n")
-        with open(dst, "w") as file:
-            try:
-                print(f"downloading {path}...")
-                logger.info("downloading %s...", path)
-                ftp.retrlines(f"RETR {path}", writeline)
-            except Exception as e:
-                print(e)
-                print(f"Download failed, trying again: {path}...")
-                logger.error("Download failed (%s), retrying: %s...", e, path)
+        dst = str(self.target_dir.joinpath(path.name))
+        with FTP(*self.eddi_ftp_args, timeout=60*5) as ftp:
+            def writeline(line):
+                file.write(line + "\n")
+            with open(dst, "w") as file:
                 try:
+                    logger.info("downloading %s...", path)
                     ftp.retrlines(f"RETR {path}", writeline)
                 except Exception as e:
                     print(e)
-                    print(f"{path} totally failed")
-                    logger.error("%s totally failed: %s", path, e)
-                    raise
+                    print(f"Download failed, trying again: {path}...")
+                    logger.error("Download failed (%s), retrying: %s...", e,
+                                 path)
+                    try:
+                        ftp.retrlines(f"RETR {path}", writeline)
+                    except Exception as e:
+                        print(e)
+                        print(f"{path} totally failed, adding file to missed "
+                              f"download list ({len(self.missed)} items).")
+                        logger.error("%s totally failed: %s", path, e)
+                        self.missed.append(path)
+                        pass
 
 
 class PRISM(NetCDF):
@@ -697,6 +710,15 @@ class Data_Builder(NetCDF):
         self.resolution = resolution
         self.template = template
         self._set_index(index)
+
+    def __repr__(self):
+        """Return representation string."""
+        address = hex(id(self))
+        name = str(self.__class__).replace(">", f" at {address}>")
+        attrs = [f"{key}='{attr}'" for key, attr in self.__dict__.items()]
+        attr_str = "\n  ".join(attrs)
+        msg = f"{name}\n  {attr_str}"
+        return msg
 
     def build(self, overwrite=False):
         """Download and combine multiple NetCDF files from WWDT into one."""
@@ -733,7 +755,6 @@ class Data_Builder(NetCDF):
         """Return appropriate remote and local paths for downloading."""
         if self.host == "https://wrcc.dri.edu/wwdt/data/PRISM":
             return self.paths_wwdt
-
 
     @property
     def paths_wwdt(self):

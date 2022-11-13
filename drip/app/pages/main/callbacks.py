@@ -74,137 +74,6 @@ function_names = {
 }
 
 
-# For singular elements
-@app.callback(
-    Output("date_range_1", "children"),
-    Output("date_print_1", "children"),
-    Input("year_slider_1", "value"),
-    Input("month_slider_1a", "value"),
-    Input("month_slider_1b", "value"),
-    Input("month_check_1", "value"),
-    Input("date_sync", "n_clicks")
-)
-@calls.log
-def adjustDatePrint1(year_range, month_a,  month_b, month_check, sync):
-    """If users select one year, only print it once."""
-    # If not syncing, these need numbers
-    months = [int(m) for m in range(1, 13)]
-    if not sync:
-        sync = 0
-    if sync % 2 == 0:
-        number = ""
-    else:
-        number = " #1"
-
-    # Don"t print start and end months if full year is chosen
-    month_a = Options.date_marks["months"][month_a - 1]["label"]
-    month_b = Options.date_marks["months"][month_b - 1]["label"]
-    if month_a == "Jan" and month_b == "Dec":
-        mrs = ["", ""]
-        mjoin = ""
-    else:
-        mrs = [month_a + " ", month_b + " "]
-        mjoin = " - "
-
-    # Don"t print months included if all are included
-    if not month_check[0]:
-        month_check = month_check[1:]
-
-    if len(month_check) == 12 or len(month_check) == 0:
-        month_incl_print = ""
-    else:
-        month_check.sort()
-        if months[0]:
-            month_incl_print = "".join(
-                [Options.date_marks["months"][i - 1]["label"].upper()[0] for i in month_check]
-            )
-            month_incl_print = f" ({month_incl_print})"
-        else:
-            month_incl_print = ""
-
-    # Year slider #1: If a single year do this
-    if year_range[0] == year_range[1]:
-        string = str(year_range[0])
-        if mrs[0] == mrs[1]:
-            string = mrs[0] + str(year_range[0])
-        else:
-            string = mrs[0] + mjoin + mrs[1] + str(year_range[0])
-    else:
-        string = (mrs[0] + str(year_range[0]) + " - " + mrs[1] +
-                  str(year_range[1]))
-
-    # And now add the month printouts
-    string = string + month_incl_print
-    full = "Date Range" + number + ":  " + string
-
-    return full, string
-
-
-@app.callback(
-    Output("date_range_2", "children"),
-    Output("date_print_2", "children"),
-    Input("year_slider_2", "value"),
-    Input("month_slider_2a", "value"),
-    Input("month_slider_2b", "value"),
-    Input("month_check_2", "value"),
-    Input("date_sync", "n_clicks")
-)
-@calls.log
-def adjustDatePrint2(year_range, month_a,  month_b, month_check, sync):
-    """If users select one year, only print it once."""
-    # If not syncing, these need numbers
-    months = [int(m) for m in range(1, 13)]
-    if not sync:
-        sync = 0
-    if sync % 2 == 0:
-        number = ""
-    else:
-        number = " #2"
-
-    # Don"t print start and end months if full year is chosen
-    month_a = Options.date_marks["months"][month_a - 1]["label"]
-    month_b = Options.date_marks["months"][month_b - 1]["label"]
-    if month_a == "Jan" and month_b == "Dec":
-        mrs = ["", ""]
-        mjoin = ""
-    else:
-        mrs = [month_a + " ", month_b + " "]
-        mjoin = " - "
-
-    # Don"t print months included if all are included
-    if not month_check[0]:
-        month_check = month_check[1:]
-    
-    if len(month_check) == 12 or len(month_check) == 0:
-        month_incl_print = ""
-    else:
-        month_check.sort()
-        if months[0]:
-            month_incl_print = "".join(
-                [Options.date_marks["months"][i - 1]["label"].upper() for i in month_check]
-            )
-            month_incl_print = " (" + month_incl_print + ")"
-        else:
-            month_incl_print = ""
-
-    # Year slider #1: If a single year do this
-    if year_range[0] == year_range[1]:
-        string = str(year_range[0])
-        if mrs[0] == mrs[1]:
-            string = mrs[0] + str(year_range[0])
-        else:
-            string = mrs[0] + mjoin + mrs[1] + str(year_range[0])
-    else:
-        string = (mrs[0] + str(year_range[0]) + " - " + mrs[1] +
-                  str(year_range[1]))
-
-    # And now add the month printouts
-    string = string + month_incl_print
-    full = "Date Range" + number + ":  " + string
-
-    return full, string
-
-
 @app.callback(
     Output("month_start_print_1", "children"),
     Output("month_end_print_1", "children"),
@@ -604,11 +473,110 @@ def toggleDateSyncButton(click, old_style):
     return style, children
 
 
-
-
-
 # For multiple instances
 for i in range(1, 3):
+    
+    @app.callback(
+        Output(f"year_slider_{i}", "min"),
+        Output(f"year_slider_{i}", "max"),
+        Output(f"year_slider_{i}", "marks"),
+        Input("choice_1", "value"),
+        Input("choice_2", "value"),
+        Input("date_sync", "n_clicks"),
+        State("key_{}".format(i), "children")
+    )
+    def adjust_year_slider(choice1, choice2, sync, key):
+        """Adjust years slider to available years in chosen index."""
+        # Figure which choice is this panel's and which is the other
+        key = int(key) - 1
+        choices = [choice1, choice2]
+        choice = choices[key]
+        choice2 = choices[~key]
+
+        # Sync is None on first load
+        if not sync:
+            sync = 0
+
+        # Get date range for each index, use shared range if syncing
+        if sync % 2 == 0:
+            options = Options(choice1)
+        else:
+            options = Options(choice)
+
+        max_year = options.dates["max_year"]
+        min_year = options.dates["min_year"]
+        marks = options.date_marks["years"]
+
+        return min_year, max_year, marks
+
+    @app.callback(
+        Output(f"date_range_{i}", "children"),
+        Output(f"date_print_{i}", "children"),
+        Input(f"year_slider_{i}", "value"),
+        Input(f"month_slider_{i}a", "value"),
+        Input(f"month_slider_{i}b", "value"),
+        Input(f"month_check_{i}", "value"),
+        Input("date_sync", "n_clicks"),
+        State("key_{}".format(i), "children")
+    )
+    @calls.log
+    def adjustDatePrint(year_range, month_a,  month_b, month_check,  sync,
+                        key):
+        """If users select one year, only print it once."""
+        # If not syncing, these need numbers
+        months = [int(m) for m in range(1, 13)]
+        if not sync:
+            sync = 0
+        if sync % 2 == 0:
+            number = ""
+        else:
+            number = f" #{key}"
+    
+        # Don"t print start and end months if full year is chosen
+        options = Options("pdsi")
+        month_a = options.date_marks["months"][month_a - 1]["label"]
+        month_b = options.date_marks["months"][month_b - 1]["label"]
+        if month_a == "Jan" and month_b == "Dec":
+            mrs = ["", ""]
+            mjoin = ""
+        else:
+            mrs = [month_a + " ", month_b + " "]
+            mjoin = " - "
+
+        # Don"t print months included if all are included
+        if not month_check[0]:
+            month_check = month_check[1:]
+    
+        if len(month_check) == 12 or len(month_check) == 0:
+            month_incl_print = ""
+        else:
+            month_check.sort()
+            if months[0]:
+                month_incl_print = "".join(
+                    [Options.date_marks["months"][i - 1]["label"].upper()[0]
+                     for i in month_check]
+                )
+                month_incl_print = f" ({month_incl_print})"
+            else:
+                month_incl_print = ""
+    
+        # Year slider #1: If a single year do this
+        if year_range[0] == year_range[1]:
+            string = str(year_range[0])
+            if mrs[0] == mrs[1]:
+                string = mrs[0] + str(year_range[0])
+            else:
+                string = mrs[0] + mjoin + mrs[1] + str(year_range[0])
+        else:
+            string = (mrs[0] + str(year_range[0]) + " - " + mrs[1] +
+                      str(year_range[1]))
+    
+        # And now add the month printouts
+        string = string + month_incl_print
+        full = "Date Range" + number + ":  " + string
+    
+        return full, string
+
     @app.callback(
         Output("location_store_{}".format(i), "children"),
         Input("map_1", "clickData"),

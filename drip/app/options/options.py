@@ -46,11 +46,19 @@ DEFAULT_LOCATION = ["grids", "[10, 11, 11, 11, 12, 12, 12, 12]",
 class Options(Paths):
     """Methods for retrieving updated default options and values."""
 
-    def __init__(self):
+    def __init__(self, index="pdsi"):
         """Initialize Drip_Defaults object."""
+        self.index = index
+        self.index_path = self.paths["indices"].joinpath(index, index + ".nc")
 
     def __repr__(self):
-        """Return representation string for Drip_Defaults object."""
+        """Return representation string."""
+        address = hex(id(self))
+        name = str(self.__class__).replace(">", f" at {address}>")
+        attrs = [f"{key}='{attr}'" for key, attr in self.__dict__.items()]
+        attr_str = "\n  ".join(attrs)
+        msg = f"{name}\n  {attr_str}"
+        return msg
 
     @classmethod
     @property
@@ -89,12 +97,11 @@ class Options(Paths):
             options.append({"label": row["place"], "value": row["fips"]})
         return options
 
-    @classmethod
     @property
-    def dates(cls):
+    def dates(self):
         """Return minimum and maxmium dates in sample dataset."""
         base = dateutil.parser.parse("19000101")
-        with Dataset(cls.sample_path) as data:
+        with Dataset(self.index_path) as data:
             min_date = base + dt.timedelta(days=data["time"][:].min())
             max_date = base + dt.timedelta(days=data["time"][:].max())
         dates = {}
@@ -104,14 +111,13 @@ class Options(Paths):
         dates["years"] = list(range(dates["min_year"], dates["max_year"] + 1))
         return dates
 
-    @classmethod
     @property
-    def date_marks(cls):
+    def date_marks(self):
         """Return slider tick marks for year sliders."""
-        min_year = cls.dates["min_year"]
-        max_year = cls.dates["max_year"]
+        min_year = self.dates["min_year"]
+        max_year = self.dates["max_year"]
         years = {}
-        for i, y in enumerate(cls.dates["years"]):
+        for i, y in enumerate(self.dates["years"]):
             ymark = str(y)
             if y % 5 != 0 and y != min_year and y != max_year:  
                 ymark = ""

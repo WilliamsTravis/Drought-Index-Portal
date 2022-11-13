@@ -9,6 +9,9 @@ from drip.app.options.options import Options, DEFAULT_LOCATION, DEFAULT_SIGNAL
 from drip.app.options.styles import STYLES
 
 
+OPTIONS = Options("pdsi")
+
+
 # Dynamic Elements
 def divMaker(id_num, index="noaa"):
     div = html.Div(
@@ -41,7 +44,7 @@ def divMaker(id_num, index="noaa"):
                             ),
                             dcc.Dropdown(
                                 id="choice_{}".format(id_num),
-                                options=Options.index_options,
+                                options=OPTIONS.index_options,
                                 value=index,
                                 clearable=False,
                                 style={"border-radius": "0px"}
@@ -89,7 +92,7 @@ def divMaker(id_num, index="noaa"):
                                         children=[
                                             dcc.Dropdown(
                                                 id="state_{}".format(id_num),
-                                                options=Options.states,
+                                                options=OPTIONS.states,
                                                 clearable=False,
                                                 multi=True,
                                                 style={"border-radius": "0px"},
@@ -104,7 +107,7 @@ def divMaker(id_num, index="noaa"):
                                             dcc.Dropdown(
                                                 id="county_{}".format(id_num),
                                                 clearable=False,
-                                                options=Options.counties,
+                                                options=OPTIONS.counties,
                                                 multi=False,
                                                 style={"border-radius": "0px"},
                                                 value=24098
@@ -466,15 +469,16 @@ LAYOUT = html.Div(
                             children="Date Range"
                         ),
                         html.Div(
+                            id="year_slider_div_1",
                             children=[
                                 dcc.RangeSlider(
                                     id="year_slider_1",
-                                    value=[1980, Options.dates["max_year"]],
-                                    min=Options.dates["min_year"],
-                                    max=Options.dates["max_year"],
+                                    value=[1980, OPTIONS.dates["max_year"]],
+                                    min=OPTIONS.dates["min_year"],
+                                    max=OPTIONS.dates["max_year"],
                                     updatemode="drag",
                                     step=1,
-                                    marks=Options.date_marks["years"]
+                                    marks=OPTIONS.date_marks["years"]
                                 )
                             ],
                             style={
@@ -489,15 +493,20 @@ LAYOUT = html.Div(
                                     id="date_range_2",
                                     children="Date Range #2"
                                 ),
-                                dcc.RangeSlider(
-                                    id="year_slider_2",
-                                    value=[1980, Options.dates["max_year"]],
-                                    min=Options.dates["min_year"],
-                                    max=Options.dates["max_year"],
-                                    step=1,
-                                    updatemode="drag",
-                                    marks=Options.date_marks["years"]
-                                )
+                                html.Div(
+                                    id="year_slider_div_2",
+                                    children=[
+                                        dcc.RangeSlider(
+                                            id="year_slider_2",
+                                            value=[1980, OPTIONS.dates["max_year"]],
+                                            min=OPTIONS.dates["min_year"],
+                                            max=OPTIONS.dates["max_year"],
+                                            step=1,
+                                            updatemode="drag",
+                                            marks=OPTIONS.date_marks["years"]
+                                        )
+                                    ]
+                                ),
                             ],
                             style={
                                 "display": "none",
@@ -519,7 +528,7 @@ LAYOUT = html.Div(
                                  dcc.Slider(
                                      id="month_slider_1a",
                                      value=1,
-                                     marks=Options.date_marks["months_slanted"],
+                                     marks=OPTIONS.date_marks["months_slanted"],
                                      min=1,
                                      max=12,
                                      step=1,
@@ -537,7 +546,7 @@ LAYOUT = html.Div(
                                  dcc.Slider(
                                      id="month_slider_1b",
                                      value=1,
-                                     marks=Options.date_marks["months_slanted"],
+                                     marks=OPTIONS.date_marks["months_slanted"],
                                      min=1,
                                      max=12,
                                      step=1,
@@ -557,7 +566,7 @@ LAYOUT = html.Div(
                                          className="check_blue",
                                          id="month_check_1",
                                          value=list(range(1, 13)),
-                                         options=Options.date_marks["months"],
+                                         options=OPTIONS.date_marks["months"],
                                          labelStyle={"display": "inline-block"}
                                      ),
                                      html.Button(
@@ -610,7 +619,7 @@ LAYOUT = html.Div(
                                  dcc.Slider(
                                       id="month_slider_2a",
                                       value=1,
-                                      marks=Options.date_marks["months_slanted"],
+                                      marks=OPTIONS.date_marks["months_slanted"],
                                       min=1,
                                       max=12,
                                       step=1,
@@ -627,7 +636,7 @@ LAYOUT = html.Div(
                                 dcc.Slider(
                                     id="month_slider_2b",
                                     value=1,
-                                    marks=Options.date_marks["months_slanted"],
+                                    marks=OPTIONS.date_marks["months_slanted"],
                                     step=1,
                                     min=1,
                                     max=12,
@@ -648,7 +657,7 @@ LAYOUT = html.Div(
                                     className="check_blue",
                                     id="month_check_2",
                                     value=list(range(1, 13)),
-                                    options=Options.date_marks["months"],
+                                    options=OPTIONS.date_marks["months"],
                                     labelStyle={"display": "inline-block"}
                                 ),
                                 html.Button(
@@ -701,7 +710,7 @@ LAYOUT = html.Div(
                                      dcc.Dropdown(
                                          id="map_type",
                                          value="dark",
-                                         options=Options.base_maps
+                                         options=OPTIONS.base_maps
                                      )],
                                      className="two columns"
                                  ),
@@ -729,7 +738,7 @@ LAYOUT = html.Div(
                                      ),
                                      dcc.Dropdown(
                                          id="function_choice",
-                                         options=Options.functions["main"],
+                                         options=OPTIONS.functions["main"],
                                          value="omean"
                                      )],
                                     className="three columns"),
@@ -752,7 +761,7 @@ LAYOUT = html.Div(
                                                      selected_style=STYLES["tab"])]),
                                      dcc.Dropdown(
                                          id="colors",
-                                         options=Options.colors,
+                                         options=OPTIONS.colors,
                                          value="Default"
                                      )
                                 ],
@@ -792,8 +801,8 @@ LAYOUT = html.Div(
         # The Map divs
         html.Div(
             children=[
-                divMaker(1, Options.index_keys[0]),
-                divMaker(2, Options.index_keys[1])
+                divMaker(1, OPTIONS.index_keys[0]),
+                divMaker(2, OPTIONS.index_keys[1])
             ],
             className="row"
         ),
@@ -806,12 +815,12 @@ LAYOUT = html.Div(
         ),
         html.Div(
           id="date_print_1",
-          children=f"1980 - {Options.dates['max_year']}",
+          children=f"1980 - {OPTIONS.dates['max_year']}",
           style={"display": "none"}
         ),
         html.Div(
           id="date_print_2",
-          children=f"1980 - {Options.dates['max_year']}",
+          children=f"1980 - {OPTIONS.dates['max_year']}",
           style={"display": "none"}
         ),
         html.Div(

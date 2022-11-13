@@ -18,5 +18,5 @@ def main():
                 builder.build(overwrite=False)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
