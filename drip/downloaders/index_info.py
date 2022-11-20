@@ -19,7 +19,14 @@ ADDRESSES = {
     "ftp://ftp2.psl.noaa.gov/Projects/EDDI/CONUS_archive": [
         f"eddi{i}" for i in range(1, 13)
     ],
-    "prism.nacse.org": [],
+    "prism.nacse.org": [
+        "tmin",
+        "tmax",
+        "tdmean",
+        "ppt",
+        "vpdmax",
+        "vpdmin"
+    ],
     "https://wrcc.dri.edu/wwdt/data/PRISM": [
         'pdsi',
         'scpdsi',

@@ -2,6 +2,10 @@
 
 Methods to help download and format drought indices from source.
 
+To Do:
+    - Catch urlopen error (spei7_07)
+
+
 date: Sun Mar 27th, 2022
 author: Travis Williams
 """
@@ -10,6 +14,7 @@ import pathlib
 import socket
 import time
 import urllib
+import zipfile
 
 from ftplib import FTP
 from multiprocessing.pool import ThreadPool
@@ -123,7 +128,7 @@ class Downloader(drip.Paths):
                 dst
             )
             urllib.request.urlretrieve(url, dst)
-        except (HTTPError, URLError) as error:
+        except (HTTPError, URLError, Exception) as error:
             logger.error("%s not retrieved because %s\nURL: %s", dst,
                          error, url)
         except timeout:
@@ -131,7 +136,7 @@ class Downloader(drip.Paths):
             try:
                 os.remove(dst)
                 urllib.request.urlretrieve(url, dst)
-            except (HTTPError, URLError) as error:
+            except (HTTPError, URLError, Exception) as error:
                 logger.error("%s not retrieved because %s\nURL: %s", dst,
                             error, url)
             except timeout:
@@ -476,7 +481,7 @@ class NetCDF(Adjustments):
 
     def _set_logger(self):
         """Create logging file handler for this process."""
-        filename = self.home.joinpath("logs", self.index + ".log")
+        filename = self.home.joinpath(self.index + ".log")
         set_handler(logger, filename)
 
     def _warp(self, src, dst, dst_srs="epsg:4326", xres=None, yres=None):
@@ -679,7 +684,7 @@ class EDDI(NetCDF):
 
 
 class PRISM(NetCDF):
-    """Methods fordownloading and formatting PRISM datasets."""
+    """Methods for downloading and formatting PRISM datasets."""
 
     def __init__(self, index):
         """Initialize PRISM Object."""
@@ -688,6 +693,148 @@ class PRISM(NetCDF):
             "prism.nacse.org",
             "anonymous"
         ]
+        self.target_dir = self.home.joinpath("originals")
+        self.target_dir.mkdir(exist_ok=True, parents=True)
+        self.missed = []
+
+    def download_prism(self):
+        """Download a PRISM dataset."""
+        logger.info(f"Downloading datasets for {self.index}...")
+        paths = self.prism_paths
+        with ThreadPool(8) as pool:  # <--------------------------------------- max 8 or ncpu
+            for _ in pool.imap(self._get, paths):
+                pass
+
+        if self.missed:
+            logger.error("%d missed downloads: ", len(self.missed))
+            for miss in self.missed:
+                logger.error("   %s", miss)
+        else:
+            logger.info("%d files successfully downloaded to %s",
+                        len(paths), str(self.target_dir))
+
+    def format_prism(self, time_tag="NETCDF_DIM_day"):
+        """Reformat PRISM files to geotiff for use in DataBuilder."""
+        logger.info("Adjusting %s downloads to DrIP format", self.index)
+
+        # Collect all paths
+        all_paths = list(self.target_dir.glob("*.bil"))
+        paths = [p for p in all_paths if len(p.name.split("_")[4]) == 6]
+        paths.sort()
+
+        # Group by month and get days since 1900
+        monthly = {}
+        for i in range(1, 13):
+            if i not in monthly:
+                monthly[i] = {}
+            mpaths = [p for p in paths if p.name.split("_")[4][4:6] == f"{i:02d}"]
+            array = np.array([rio.open(mp).read(1) for mp in mpaths])
+            date_strings = [f"{mp.name.split('_')[4]}01" for mp in mpaths]
+            days = [self.to_date(date) for date in date_strings]
+            monthly[i]["paths"] = mpaths
+            monthly[i]["days"] = days
+            monthly[i]["array"] = array
+
+        # Write to geotiff
+        profile = rio.open(paths[0]).profile
+        profile["crs"] = "epsg:4326"
+        profile["driver"] = "GTiff"
+        for month, values in monthly.items():
+            profile = profile.copy()
+            array = values["array"]
+            count = array.shape[0]
+            profile["count"] = count
+            fname = f"{self.index}_{month:02d}_temp.tif"
+            dst = self.home.joinpath("originals", fname)
+            with rio.open(dst, "w", **profile) as file:
+                for i in range(count):
+                    band = i + 1
+                    meta = {time_tag: values["days"][i]}
+                    file.write(array[i], band)
+                    file.update_tags(band, **meta)
+
+        # Reproject and resample
+        self._adjust_prism()
+
+    @property
+    def prism_paths(self):
+        """Get the last day of the month."""
+        pattern = "all_bil.zip"
+        paths = []
+        with FTP(*self.prism_ftp_args) as ftp:
+            ftp.cwd(f"/monthly/{self.index}")
+            years = [item for item in ftp.nlst() if isint(item)]
+            years.sort()
+            for year in years:
+                cwd = f"/monthly/{self.index}/{year}"
+                ftp.cwd(cwd)
+                all_paths = ftp.nlst()
+                complete_paths = [f for f in all_paths if pattern in f]
+                if complete_paths:
+                    paths.append(Path(f"{cwd}/{complete_paths[-1]}"))
+                else:
+                    for all_path in all_paths:
+                        paths.append(Path(f"{cwd}/{all_path}"))  # Includes provisional paths
+
+        return paths
+
+    def _unzip_prism(self):
+        """Unzip all downloaded prism paths."""
+        zip_paths = list(self.target_dir.glob("*.zip"))
+        for zip_path in zip_paths:
+            with zipfile.ZipFile(zip_path, "r") as zref:
+                zref.extractall(self.target_dir)
+
+    def _adjust_prism(self, resolution=0.25):
+        """Resample all downloaded monthly files to target resolution."""
+        # Collect all needed arguments
+        resample_list = []
+        reproject_list = []
+        resolution = resolution
+        monthlies = list(self.home.joinpath("originals").glob("*tif"))
+        monthlies.sort()
+        for src in monthlies:
+            rs_name = src.name.replace(".tif", "_resampled.tif")
+            rp_name = src.name.replace(".tif", "_reprojected.tif")
+            rs_dst = src.parent.joinpath(rs_name)
+            rp_dst = src.parent.joinpath(rp_name)
+            rs_args = [src, rs_dst, "epsg:4326", resolution, -resolution]
+            rp_args = [rs_dst, rp_dst, "epsg:5070", None, None]
+            resample_list.append(rs_args)
+            reproject_list.append(rp_args)
+
+        # Resample
+        with ThreadPool(os.cpu_count() - 1) as pool:
+            for _ in pool.starmap(self._warp, resample_list):
+                pass
+
+        # Reproject
+        with ThreadPool(os.cpu_count() - 1) as pool:
+            for _ in pool.starmap(self._warp, reproject_list):
+                pass
+
+    def _get(self, path):
+        """Download path from an FTP server. Add error handling/logging."""
+        dst = str(self.target_dir.joinpath(path.name))
+        with FTP(*self.prism_ftp_args, timeout=60*5) as ftp:
+            with open(dst, "wb") as file:
+                try:
+                    logger.info("downloading %s...", path)
+                    ftp.retrbinary("RETR " + str(path), file.write)
+                except Exception as e:
+                    print(e)
+                    print(f"Download failed, trying again: {path}...")
+                    logger.error("Download failed (%s), retrying: %s...", e,
+                                 path)
+                    try:
+                        ftp.retrbinary("RETR " + str(path), file.write)
+                    except Exception as e:
+                        print(e)
+                        print(f"{path} totally failed, adding file to missed "
+                              f"download list ({len(self.missed)} items).")
+                        logger.error("%s totally failed: %s", path, e)
+                        self.missed.append(path)
+                        pass
 
 
 class Data_Builder(NetCDF):
@@ -739,6 +886,11 @@ class Data_Builder(NetCDF):
                 eddi = EDDI(self.index)
                 eddi.download_eddi()
                 eddi.format_eddi()
+            elif "prism" in self.host:
+                prism = PRISM(self.index)
+                prism.download_prism()
+                prism._unzip_prism()
+                prism.format_prism()
             else:
                 self.download_all(self.download_paths)
                 self._adjust_wwdt()

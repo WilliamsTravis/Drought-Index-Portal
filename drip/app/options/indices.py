@@ -91,7 +91,7 @@ INDEX_NAMES = {
     "spei12": "Standardized Precipitation-Evaporation Index - 12 month",
     "tmin": "Temperature - Minimum (C)",
     "tmax": "Temperature - Maximum (C)",
-    "tmean": "Temperature - Mean (C)",
+    # "tmean": "Temperature - Mean (C)",
     "tdmean": "Dew Point Temperature - Mean (C)",
     "ppt": "Precipitation (mm)?",
     "vpdmax": "Vapor Pressure Deficit - Maxmimumm",

@@ -11,12 +11,11 @@ def main():
     """Download and format all needed files for the prf app."""
     for index, desc in INDEX_NAMES.items():
         if not index.startswith("ri"):
-            if "Index" in desc:
-                logger.info("Building %s ...", index)
-                print(f"Building {index}...")
-                builder = Data_Builder(index)
-                builder.build(overwrite=False)
+            logger.info("Building %s ...", index)
+            print(f"Building {index}...")
+            builder = Data_Builder(index)
+            builder.build(overwrite=False)
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
