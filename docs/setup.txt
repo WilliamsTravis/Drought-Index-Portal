@@ -1,4 +1,4 @@
-Installation Steps (Using Anaconda and a Linux OS)
+Installation Steps (Using Anaconda and Ubuntu 22.10)
 
 1) Clone repository
 2) Get Anaconda
@@ -31,13 +31,21 @@ Installation Steps (Using Anaconda and a Linux OS)
     #> soa 	@ 	         Primary nameserver: ns53.domaincontrol.com.   1 Hour
 
    b) Then install certbot (and by association 'letsencrypt') for nginx:
-        1) sudo add-apt-repository ppa:certbot/certbot
-	2) sudo apt-get update
-	3) sudo apt-get install python-certbot-nginx
+   	Old way:
+        	1) sudo add-apt-repository ppa:certbot/certbot
+		2) sudo apt-get update
+		3) sudo apt-get install python-certbot-nginx
+	New way with snap:
+		1) https://certbot.eff.org/instructions?ws=nginx&os=ubuntufocal
 
    c) Next, generate ssl certificates for the domain from above, take note of where the
       certificates are saved (likely in "/etc/letsencrypt/live/<domain>")
         1)   certbot --nginx -d <domain-name>
+
+   c)(b) Alternately, with the new method of installing certbot, just run the following command
+         and follow the prompts to enter your domain name. This will update the default nginx
+	 configuration and you can skip d):
+	 	certbot --nginx
 
    d) Okay, so when you run the app it will be directed through a port on the local machine. 
       What we are going to do is tell the webserver (nginx) that it should take what ever
@@ -93,9 +101,13 @@ Installation Steps (Using Anaconda and a Linux OS)
 	    sudo nginx -t
 
  6) If this works, setup the automatic data renewal process with crontab. Instructions coming.
- 7) Now we need to either download and transform all of the data or transfer from an existing source. There are many sources of data and, at the     
-    moment, each has
-    its own script.
+
+ 7) Now we need to either download and transform all of the data or transfer from an existing source. To
+    build the needed datasets run the file in the 'installations' folder:
+    
+    cd installations
+    python build_datasets.py
+ 
  7) Now, to run the actual application use a webserver gateway interface like green unicorn. The syntax
     is simple enough:
 
