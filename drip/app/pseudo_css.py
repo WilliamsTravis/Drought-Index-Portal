@@ -56,6 +56,12 @@ CSS = {
             "margin-left": "25px",
             "margin-right": "100px"
         },
+        "tutorial": {
+            "margin-bottom": "75px",
+            "margin-top": "15px",
+            "border-radius": "5px",
+            "box-shadow": BOX_SHADOW
+        },
         "text-large": {
             "font-weight": "bolder",
             "text-align": "center",

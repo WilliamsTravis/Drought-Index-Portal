@@ -43,6 +43,7 @@ from drip.loggers import init_logger, set_handler
 
 logger = init_logger(__name__)
 socket.setdefaulttimeout(120)
+gdal.UseExceptions()
 
 
 POSSIBLE_LATS = ["latitude", "lat", "lati", "y"]
@@ -488,22 +489,12 @@ class NetCDF(Adjustments):
         """Reproject array to epsg:5070.
 
         Adding ram will almost certainly increase the speed. That’s not at all the same as saying that it is worth it, or that the speed increase will be significant. Disks are the slowest part of the process.
-
         By default gdalwarp won't take much advantage of RAM. Using the flag "-wm 500" will operate on 500MB chunks at a time which is better than the default. To increase the io block cache size may also help. This can be done on the command like:
-
         gdalwarp --config GDAL_CACHEMAX 500 -wm 500 ...
         This uses 500MB of RAM for read/write caching, and 500MB of RAM for working buffers during the warp. Beyond that it is doubtful more memory will make a substantial difference.
-
         Check CPU usage while gdalwarp is running. If it is substantially less than 100% then you know things are IO bound. Otherwise they are CPU bound.
-
         Caution : increasing the value of the -wm param may lead to loss of performance in certain circumstances, particularly when gdalwarping *many* small rasters into a big mosaic. See http://trac.osgeo.org/gdal/ticket/3120 for more details
         """
-        # Alternate strategy, much like first
-        # Reproject to tiff with gdal, all bands
-        # Read in tiff array,
-        # Reset (or better use before setting) geometry using tiff array
-        # Continue along
-
         # Get geographic information
         na = -9999 # Infer from datatype
 
@@ -519,7 +510,8 @@ class NetCDF(Adjustments):
                 format="GTiff",
                 targetAlignedPixels=True,  # test this
                 xRes=xres,
-                yRes=yres
+                yRes=yres,
+                resampleAlg="bilinear"
             )
             del warped
 
@@ -530,7 +522,8 @@ class NetCDF(Adjustments):
                 srcDSOrSrcDSTab=str(src),
                 dstSRS=dst_srs,
                 dstNodata=float(na),
-                format="GTiff"
+                format="GTiff",
+                resampleAlg="bilinear"
             )
             del warped
 

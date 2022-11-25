@@ -438,6 +438,23 @@ LAYOUT = html.Div(
             }
         ),
     
+        # Tutorial
+        html.Div(
+            id="tutorial_div",
+            className="twelve columns",
+            style=CSS["body"]["tutorial"],
+            children=[
+                html.ObjectEl(
+                    data="assets/Introductory Tutorial - CU's Drought Index Portal (DrIP).pdf",
+                    type="application/pdf",
+                    style={
+                        "width": "100%",
+                        "height": "1000px"
+                    }
+                ),
+            ]
+        ),
+
         # Other Portal Links
         html.Div([
             html.Div(
@@ -694,10 +711,17 @@ LAYOUT = html.Div(
                                 )
                             ],
                             className="six columns",
-                            title=("Choose which months of the year to " +
-                                "be included."))],
-                    style={"display": "none", "margin-top": "30",
-                        "margin-bottom": "30"},
+                            title=(
+                                "Choose which months of the year to "
+                                "be included."
+                            )
+                        )
+                    ],
+                    style={
+                        "display": "none",
+                        "margin-top": "30",
+                        "margin-bottom": "30"
+                    },
                     className="row"),
     
                      # Rendering Options

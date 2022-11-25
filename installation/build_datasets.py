@@ -14,7 +14,10 @@ def main():
             logger.info("Building %s ...", index)
             print(f"Building {index}...")
             builder = Data_Builder(index)
-            builder.build(overwrite=False)
+            try:
+                builder.build(overwrite=False)
+            except:
+                logger.info("%s build failed.", index)
 
 
 if __name__ == "__main__":

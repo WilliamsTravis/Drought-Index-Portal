@@ -21,8 +21,6 @@ ACRONYM_TEXT = """
     
     EDDI:            Evaporative Demand Drought Index
     
-    LERI:            Landscape Evaporation Response Index
-    
     TMIN:            Average Daily Minimum Temp (°C)
     
     TMAX:            Average Daily Maximum Temp (°C)
@@ -161,6 +159,15 @@ NAVBAR = html.Nav(
                     style={
                         **CSS["navbar"]["button"], **{"margin-left": "25px"}
                     }
+                ),
+                html.Button(
+                    id="tutorial_button",
+                    n_clicks=0,
+                    children="Tutorial: Off",
+                    title=(
+                        "Display/hide an intorudctory tutorial."
+                    ),
+                    style={**CSS["navbar"]["button"], **{"margin-left": "-2px"}}
                 ),
                 html.Button(
                     id="other_button",

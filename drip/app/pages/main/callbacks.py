@@ -418,6 +418,35 @@ def toggleMonthFilter2(all_months, no_months):
 
 
 @app.callback(
+    Output("tutorial_div", "style"),
+    Output("tutorial_button", "style"),
+    Output("tutorial_button", "children"),
+    Input("tutorial_button", "n_clicks"),
+    State("tutorial_div", "style"),
+    State("tutorial_button", "style")
+)
+@calls.log
+def toggleTutorial(click, old_div_style, old_button_style):
+    """Toggle description on/off."""
+    div_style = old_div_style.copy()
+    button_style = old_button_style.copy()
+
+    if not click:
+        click = 0
+    if click % 2 == 0:
+        div_style["display"] = "none"
+        button_style["background-color"] = OFF_COLOR
+        button_children = "Tutorial: Off"
+    else:
+        if "display" in div_style:
+            del div_style["display"]
+        button_style["background-color"] = ON_COLOR
+        button_children = "Tutorial: On"
+
+    return div_style, button_style, button_children
+
+
+@app.callback(
     Output("year_div2", "style"),
     Input("date_sync", "n_clicks")
 )
@@ -988,22 +1017,22 @@ for i in range(1, 3):
         return style, children
 
     @app.callback(
-        Output("map_{}".format(i), "figure"),
+        Output(f"map_{i}", "figure"),
         Input("choice_1", "value"),
         Input("choice_2", "value"),
         Input("map_type", "value"),
         Input("signal", "children"),
-        Input("point_size_{}".format(i), "value"),
+        Input(f"point_size_{i}", "value"),
         Input(f"color_min_{i}", "value"),
         Input(f"color_max_{i}", "value"),
-        Input("location_store_{}".format(i), "children"),
+        Input(f"location_store_{i}", "children"),
         State("function_choice", "value"),
-        State("key_{}".format(i), "children"),
+        State(f"key_{i}", "children"),
         State("click_sync", "children"),
         State("date_sync", "children"),
         State("date_print_1", "children"),
         State("date_print_2", "children"),
-        State("map_{}".format(i), "relayoutData")
+        State(f"map_{i}", "relayoutData")
     )
     @calls.log
     def makeMap(choice1, choice2, map_type, signal, point_size, color_min,
@@ -1020,9 +1049,9 @@ for i in range(1, 3):
 
         # Prevent update from location unless its a state, shape or bbox filter
         if trigger == "location_store_{}.children".format(key):
-            if "corr" not in function:
-                if "grid" in location[0]:
-                    raise PreventUpdate
+        #     if "corr" not in function:
+        #         if "grid" in location[0]:
+        #             raise PreventUpdate
 
             # Check which element the selection came from
             triggered_element = location[-1]
@@ -1174,7 +1203,6 @@ for i in range(1, 3):
             lon=df["lonbin"],
             lat=df["latbin"],
             text=df["printdata"],
-            # mode="markers",
             hoverinfo="text",
             hovermode="closest",
             showlegend=False,
@@ -1198,21 +1226,52 @@ for i in range(1, 3):
         )
 
         # Add an outline to help see when zoomed in
-        d2 = dict(
-            type="scattermapbox",
-            lon=df["lonbin"],
-            lat=df["latbin"],
-            mode="markers",
-            hovermode="closest",
-            showlegend=False,
-            marker=dict(
-                color="#000000",
-                size=point_size * 1.05
-            )
-        )
+        # d2 = dict(
+        #     type="scattermapbox",
+        #     lon=df["lonbin"],
+        #     lat=df["latbin"],
+        #     mode="markers",
+        #     hovermode="closest",
+        #     showlegend=False,
+        #     marker=dict(
+        #         color="#000000",
+        #         size=point_size * 1.05
+        #     )
+        # )
 
         # package these in a list
-        data_list = [d2, d1]
+        data_list = [d1]
+
+        # Add shape if a single site is selected
+        if location[0] == "grid":
+            site = location[3]
+            gridid = float(site[site.index("(Grid") + 6: site.index(")")])
+            row = df[df["grid"] == gridid]
+            # d3 = dict(
+            #     type="scattermapbox",
+            #     lon=row["lonbin"],
+            #     lat=row["latbin"],
+            #     mode="markers",
+            #     hovermode="closest",
+            #     showlegend=False,
+            #     marker=dict(
+            #         color="black",
+            #         size=point_size * 3.5
+            #     )
+            # )
+            d4 = dict(
+                type="scattermapbox",
+                lon=row["lonbin"],
+                lat=row["latbin"],
+                mode="markers",
+                hovermode="closest",
+                showlegend=False,
+                marker=dict(
+                    color="black",
+                    size=point_size * 2
+                )
+            )
+            data_list += [d4]
 
         # Set up layout
         layout_copy = copy.deepcopy(MAPBOX_LAYOUT)
