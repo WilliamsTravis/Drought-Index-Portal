@@ -42,11 +42,6 @@ Installation Steps (Using Anaconda and Ubuntu 22.10)
       certificates are saved (likely in "/etc/letsencrypt/live/<domain>")
         1)   certbot --nginx -d <domain-name>
 
-   c)(b) Alternately, with the new method of installing certbot, just run the following command
-         and follow the prompts to enter your domain name. This will update the default nginx
-	 configuration and you can skip d):
-	 	certbot --nginx
-
    d) Okay, so when you run the app it will be directed through a port on the local machine. 
       What we are going to do is tell the webserver (nginx) that it should take what ever
       is running in that port and send it to the domain we set up. To do this we need to
