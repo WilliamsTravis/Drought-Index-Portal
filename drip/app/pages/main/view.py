@@ -562,7 +562,7 @@ LAYOUT = html.Div(
                                  ),
                                  dcc.Slider(
                                      id="month_slider_1b",
-                                     value=1,
+                                     value=12,
                                      marks=OPTIONS.date_marks["months_slanted"],
                                      min=1,
                                      max=12,
@@ -652,7 +652,7 @@ LAYOUT = html.Div(
                                 html.H5("End Month #2"),
                                 dcc.Slider(
                                     id="month_slider_2b",
-                                    value=1,
+                                    value=12,
                                     marks=OPTIONS.date_marks["months_slanted"],
                                     step=1,
                                     min=1,
