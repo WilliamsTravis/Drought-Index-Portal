@@ -3,7 +3,6 @@
 import datetime as dt
 import gc
 import json
-import inspect
 import os
 import sys
 import warnings
@@ -16,7 +15,7 @@ import dask.array as da
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import salem
+import rasterio as rio
 import xarray as xr
 
 from dash.exceptions import PreventUpdate
@@ -24,7 +23,6 @@ from osgeo import gdal, ogr, osr
 from matplotlib.animation import FuncAnimation
 from netCDF4 import Dataset
 from numba import jit
-from pyproj import Proj
 from scipy.stats import rankdata
 from tqdm import tqdm
 
@@ -33,121 +31,143 @@ from drip import Paths
 warnings.filterwarnings("ignore")
 
 
-title_map = {"noaa": "NOAA CPC-Derived Rainfall Index",
-             "mdn1": "Mean Temperature Departure  (1981 - 2010) - 1 month",
-             "pdsi": "Palmer Drought Severity Index",
-             "scpdsi": "Self-Calibrated Palmer Drought Severity Index",
-             "pzi": "Palmer Z-Index",
-             "spi1": "Standardized Precipitation Index - 1 month",
-             "spi2": "Standardized Precipitation Index - 2 month",
-             "spi3": "Standardized Precipitation Index - 3 month",
-             "spi4": "Standardized Precipitation Index - 4 month",
-             "spi5": "Standardized Precipitation Index - 5 month",
-             "spi6": "Standardized Precipitation Index - 6 month",
-             "spi7": "Standardized Precipitation Index - 7 month",
-             "spi8": "Standardized Precipitation Index - 8 month",
-             "spi9": "Standardized Precipitation Index - 9 month",
-             "spi10": "Standardized Precipitation Index - 10 month",
-             "spi11": "Standardized Precipitation Index - 11 month",
-             "spi12": "Standardized Precipitation Index - 12 month",
-             "spei1": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 1 month",
-             "spei2": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 2 month",
-             "spei3": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 3 month",
-             "spei4": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 4 month",
-             "spei5": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 5 month",
-             "spei6": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 6 month",
-             "spei7": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 7 month",
-             "spei8": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 8 month",
-             "spei9": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 9 month",
-             "spei10": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 10 month",
-             "spei11": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 11 month",
-             "spei12": "Standardized Precipitation-Evapotranspiration Index" +
-                      " - 12 month",
-             "eddi1": "Evaporative Demand Drought Index - 1 month",
-             "eddi2": "Evaporative Demand Drought Index - 2 month",
-             "eddi3": "Evaporative Demand Drought Index - 3 month",
-             "eddi4": "Evaporative Demand Drought Index - 4 month",
-             "eddi5": "Evaporative Demand Drought Index - 5 month",
-             "eddi6": "Evaporative Demand Drought Index - 6 month",
-             "eddi7": "Evaporative Demand Drought Index - 7 month",
-             "eddi8": "Evaporative Demand Drought Index - 8 month",
-             "eddi9": "Evaporative Demand Drought Index - 9 month",
-             "eddi10": "Evaporative Demand Drought Index - 10 month",
-             "eddi11": "Evaporative Demand Drought Index - 11 month",
-             "eddi12": "Evaporative Demand Drought Index - 12 month",
-             "leri1": "Landscape Evaporative Response Index - 1 month",
-             "leri3": "Landscape Evaporative Response Index - 3 month",
-             "tmin": "Average Daily Minimum Temperature (PRISM)",
-             "tmax": "Average Daily Maximum Temperature (PRISM)",
-             "tmean": "Mean Temperature (PRISM)",
-             "tdmean": "Mean Dew Point Temperature (PRISM)", 
-             "ppt": "Total Precipitation (PRISM)",
-             "vpdmax": "Maximum Vapor Pressure Deficit (PRISM)" ,
-             "vpdmin": "Minimum Vapor Pressure Deficit (PRISM)",
-             "vpdmean": "Mean Vapor Pressure Deficit (PRISM)"}
-
-unit_map = {"noaa": "%",
-            "mdn1": "°C",
-            "pdsi": "Index",
-            "scpdsi": "Index",
-            "pzi": "Index",
-            "spi1": "Index",
-            "spi2": "Index",
-            "spi3": "Index",
-            "spi4": "Index",
-            "spi5": "Index",
-            "spi6": "Index",
-            "spi7": "Index",
-            "spi8": "Index",
-            "spi9": "Index",
-            "spi10": "Index",
-            "spi11": "Index",
-            "spi12": "Index",
-            "spei1": "Index",
-            "spei2": "Index",
-            "spei3": "Index",
-            "spei4": "Index",
-            "spei5": "Index",
-            "spei6": "Index",
-            "spei7": "Index",
-            "spei8": "Index",
-            "spei9": "Index",
-            "spei10": "Index",
-            "spei11": "Index",
-            "spei12": "Index",
-            "eddi1": "Index",
-            "eddi2": "Index",
-            "eddi3": "Index",
-            "eddi4": "Index",
-            "eddi5": "Index",
-            "eddi6": "Index",
-            "eddi7": "Index",
-            "eddi8": "Index",
-            "eddi9": "Index",
-            "eddi10": "Index",
-            "eddi11": "Index",
-            "eddi12": "Index",
-            "leri1": "Index",
-            "leri3": "Index",
-            "tmin": "°C",
-            "tmax": "°C",
-            "tmean": "°C",
-            "tdmean": "°C",
-            "ppt": "mm",
-            "vpdmax": "hPa" ,
-            "vpdmin": "hPa",
-            "vpdmean": "hPa"}
+TITLE_MAP = {
+    "noaa": "NOAA CPC-Derived Rainfall Index",
+    "mdn1": "Mean Temperature Departure  (1981 - 2010) - 1 month",
+    "pdsi": "Palmer Drought Severity Index",
+    "scpdsi": "Self-Calibrated Palmer Drought Severity Index",
+    "pzi": "Palmer Z-Index",
+    "spi1": "Standardized Precipitation Index - 1 month",
+    "spi2": "Standardized Precipitation Index - 2 month",
+    "spi3": "Standardized Precipitation Index - 3 month",
+    "spi4": "Standardized Precipitation Index - 4 month",
+    "spi5": "Standardized Precipitation Index - 5 month",
+    "spi6": "Standardized Precipitation Index - 6 month",
+    "spi7": "Standardized Precipitation Index - 7 month",
+    "spi8": "Standardized Precipitation Index - 8 month",
+    "spi9": "Standardized Precipitation Index - 9 month",
+    "spi10": "Standardized Precipitation Index - 10 month",
+    "spi11": "Standardized Precipitation Index - 11 month",
+    "spi12": "Standardized Precipitation Index - 12 month",
+    "spei1": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 1 month",
+    "spei2": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 2 month",
+    "spei3": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 3 month",
+    "spei4": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 4 month",
+    "spei5": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 5 month",
+    "spei6": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 6 month",
+    "spei7": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 7 month",
+    "spei8": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 8 month",
+    "spei9": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 9 month",
+    "spei10": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 10 month",
+    "spei11": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 11 month",
+    "spei12": "Standardized Precipitation-Evapotranspiration Index" +
+             " - 12 month",
+    "eddi1": "Evaporative Demand Drought Index - 1 month",
+    "eddi2": "Evaporative Demand Drought Index - 2 month",
+    "eddi3": "Evaporative Demand Drought Index - 3 month",
+    "eddi4": "Evaporative Demand Drought Index - 4 month",
+    "eddi5": "Evaporative Demand Drought Index - 5 month",
+    "eddi6": "Evaporative Demand Drought Index - 6 month",
+    "eddi7": "Evaporative Demand Drought Index - 7 month",
+    "eddi8": "Evaporative Demand Drought Index - 8 month",
+    "eddi9": "Evaporative Demand Drought Index - 9 month",
+    "eddi10": "Evaporative Demand Drought Index - 10 month",
+    "eddi11": "Evaporative Demand Drought Index - 11 month",
+    "eddi12": "Evaporative Demand Drought Index - 12 month",
+    "leri1": "Landscape Evaporative Response Index - 1 month",
+    "leri3": "Landscape Evaporative Response Index - 3 month",
+    "tmin": "Average Daily Minimum Temperature (PRISM)",
+    "tmax": "Average Daily Maximum Temperature (PRISM)",
+    "tmean": "Mean Temperature (PRISM)",
+    "tdmean": "Mean Dew Point Temperature (PRISM)", 
+    "ppt": "Total Precipitation (PRISM)",
+    "vpdmax": "Maximum Vapor Pressure Deficit (PRISM)" ,
+    "vpdmin": "Minimum Vapor Pressure Deficit (PRISM)",
+    "vpdmean": "Mean Vapor Pressure Deficit (PRISM)"
+}
+TYPE_PATHS = {
+    "original": "",
+    "area": "",
+    "correlation_o": "",
+    "correlation_p": "_percentile",
+    "percentile": "_percentile",
+    "projected": "_projected"
+}
+FUNCTION_TYPES = {
+    "omean": "original",
+    "omin": "original",
+    "omax": "original",
+    "pmean": "percentile",
+    "pmin": "percentile",
+    "pmax": "percentile",
+    "oarea": "area",
+    "ocorr": "correlation_o",
+    "pcorr": "correlation_p"
+}
+UNIT_MAP = {
+    "noaa": "%",
+    "mdn1": "°C",
+    "pdsi": "Index",
+    "scpdsi": "Index",
+    "pzi": "Index",
+    "spi1": "Index",
+    "spi2": "Index",
+    "spi3": "Index",
+    "spi4": "Index",
+    "spi5": "Index",
+    "spi6": "Index",
+    "spi7": "Index",
+    "spi8": "Index",
+    "spi9": "Index",
+    "spi10": "Index",
+    "spi11": "Index",
+    "spi12": "Index",
+    "spei1": "Index",
+    "spei2": "Index",
+    "spei3": "Index",
+    "spei4": "Index",
+    "spei5": "Index",
+    "spei6": "Index",
+    "spei7": "Index",
+    "spei8": "Index",
+    "spei9": "Index",
+    "spei10": "Index",
+    "spei11": "Index",
+    "spei12": "Index",
+    "eddi1": "Index",
+    "eddi2": "Index",
+    "eddi3": "Index",
+    "eddi4": "Index",
+    "eddi5": "Index",
+    "eddi6": "Index",
+    "eddi7": "Index",
+    "eddi8": "Index",
+    "eddi9": "Index",
+    "eddi10": "Index",
+    "eddi11": "Index",
+    "eddi12": "Index",
+    "leri1": "Index",
+    "leri3": "Index",
+    "tmin": "°C",
+    "tmax": "°C",
+    "tmean": "°C",
+    "tdmean": "°C",
+    "ppt": "mm",
+    "vpdmax": "hPa" ,
+    "vpdmin": "hPa",
+    "vpdmean": "hPa"
+}
 
 
 @jit(nopython=True)
@@ -538,7 +558,7 @@ def toNetCDFSingle(file, ncfile, savepath, index, epsg=4326, wmode="w"):
 
     # Attributes
     # Global Attrs
-    nco.title = title_map[index]
+    nco.title = TITLE_MAP[index]
     nco.subtitle = "Monthly Index values since 1948-01-01"
     nco.description = ("Monthly gridded data at 0.25 decimal degree" +
                        " (15 arc-minute resolution, calibrated to 1895-2010 " +
@@ -654,7 +674,7 @@ def toNetCDF(tfiles, ncfiles, savepath, index, year1, month1, year2, month2,
 
     # Attributes
     # Global Attrs
-    nco.title = title_map[index]
+    nco.title = TITLE_MAP[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
     nco.description = ("Monthly gridded data at "+ str(res) +
                        " decimal degree (15 arc-minute resolution, " +
@@ -817,7 +837,7 @@ def toNetCDFAlbers(tfiles, ncfiles, savepath, index, year1, month1,
 
     # Attributes
     # Global Attrs
-    nco.title = title_map[index]
+    nco.title = TITLE_MAP[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
     nco.description = ("Monthly gridded data at "+ str(res) +
                        " decimal degree (15 arc-minute resolution, " +
@@ -966,7 +986,7 @@ def toNetCDF3(tfile, ncfile, savepath, index, epsg=102008, percentiles=False,
 
     # Attributes
     # Global Attrs
-    nco.title = title_map[index]
+    nco.title = TITLE_MAP[index]
     nco.subtitle = "Monthly Index values since 1895-01-01"
     nco.description = ("Monthly gridded data at 0.25 decimal degree" +
                        " (15 arc-minute resolution, calibrated to 1895-2010 " +
@@ -1675,20 +1695,10 @@ class Index_Maps(Paths):
         slowing the app down. So xarray and dask are lazy loaders, which means
         we can access the full dataset hear without worrying about that.
         """
-        # There are three types of datsets
-        type_paths = {
-            "original": "",
-            "area": "",
-            "correlation_o": "",
-            "correlation_p": "_percentile",
-            "percentile": "_percentile",
-            "projected": "_projected"
-        }
-
         # Build path and retrieve the data set
         file_path =  self.paths["indices"].joinpath(
             self.choice,
-            f"{self.choice}{type_paths[self.choice_type]}.nc"
+            f"{self.choice}{TYPE_PATHS[self.choice_type]}.nc"
         )
         if self.chunk:
             dataset = xr.open_dataset(file_path, chunks=100)  # <------------------ Best chunk size/shape?
@@ -1711,20 +1721,23 @@ class Index_Maps(Paths):
         mask = crdict.grid.copy()
 
         # Create mask array
-        if flag not in ["all", "bbox"]:
+        if flag not in ["all", "bbox", "shape"]:
             y = json.loads(y)
             x = json.loads(x)
             gridids = crdict.grid[y, x]
             mask[~np.isin(crdict.grid, gridids)] = np.nan
-            mask = mask * 0 + 1
+        elif flag == "shape":
+            with rio.open(location[3]) as r:
+                mask = r.read(1)
+            mask[mask == 0] = np.nan
         elif flag == "bbox":
             y = json.loads(y)
             x = json.loads(x)
             gridids = crdict.grid[y[0]:y[-1], x[0]:x[-1]].flatten()
             mask[~np.isin(crdict.grid, gridids)] = np.nan
-            mask = mask * 0 + 1
-        else:
-            mask = mask * 0 + 1
+
+        # Invert mask so that 1's represent included area
+        mask = mask * 0 + 1
 
         # Set up grid info from coordinate dictionary
         geom = crdict.source.transform
@@ -1854,26 +1867,50 @@ class Index_Maps(Paths):
             arrays = arrays * -1
 
         # Drought Categories
-        drought_cats = {"sp": {0: [-0.5, -0.8],
-                               1: [-0.8, -1.3],
-                               2: [-1.3, -1.5],
-                               3: [-1.5, -2.0],
-                               4: [-2.0, -999]},
-                        "eddi": {0: [-0.5, -0.8],
-                                 1: [-0.8, -1.3],
-                                 2: [-1.3, -1.5],
-                                 3: [-1.5, -2.0],
-                                 4: [-2.0, -999]},
-                        "pdsi": {0: [-1.0, -2.0],
-                                 1: [-2.0, -3.0],
-                                 2: [-3.0, -4.0],
-                                 3: [-4.0, -5.0],
-                                 4: [-5.0, -999]},
-                        "leri": {0: [-0.5, -0.8],
-                                 1: [-0.8, -1.3],
-                                 2: [-1.3, -1.5],
-                                 3: [-1.5, -2.0],
-                                 4: [-2.0, -999]}}
+        drought_cats = {
+            "sp": {
+                0: [-0.5, -0.8],
+                1: [-0.8, -1.3],
+                2: [-1.3, -1.5],
+                3: [-1.5, -2.0],
+                4: [-2.0, -999]
+            },
+            "eddi": {
+                0: [-0.5, -0.8],
+                1: [-0.8, -1.3],
+                2: [-1.3, -1.5],
+                3: [-1.5, -2.0],
+                4: [-2.0, -999]
+            },
+            "pdsi": {
+                0: [-1.0, -2.0],
+                1: [-2.0, -3.0],
+                2: [-3.0, -4.0],
+                3: [-4.0, -5.0],
+                4: [-5.0, -999]
+            },
+            "scpdsi": {
+                0: [-1.0, -2.0],
+                1: [-2.0, -3.0],
+                2: [-3.0, -4.0],
+                3: [-4.0, -5.0],
+                4: [-5.0, -999]
+            },
+            "pzi": {
+                0: [-1.0, -2.0],
+                1: [-2.0, -3.0],
+                2: [-3.0, -4.0],
+                3: [-4.0, -5.0],
+                4: [-5.0, -999]
+            },
+            "leri": {
+                0: [-0.5, -0.8],
+                1: [-0.8, -1.3],
+                2: [-1.3, -1.5],
+                3: [-1.5, -2.0],
+                4: [-2.0, -999]
+            }
+        }
 
         # Choose a set of categories
         cat_key = [key for key in drought_cats.keys() if key in choice][0]
@@ -1924,15 +1961,17 @@ class Index_Maps(Paths):
         """
         To choose which function to return using a string from a dropdown app.
         """
-        functions = {"omean": self.getMean,
-                     "omin": self.getMin,
-                     "omax": self.getMax,
-                     "pmean": self.getMean,
-                     "pmin": self.getMin,
-                     "pmax": self.getMax,
-                     "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now (skipped,  performed in app for now)
-                     "ocorr": self.getMean,
-                     "pcorr": self.getMean}
+        functions = {
+            "omean": self.getMean,
+            "omin": self.getMin,
+            "omax": self.getMax,
+            "pmean": self.getMean,
+            "pmin": self.getMin,
+            "pmax": self.getMax,
+            "oarea": self.getMean,  # <------------------------------- Note that this is returning the mean for now (skipped,  performed in app for now)
+            "ocorr": self.getMean,
+            "pcorr": self.getMean
+        }
         function = functions[function]
 
         return function()

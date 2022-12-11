@@ -37,12 +37,13 @@ def callback_trigger():
         context not found.
     """
     try:
-        trigger = dash.callback_context.triggered[0]
-        trigger = trigger["prop_id"]
+        trigger = dash.callback_context.triggered[0]["prop_id"]
+        trigger_value = dash.callback_context.triggered[0]["value"]
     except dash.exceptions.MissingCallbackContextException:
         trigger = "Unknown"
+        trigger_value = "Unknown"
 
-    return trigger
+    return trigger, trigger_value
 
 
 def init_logger(name, level="DEBUG", mode="w"):
@@ -229,12 +230,13 @@ class CallbackArgs:
             sig = inspect.signature(func)
             keys = sig.parameters.keys()
 
-            trigger = callback_trigger()
+            trigger, trigger_value = callback_trigger()
 
             self.args[name] = {
                 **dict(zip(keys, args)),
                 **kwargs,
                 "trigger": trigger,
+                "trigger_value": trigger_value
             }
 
             logger.info("Running %s... (Trigger: %s)", name, trigger)

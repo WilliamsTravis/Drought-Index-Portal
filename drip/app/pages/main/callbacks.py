@@ -1,26 +1,21 @@
 """Callbacks for main Drip page."""
-import base64
 import copy
 import gc
 import json
 import os
 import psutil
-import tempfile
-import urllib
+
+from pathlib import Path
 
 import dash
 import datetime as dt
-import fiona
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from collections import OrderedDict
-from dash import dash_table, html, Input, Output, State
+from dash import dash_table, dcc, html, Input, Output, State
 from dash.exceptions import PreventUpdate
-from osgeo import gdal, osr
-from tqdm import tqdm
 
 from drip import calls, Paths
 from drip.app.app import app, cache
@@ -29,12 +24,14 @@ from drip.app.old.functions import (
     Admin_Elements,
     Index_Maps,
     Location_Builder,
-    shapeReproject,
-    unit_map
+    FUNCTION_TYPES,
+    TYPE_PATHS,
+    UNIT_MAP
 )
 from drip.app.options.indices import INDEX_NAMES
 from drip.app.options.options import Options
 from drip.app.options.styles import ON_COLOR, OFF_COLOR, STYLES
+from drip.app.pages.main.model import Parse_Shape
 from drip.loggers import init_logger, set_handler
 
 logger = init_logger(__name__)
@@ -48,20 +45,20 @@ admin = Admin_Elements(resolution)
  source, albers_source, crdict, admin_df] = admin.getElements()  # <----------- remove albers ource here (carefully)
 
 
-function_options_perc = [
+FUNCTION_OPTIONS_PERC = [
     {"label": "Mean", "value": "pmean"},
     {"label": "Maximum", "value": "pmax"},
     {"label": "Minimum", "value": "pmin"},
     {"label": "Correlation", "value": "pcorr"}
 ]
-function_options_orig = [
+FUNCTION_OPTIONS_ORIG = [
     {"label": "Mean", "value": "omean"},
     {"label": "Maximum", "value": "omax"},
     {"label": "Minimum", "value": "omin"},
     {"label": "Drought Severity Area", "value":"oarea"},
     {"label": "Correlation", "value": "ocorr"}
 ]
-function_names = {
+FUNCTION_NAMES = {
     "pmean": "Average Percentiles",
     "pmax": "Maxmium Percentiles",
     "pmin": "Minimum Percentiles",
@@ -73,6 +70,85 @@ function_names = {
     "ocorr": "Pearson's Correlation "
 }
 
+
+def makeCSV(arg):
+    """Make a single summary CSV of the time series plot."""
+    # Unpack arguments, retrieve data, and format dates
+    index, signal, function, location, crdict = arg
+    data = retrieveData(signal, function, index, location)
+    dates = data.dataset_interval.time.values
+    dates = [pd.to_datetime(str(d)).strftime("%Y-%m") for d in dates]
+
+    # If the function is oarea, we plot five overlapping timeseries
+    label = location[3]
+    nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
+                  "vpdmin", "vpdmean"]
+    if function != "oarea" or index in nonindices:
+        # Get the time series from the data object
+        try:
+            timeseries = data.getSeries(location, crdict)
+        except Exception as e:
+            print(e)
+            
+        # Create data frame as string for download option
+        columns = OrderedDict(
+            {
+                "month": dates,
+                "value": list(timeseries),
+                "function": FUNCTION_NAMES[function],  # <-- This doesn"t always make sense
+                "location": location[-2],
+                "index": INDEX_NAMES[index]
+            }
+        )
+        df = pd.DataFrame(columns)
+
+    else:
+        label = location[3]
+        ts_series, ts_series_ninc, dsci = data.getArea(crdict)
+
+        # Save to file for download option
+        columns = OrderedDict(
+            {
+                "month": dates,
+                "d0": ts_series_ninc[0],
+                "d1": ts_series_ninc[1],
+                "d2": ts_series_ninc[2],
+                "d3": ts_series_ninc[3],
+                "d4": ts_series_ninc[4],
+                "dsci": dsci,
+                "function": "Percent Area",
+                "location":  label,
+                "index": INDEX_NAMES[index]
+            }
+        )
+        df = pd.DataFrame(columns)
+
+    return df
+
+def makeCSVs(signal, function, location):
+    """Take a path with query information and save a csv."""
+    # Get data
+    dfs = []
+    args = []
+    data_dir = Paths.paths["indices"]
+    for i in INDEX_NAMES:
+        ftype = FUNCTION_TYPES[function]
+        fpath = data_dir.joinpath(i, f"{i}{TYPE_PATHS[ftype]}.nc")
+        if fpath.exists():
+            args.append((i, signal, function, location, crdict))
+
+    # crdict isn't working in multiprocess
+    # with mp.Pool(mp.cpu_count() - 1) as pool:
+    #     for df in pool.imap(makeCSV, args):
+    #         dfs.append(df)
+
+    for arg in args:
+        df = makeCSV(arg)
+        if df is not None:
+            dfs.append(df)
+    df = pd.concat(dfs)
+
+    return df
 
 @app.callback(
     Output("month_start_print_1", "children"),
@@ -101,72 +177,6 @@ def adjustMonthPrint1(sync):
     filters = filters + number
 
     return start, end, filters
-
-
-def make_csv(arg):
-    signal, function, index, location, choice = arg
-    data = retrieveData(signal, function, index, location)
-    dates = data.dataset_interval.time.values
-    dates = [pd.to_datetime(str(d)).strftime("%Y-%m") for d in dates]
-
-    # If the function is oarea, we plot five overlapping timeseries
-    label = location[3]
-    nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
-                  "vpdmin", "vpdmean"]
-
-
-    if function != "oarea" or choice in nonindices:
-        # Get the time series from the data object
-        try:
-            timeseries = data.getSeries(location, crdict)
-        except Exception as e:
-            print(e)
-
-        # Create data frame as string for download option
-        columns = OrderedDict({"month": dates,
-                                "value": list(timeseries),
-                                "function": function_names[function],  # <-- This doesn"t always make sense
-                                "location": location[-2],
-                                "index": INDEX_NAMES[index]})
-        df = pd.DataFrame(columns)
-
-    else:
-        label = location[3]
-        ts_series, ts_series_ninc, dsci = data.getArea(crdict)
-
-        # Save to file for download option
-        columns = OrderedDict({"month": dates,
-                                "d0": ts_series_ninc[0],
-                                "d1": ts_series_ninc[1],
-                                "d2": ts_series_ninc[2],
-                                "d3": ts_series_ninc[3],
-                                "d4": ts_series_ninc[4],
-                                "dsci": dsci,
-                                "function": "Percent Area",
-                                "location":  label,
-                                "index": INDEX_NAMES[index]})
-        df = pd.DataFrame(columns)
-    return df
-
-
-def make_csvs(path):
-    """Take a path with query information and save a csv."""
-    # Separate Path
-    signal, function, choice, location, key = path.split("_")
-    location = json.loads(location)
-    signal = json.loads(signal)
-
-    # Get data
-    dfs = []
-    args = []
-    for index in tqdm(list(INDEX_NAMES.keys())):
-        arg = [signal, function, index, location, choice]
-        args.append(arg)
-        df = make_csv(arg)
-        dfs.append(df)
-    df = pd.concat(dfs)
-
-    return df, key
 
 
 @app.callback(
@@ -200,24 +210,12 @@ def retrieveData(signal, function, choice, location):
         function = "omean"
         location = ["all", "y", "x", "Contiguous United States", 0]
     """
-
     # Retrieve signal elements
     time_data = signal[0]
     colorscale = signal[1]
 
     # Determine the choice_type based on function
-    choice_types = {
-        "omean": "original",
-        "omin": "original",
-        "omax": "original",
-        "pmean": "percentile",
-        "pmin": "percentile",
-        "pmax": "percentile",
-        "oarea": "area",
-        "ocorr": "correlation_o",
-        "pcorr": "correlation_p"
-    }
-    choice_type = choice_types[function]
+    choice_type = FUNCTION_TYPES[function]
 
     # Retrieve data package
     data = Index_Maps(choice, choice_type, time_data, colorscale)
@@ -385,9 +383,9 @@ def toggleMonthFilter1(all_months, no_months):
 
     # Find which input triggered this callback
     context = dash.callback_context
-    triggered_value = context.triggered[0]["value"]
+    trigger_value = context.triggered[0]["value"]
     trigger = context.triggered[0]["prop_id"]
-    if triggered_value:
+    if trigger_value:
         if "all" in trigger:
             return list(range(1, 13))
         else:
@@ -408,9 +406,9 @@ def toggleMonthFilter2(all_months, no_months):
 
     # Find which input triggered this callback
     context = dash.callback_context
-    triggered_value = context.triggered[0]["value"]
+    trigger_value = context.triggered[0]["value"]
     trigger = context.triggered[0]["prop_id"]
-    if triggered_value:
+    if trigger_value:
         if "all" in trigger:
             return list(range(1, 13))
         else:
@@ -514,7 +512,7 @@ for i in range(1, 3):
         Input("date_sync", "n_clicks"),
         State("key_{}".format(i), "children")
     )
-    def adjust_year_slider(choice1, choice2, sync, key):
+    def adjustYearSlider(choice1, choice2, sync, key):
         """Adjust years slider to available years in chosen index."""
         # Figure which choice is this panel's and which is the other
         key = int(key) - 1
@@ -582,7 +580,7 @@ for i in range(1, 3):
             month_check.sort()
             if months[0]:
                 month_incl_print = "".join(
-                    [Options.date_marks["months"][i - 1]["label"].upper()[0]
+                    [options.date_marks["months"][i - 1]["label"].upper()[0]
                      for i in month_check]
                 )
                 month_incl_print = f" ({month_incl_print})"
@@ -607,7 +605,7 @@ for i in range(1, 3):
         return full, string
 
     @app.callback(
-        Output("location_store_{}".format(i), "children"),
+        Output(f"location_store_{i}", "children"),
         Input("map_1", "clickData"),
         Input("map_2", "clickData"),
         Input("map_1", "selectedData"),
@@ -625,7 +623,7 @@ for i in range(1, 3):
         State("state_1", "value"),
         State("state_2", "value"),
         State("click_sync", "children"),
-        State("key_{}".format(i), "children")
+        State(f"key_{i}", "children")
     )
     @calls.log
     def locationPicker(click1, click2, select1, select2, county1, county2,
@@ -637,7 +635,7 @@ for i in range(1, 3):
             independent callback that identifies the most recent selection.
             Because there are many types of buttons and clicks that could
             trigger a graph update we have to work through each input to check
-            if it is a   location. It"s still much nicer than setting up a
+            if it is a location. It's still much nicer than setting up a
             dozen hidden divs, timing callbacks, and writing long lines of
             logic to determine which was most recently updated.
 
@@ -646,7 +644,7 @@ for i in range(1, 3):
             """
             # Find which input triggered this callback
             context = dash.callback_context
-            triggered_value = context.triggered[0]["value"]
+            trigger_value = context.triggered[0]["value"]
             trigger = context.triggered[0]["prop_id"]
 
             # Figure out which element we are working with
@@ -668,10 +666,10 @@ for i in range(1, 3):
 
             # The outline points will also be in selected trigger values
             if "selectedData" in trigger:
-                if triggered_value:
-                    plen = len(triggered_value["points"])
-                    tv = triggered_value["points"][int(plen/2):]
-                    triggered_value["points"] = tv
+                if trigger_value:
+                    plen = len(trigger_value["points"])
+                    tv = trigger_value["points"][int(plen/2):]
+                    trigger_value["points"] = tv
                 else:
                     location =  ["all", "y", "x", "Contiguous United States"]
 
@@ -679,33 +677,35 @@ for i in range(1, 3):
             if "On" in sync:
                 # The update graph button activates US state selections
                 if "update_graph" in trigger:
-                    if triggered_value is None:
-                        triggered_value = "all"
+                    if trigger_value is None:
+                        trigger_value = "all"
                         sel_idx = 0
                         triggering_element = sel_idx % 2 + 1
                     else:
                         # The idx of the most recent update is -2 or -1
-                        update_idx = updates.index(triggered_value) - 2
+                        update_idx = updates.index(trigger_value) - 2
                         if locations[update_idx] is None:
                             raise PreventUpdate
-                        triggered_value = locations[update_idx]
-                        sel_idx = locations.index(triggered_value)
+                        trigger_value = locations[update_idx]
+                        sel_idx = locations.index(trigger_value)
                         triggering_element = sel_idx % 2 + 1
                 else:
-                    sel_idx = locations.index(triggered_value)
+                    sel_idx = locations.index(trigger_value)
                     triggering_element = sel_idx % 2 + 1
 
                 # Use the triggered_value to create the selector object
-                selector = Location_Builder(trigger, triggered_value, crdict,
+                selector = Location_Builder(trigger, trigger_value, crdict,
                                             admin_df, state_array,
                                             county_array)
 
                 # Retrieve information for the most recently updated element
                 location = selector.chooseRecent()
 
-                # What is this about?
+                # What is this about? Must be some error condition
                 if "shape" in location[0] and location[3] is None:
                     location =  ["all", "y", "x", "Contiguous United States"]
+
+                # Add the triggering element key to prevent updates later
                 try:
                     location.append(triggering_element)
                 except:
@@ -720,21 +720,21 @@ for i in range(1, 3):
 
                 # The update graph button activates US state selections
                 if "update_graph" in trigger:
-                    if triggered_value is None:
-                        triggered_value = "all"
+                    if trigger_value is None:
+                        trigger_value = "all"
                     else:
                         # The idx of the most recent update is -2 or -1
                         # update_idx = updates.index(triggered_value) - 2
                         if locations[-1] is None:
                             raise PreventUpdate
-                        triggered_value = locations[-1]
+                        trigger_value = locations[-1]
 
                 # If this element wasn"t the trigger, prevent updates
-                if triggered_value not in locations:
+                if trigger_value not in locations:
                     raise PreventUpdate
 
                 # Use the triggered_value to create the selector object
-                selector = Location_Builder(trigger, triggered_value,
+                selector = Location_Builder(trigger, trigger_value,
                                             crdict, admin_df, state_array,
                                             county_array)
 
@@ -749,9 +749,26 @@ for i in range(1, 3):
                 try:
                     location.append(triggering_element)
                 except:
-                    raise PreventUpdate    
+                    raise PreventUpdate
 
             return json.dumps(location)
+
+    @app.callback(
+        Output(f"download_chart_{i}", "data"),
+        Input(f"download_path_store_{i}", "children"),
+        prevent_initial_call=True,
+    )
+    @calls.log
+    def download(download_info):
+        """Download csv file."""
+        info = json.loads(download_info)
+        if info is None:
+            raise PreventUpdate
+        src = info["tmp_path"]
+        dst = info["dst"]
+        df = pd.read_csv(src)
+        os.remove(src)
+        return dcc.send_data_frame(df.to_csv, dst, index=False)
 
     @app.callback(
         Output("county_div_{}".format(i), "style"),
@@ -789,99 +806,15 @@ for i in range(1, 3):
         Output("shape_store_{}".format(i), "children"),
         Input("shape_{}".format(i), "contents"),
         State("shape_{}".format(i), "filename"),
-        State("shape_{}".format(i), "last_modified")
     )
     @calls.log
-    def parseShape(contents, filenames, last_modified):
+    def parseShape(contents, fpaths):
         """Parse a shapefile object."""
         if not contents:
             raise PreventUpdate
-        if filenames:
-            basename = os.path.splitext(filenames[0])[0]
-            if len(filenames) == 1:
-                from zipfile import ZipFile
-                if any(e in filenames[0] for e in ["zip", ".7z"]):
-                    content_type, shp_element = contents[0].split(",")
-                    decoded = base64.b64decode(shp_element)
-                    with tempfile.TemporaryFile() as tmp:
-                        tmp.write(decoded)
-                        tmp.seek(0)
-                        archive = ZipFile(tmp, "r")
-                        for file in archive.filelist:
-                            fname = file.filename
-                            content = archive.read(fname)
-                            name, ext = os.path.splitext(fname)
-                            fname = "temp" + ext
-                            fpath = Paths.paths["shapefiles"].joinpath("temp",
-                                                                      fname)
-                            with open(fpath, "wb") as f:
-                                f.write(content)
-
-            elif len(filenames) > 1:
-                content_elements = [c.split(",") for c in contents]
-                elements = [e[1] for e in content_elements]
-                for i in range(len(elements)):
-                    decoded = base64.b64decode(elements[i])
-                    fname = filenames[i]
-                    name, ext = os.path.splitext(fname)
-                    fname = "temp" + ext
-                    fpath = Paths.paths["shapefiles"].joinpath("temp", fname)
-                    with open(fpath, "wb") as f:
-                        f.write(decoded)
-
-            # Now let"s just rasterize it for a mask
-            fpath = Paths.paths["shapefiles"].joinpath("temp/temp.shp")
-            shp = gpd.read_file(fpath)
-
-            # Check CRS, reproject if needed
-            crs = shp.crs
-            try:
-                epsg = crs.to_epsg()
-            except:
-                fshp = fiona.open(fpath)
-                crs_wkt = fshp.crs_wkt
-                crs_ref = osr.SpatialReference()
-                crs_ref.ImportFromWkt(crs_wkt)
-                crs_ref.AutoIdentifyEPSG()
-                epsg = crs_ref.GetAttrValue("AUTHORITY", 1)
-                epsg = int(epsg)
-                fshp.close()
-
-            if epsg != 4326:
-                shapeReproject(
-                    src=fpath,
-                    dst=fpath,
-                    src_epsg=epsg,
-                    dst_epsg=4326
-                )
-
-            # Find a column that is numeric
-            #            numeric = shp._get_numeric_data()  # <---------------------------- I must"ve done this for a reason, probabyly looking for an id number
-            attr = shp.columns[0]
-
-            # Rasterize
-            src = fpath
-            dst = str(fpath).replace(".shp", ".tif")
-            admin.rasterize(
-                src,
-                dst,
-                extent=[-130, 50, -55, 20],
-                attribute=attr,
-                all_touch=False
-            )  # <---- All touch not working.
-
-            # Cut to extent
-            src = str(dst)
-            dst = src.replace(".tif", "1.tif")
-            tif = gdal.Warp(
-                dst,
-                src,
-                outputBounds=[-130, 50, -55, 20]
-            )
-            del tif
-
-            return basename
-
+        parser = Parse_Shape(fpaths, contents)
+        basename = parser.main()
+        return basename
 
     @app.callback(
         Output("coverage_div_{}".format(i), "children"),
@@ -1048,15 +981,17 @@ for i in range(1, 3):
         key = int(key)
 
         # Prevent update from location unless its a state, shape or bbox filter
-        if trigger == "location_store_{}.children".format(key):
-        #     if "corr" not in function:
-        #         if "grid" in location[0]:
-        #             raise PreventUpdate
+        if trigger == f"location_store_{key}.children":
+            if "corr" not in function:
+                if location[0] in ["grids"]:
+                    print("Preventing Map Update (Map point/selection trigger)")
+                    raise PreventUpdate
 
             # Check which element the selection came from
             triggered_element = location[-1]
             if "On" not in sync:
                 if triggered_element != key:
+                    print("Preventing Update (not syncing this map)")
                     raise PreventUpdate
 
         # To save zoom levels and extent between map options
@@ -1135,12 +1070,6 @@ for i in range(1, 3):
         flag, y, x, label, idx = location
         if flag in ["state", "county", "shape"]:
             array = array * data.mask
-        # elif flag == "shape":
-        #     array = array * data.mask
-            # y = np.array(json.loads(y))
-            # x = np.array(json.loads(x))
-            # gridids = grid[y, x]
-            # array.data[~np.isin(grid, gridids)] = np.nan
 
         # If it is a correlation recreate the map array
         if "corr" in function and flag != "all":
@@ -1304,8 +1233,8 @@ for i in range(1, 3):
 
     @app.callback(
         Output(f"series_{i}", "figure"),
-        Output(f"download_link_{i}", "href"),
         Output(f"area_store_{i}", "children"),
+        Output(f"download_path_store_{i}", "children"),
         Input("submit", "n_clicks"),
         Input("signal", "children"),
         Input(f"choice_{i}", "value"),
@@ -1314,6 +1243,8 @@ for i in range(1, 3):
         Input(f"dsci_button_{i}", "n_clicks"),
         Input(f"color_min_{i}", "value"),
         Input(f"color_max_{i}", "value"),
+        Input(f"download_all_link_{i}", "n_clicks"),
+        Input(f"download_link_{i}", "n_clicks"),
         State(f"key_{i}", "children"),
         State("click_sync", "children"),
         State("date_sync", "children"),
@@ -1322,8 +1253,8 @@ for i in range(1, 3):
     )
     @calls.log
     def makeSeries(submit, signal, choice, choice_store, location, show_dsci,
-                   color_min, color_max, key, sync, date_sync, function,
-                   area_store):
+                   color_min, color_max, download, download_all, key, sync,
+                   date_sync, function, area_store):
         """
         This makes the time series graph below the map.
         Sample arguments:
@@ -1340,7 +1271,7 @@ for i in range(1, 3):
         location = json.loads(location)
 
         # If we aren"t syncing or changing the function or color
-        if trigger == "location_store_{}.children".format(key):
+        if trigger == f"location_store_{key}.children":
             triggered_element = location[-1]
             if "On" not in sync:
                 if triggered_element != key:
@@ -1378,8 +1309,14 @@ for i in range(1, 3):
         area_store_key = str(signal) + "_" + choice + "_" + str(location)
         area_store = json.loads(area_store)
 
-        # If the function is oarea, we plot five overlapping timeseries
+        # Create the label for the plots, so sorry this is so complex
         label = location[3]
+        if location[0] == "shape":
+            path = Path(label)
+            ext = path.suffix
+            label = path.name.replace(ext, "")
+
+        # If the function is oarea, we plot five overlapping timeseries
         nonindices = ["tdmean", "tmean", "tmin", "tmax", "ppt",  "vpdmax",
                       "vpdmin", "vpdmean"]
         if function != "oarea" or choice in nonindices:
@@ -1390,22 +1327,22 @@ for i in range(1, 3):
             columns = OrderedDict({
                 "month": dates,
                 "value": list(timeseries),
-                "function": function_names[function],  # <-- This doesn"t always make sense
+                "function": FUNCTION_NAMES[function],  # <-- This doesn"t always make sense
                 "location": location[-2],
                 "index": INDEX_NAMES[choice]
             })
             df = pd.DataFrame(columns)
-            df_str = df.to_csv(encoding="utf-8", index=False)
-            href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
             bar_type = "bar"
             area_store = ["", ""]
-
             if choice in nonindices and function == "oarea":
                 label = "(Drought Severity Categories Not Available)"
-
         else:
             bar_type = "overlay"
             label = location[3]
+            if location[0] == "shape":
+                path = Path(label)
+                ext = path.suffix
+                label = path.name.replace(ext, "")
 
             # I cannot get this thing to cache! We are storing it in a Div
             if area_store_key == area_store[0]:
@@ -1431,15 +1368,29 @@ for i in range(1, 3):
                 "index": INDEX_NAMES[choice]
             })
             df = pd.DataFrame(columns)
-            df_str = df.to_csv(encoding="utf-8", index=False)
-            href = "data:text/csv;charset=utf-8," + urllib.parse.quote(df_str)
+
+        # Write to file for download
+        download_info = None
+        if "download_" in trigger:
+            tmp_path = "/tmp/drip_timeseries.csv"
+            if "all_link" in trigger:
+                dst = f"drip_timeseries_all_{key}.csv"
+                df = makeCSVs(signal, function, location)
+            else:
+                dst = f"drip_timeseries_{key}.csv"
+                df = makeCSV((choice, signal, function, location, crdict))
+            download_info = {
+                "dst": dst,
+                "tmp_path": tmp_path
+            }
+            df.to_csv(tmp_path, index=False)
 
         # Set up y-axis depending on selection
         if function != "oarea" or choice in nonindices:
             if "p" in function:
                 yaxis = dict(title="Percentiles", range=[0, 100])
             elif "o" in function:
-                yaxis = dict(range=[dmin, dmax], title=unit_map[choice])
+                yaxis = dict(range=[dmin, dmax], title=UNIT_MAP[choice])
 
                 # Center the color scale
                 xmask = data.mask
@@ -1518,13 +1469,18 @@ for i in range(1, 3):
 
             # Toggle the DSCI
             if show_dsci % 2 != 0:
-                data.insert(5, dict(x=dates,
-                                    y=dsci,
-                                    yaxis="y2",
-                                    hoverinfo="x",
-                                    showlegend=False,
-                                    line=dict(color="rgba(39, 57, 127, 0.85)",
-                                              width=line_width)))
+                dsci_data = dict(
+                    x=dates,
+                    y=dsci,
+                    yaxis="y2",
+                    hoverinfo="x",
+                    showlegend=False,
+                    line=dict(
+                        color="rgba(39, 57, 127, 0.85)",
+                        width=line_width
+                    )
+                )
+                data.insert(5, dsci_data)
 
         # Copy and customize Layout
         if label is None:
@@ -1569,75 +1525,4 @@ for i in range(1, 3):
 
         figure = dict(data=data, layout=layout_copy)
 
-        return figure, href, json.dumps(area_store)
-
-    @app.callback(
-        Output("download_all_link_{}".format(i), "href"),
-        Input("signal", "children"),
-        Input("choice_{}".format(i), "value"),
-        Input("location_store_{}".format(i), "children"),
-        Input("click_sync", "children"),
-        Input("date_sync", "children"),
-        Input("function_choice", "value"),
-        State("key_{}".format(i), "children"),
-        State("area_store_{}".format(i), "children")
-    )
-    @calls.log
-    def update_all_csvlink(signal, choice, location,
-                           sync, date_sync, function, key, area_store):
-        """Take the selections made for this element and return a data frame
-        containing all indicators.
-        """
-        if not signal:
-            raise PreventUpdate
-
-        # Identify element number
-        key = int(key)
-
-        # Create signal for the global_store
-        signal = json.loads(signal)
-
-        # If we are syncing times, use the key to find the right signal
-        if "On" in date_sync:
-            signal = signal[0]
-        else:
-            signal = signal[key - 1]
-        signal = json.dumps(signal)
-
-        path = "{}_{}_{}_{}_{}".format(signal, function, choice, location,
-                                       key)
-        return "/download?value=" + path
-
-
-    # @app.callback(
-    #     Output(f"color_slider_{i}", "min"),
-    #     Output(f"color_slider_{i}", "max"),
-    #     Output(f"color_slider_{i}", "marks"),
-    #     Input(f"choice_{i}", "value"),
-    #     Input("signal", "children"),
-    #     State(f"location_store_{i}", "children"),
-    #     State(f"key_{i}", "children"),
-    #     State("function_choice", "value"),
-    #     State("date_sync", "children")
-    # )
-    # def update_color_slider(choice, signal, location, key, function,
-    #                         date_sync):
-    #     """Update color slider with chosen index value ranges."""
-    #     signal = json.loads(signal)
-    #     if isinstance(location, str):
-    #         location = json.loads(location)
-    #     if "On" in date_sync:
-    #         signal = signal[0]
-    #     else:
-    #         signal = signal[key - 1]
-    #     data = retrieveData(signal, function, choice, location)
-    #     dmin = data.data_min
-    #     dmax = data.data_max
-    #     mmin = str(round(dmin, 2))
-    #     mmax = str(round(dmax, 2))
-    #     marks = {
-    #         dmin: mmin,
-    #         dmax: mmax
-    #     }
-    
-    #     return dmin, dmax, marks
+        return figure, json.dumps(area_store), json.dumps(download_info)

@@ -1,6 +1,6 @@
 """Dataset options."""
 INDEX_OPTIONS = [
-    {"label": "RI", "value": "ri"},
+    # {"label": "RI", "value": "ri"},
     {"label": "PDSI", "value": "pdsi"},
     {"label": "PDSI-Self Calibrated", "value": "scpdsi"},
     {"label": "Palmer Z Index", "value": "pzi"},
@@ -49,7 +49,7 @@ INDEX_OPTIONS = [
 ]
 
 INDEX_NAMES = {
-    "ri": "NOAA CPC-Derived Rainfall Index",
+    # "ri": "NOAA CPC-Derived Rainfall Index",
     "pdsi": "Palmer Drought Severity Index",
     "scpdsi": "Self-Calibrated Palmer Drought Severity Index",
     "pzi": "Palmer Z Index",
@@ -77,23 +77,23 @@ INDEX_NAMES = {
     "spi10": "Standardized Precipitation Index - 10 month",
     "spi11": "Standardized Precipitation Index - 11 month",
     "spi12": "Standardized Precipitation Index - 12 month",
-    "SPEI1": "Standardized Precipitation-Evaporation Index - 1 month",
-    "SPEI2": "Standardized Precipitation-Evaporation Index - 2 month",
-    "SPEI3": "Standardized Precipitation-Evaporation Index - 3 month",
-    "SPEI4": "Standardized Precipitation-Evaporation Index - 4 month",
-    "SPEI5": "Standardized Precipitation-Evaporation Index - 5 month",
-    "SPEI6": "Standardized Precipitation-Evaporation Index - 6 month",
-    "SPEI7": "Standardized Precipitation-Evaporation Index - 7 month",
-    "SPEI8": "Standardized Precipitation-Evaporation Index - 8 month",
-    "SPEI9": "Standardized Precipitation-Evaporation Index - 9 month",
-    "SPEI10": "Standardized Precipitation-Evaporation Index - 10 month",
-    "SPEI11": "Standardized Precipitation-Evaporation Index - 11 month",
-    "SPEI12": "Standardized Precipitation-Evaporation Index - 12 month",
+    "spei1": "Standardized Precipitation-Evaporation Index - 1 month",
+    "spei2": "Standardized Precipitation-Evaporation Index - 2 month",
+    "spei3": "Standardized Precipitation-Evaporation Index - 3 month",
+    "spei4": "Standardized Precipitation-Evaporation Index - 4 month",
+    "spei5": "Standardized Precipitation-Evaporation Index - 5 month",
+    "spei6": "Standardized Precipitation-Evaporation Index - 6 month",
+    "spei7": "Standardized Precipitation-Evaporation Index - 7 month",
+    "spei8": "Standardized Precipitation-Evaporation Index - 8 month",
+    "spei9": "Standardized Precipitation-Evaporation Index - 9 month",
+    "spei10": "Standardized Precipitation-Evaporation Index - 10 month",
+    "spei11": "Standardized Precipitation-Evaporation Index - 11 month",
+    "spei12": "Standardized Precipitation-Evaporation Index - 12 month",
     "tmin": "Temperature - Minimum (C)",
     "tmax": "Temperature - Maximum (C)",
     # "tmean": "Temperature - Mean (C)",
     "tdmean": "Dew Point Temperature - Mean (C)",
-    "ppt": "Precipitation (mm)?",
+    "ppt": "Precipitation (mm)",
     "vpdmax": "Vapor Pressure Deficit - Maxmimumm",
     "vpdmin": "Vapor Pressure Deficit - Minimum"
 }
