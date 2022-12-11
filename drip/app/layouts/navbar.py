@@ -25,8 +25,6 @@ ACRONYM_TEXT = """
     
     TMAX:            Average Daily Maximum Temp (°C)
     
-    TMEAN:           Mean Temperature (°C)
-    
     TDMEAN:          Mean Dew Point Temperature (°C)
     
     PPT:             Average Precipitation (mm)
