@@ -3,7 +3,7 @@ channels:
     - conda-forge
     - defaults
 dependencies:
-    - dash=2.6.2
+    - dash=2.6.1
     - dash-bootstrap-components
     - dask
     - flask-caching

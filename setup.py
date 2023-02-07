@@ -12,8 +12,8 @@ setup(
     author="Travis Williams",
     author_email="travissius@gmail.com",
     include_package_data=True,
-    install_requires=INSTALL_REQUIREMENTS,
-    python_requires="==3.9",
+    # install_requires=INSTALL_REQUIREMENTS,
+    python_requires=">=3.9",
     test_suite="tests",
     package_data={
         "data": [

@@ -32,7 +32,6 @@ logger = init_logger(__name__)
 PRISM_URL = "https://wrcc.dri.edu/wwdt/data/PRISM"
 
 
-
 class WWDT_Builder(NetCDF):
     """Methods for downloading and formatting selected data from the WWDT."""
 
