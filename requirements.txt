@@ -5,14 +5,14 @@ dash_html_components==2.0.0
 dash_table==5.0.0
 dask==2022.2.1
 fiona==1.9.0
-Flask==1.1.2
+Flask==2.2.2
 Flask_Caching==2.0.1
 geopandas==0.12.2
 matplotlib==3.5.1
 netCDF4==1.6.2
 numba==0.55.1
 numpy==1.21.5
-osgeo==0.0.1
+gdal
 pandas==1.4.2
 pathos==0.3.0
 plotly==5.6.0

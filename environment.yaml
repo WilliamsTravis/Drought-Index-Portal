@@ -3,12 +3,11 @@ channels:
     - conda-forge
     - defaults
 dependencies:
-    - dash=2.6.1
+    - dash
     - dash-bootstrap-components
     - dask
     - flask-caching
     - geopandas
-    - ipython
     - netcdf4
     - numba
     - numpy
@@ -20,10 +19,9 @@ dependencies:
     - rioxarray
     - salem
     - scipy
-    - spyder-kernels
     - tqdm
     - xarray
-    - werkzeug=2.0.3
+    - werkzeug
     - yaml
     - pip
     - pip:
