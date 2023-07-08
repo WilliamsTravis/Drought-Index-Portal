@@ -19,7 +19,7 @@ def main():
             print(f"Building {index}...")
             builder = Data_Builder(index)
             try:
-                builder.build(overwrite=False)
+                builder.build(overwrite=True)
             except Exception as error:
                 print(f" {index} build failed: {error}")
                 logger.error("%s build failed: %s.", index, error,
