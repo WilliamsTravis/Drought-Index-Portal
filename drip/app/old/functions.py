@@ -342,7 +342,7 @@ def readRaster(rasterpath, band, navalue=-9999):
       array (numpy), spatial geometry (gdal object),
                                       coordinate reference system (gdal object)
     """
-    raster = gdal.Open(rasterpath)
+    raster = gdal.Open(str(rasterpath))
     geometry = raster.GetGeoTransform()
     arrayref = raster.GetProjection()
     array = np.array(raster.GetRasterBand(band).ReadAsArray())
@@ -1616,12 +1616,14 @@ class Index_Maps(Paths):
         if len(data.time) == 0:
 
             # Get the right resolution file
-            res = data.crs.GeoTransform[1]
+            res = data.crs.GeoTransform[0]
             res_print = str(res).replace(".", "_")
-            na_path = self.paths["rasters"].joinpath(f"na_banner_{res_print}.tif")
+            na_fname = f"na_banner_{res_print}.tif"
+            na_path = self.paths["rasters"].joinpath(na_fname)
 
             # The whole data set just says "NA" using the value -9999
             today = dt.datetime.now()
+
             # base = dt.datetime(1900, 1, 1)
             na = readRaster(na_path, 1, -9999)[0]
             na = na * 0 - 9999

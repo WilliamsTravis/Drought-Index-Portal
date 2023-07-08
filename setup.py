@@ -1,3 +1,11 @@
+"""Setup for drip package installation.
+
+Note:
+    - Please confirm that GDAL is installed on your system or run
+      `install_gdal.sh` before installating this package.
+    - If you are having problems with the Python GDAL package, try installing
+      with the `--no-cache-dir` option.
+"""
 import os
 import subprocess as sp
 
@@ -25,8 +33,8 @@ def get_gdal_version():
 
 def get_requirements():
     """Get requirements and update gdal version number."""
-    with open("requirements.txt") as f:
-        reqs = f.readlines()
+    with open("requirements.txt", encoding="utf-8") as file:
+        reqs = file.readlines()
     gdal_version = get_gdal_version()
     gdal_line = [req for req in reqs if req.startswith("gdal")][0]
     gdal_line = gdal_line[:-1]
@@ -36,9 +44,6 @@ def get_requirements():
     return reqs
 
 
-INSTALL_REQUIREMENTS = get_requirements()
-
-
 setup(
     name="drip",
     packages=["drip"],
@@ -46,7 +51,7 @@ setup(
     author="Travis Williams",
     author_email="travissius@gmail.com",
     include_package_data=True,
-    install_requires=INSTALL_REQUIREMENTS,
+    install_requires=get_requirements(),
     python_requires=">=3.9",
     test_suite="tests",
     package_data={

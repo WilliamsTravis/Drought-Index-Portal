@@ -9,7 +9,7 @@ Flask==2.2.2
 Flask_Caching==2.0.1
 geopandas==0.12.2
 matplotlib==3.5.1
-netCDF4==1.6.2
+netCDF4==1.5.8
 numba==0.55.1
 numpy==1.21.5
 gdal
@@ -25,4 +25,4 @@ rioxarray==0.12.0
 scipy==1.7.3
 setuptools==61.2.0
 tqdm==4.64.0
-xarray==0.20.1
+xarray==2023.2.0
