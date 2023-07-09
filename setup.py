@@ -49,7 +49,7 @@ setup(
     packages=["drip"],
     version="0.2.0",
     author="Travis Williams",
-    author_email="travissius@gmail.com",
+    author_email="twillico@proton.me",
     include_package_data=True,
     install_requires=get_requirements(),
     python_requires=">=3.9",

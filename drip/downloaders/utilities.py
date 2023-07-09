@@ -69,7 +69,7 @@ class Downloader(drip.Paths):
         argstr = ", ".join([f"{k}='{v}'" for k, v in self.__dict__.items()])
         return f"<Downloader object: {argstr}>"
 
-    def download_all(self, download_paths):
+    def download_all(self, download_paths, overwrite=True):
         """Download all files.
 
         Parameters
@@ -77,14 +77,17 @@ class Downloader(drip.Paths):
         download_paths : list
             List of dictionaries containing 'url' and 'dst' keys for remote
             source and local destination, respectively.
+        overwrite: boolean
+            Overwrite existing files.
         """
         # We have a set of different methods here
         logger.info("Downloading %d files...", len(download_paths))
+        args = [(entry, overwrite) for entry in download_paths]
         with ThreadPool(os.cpu_count() - 1) as pool:
-            for _ in pool.imap(self.download, download_paths):
+            for _ in pool.starmap(self.download, args):
                 pass
 
-    def download(self, entry):
+    def download(self, entry, overwrite=True):
         """Download single file.
 
         Parameters
@@ -98,7 +101,7 @@ class Downloader(drip.Paths):
         dst = entry["local"]
 
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        if os.path.exists(dst):
+        if os.path.exists(dst) and not overwrite:
             logger.info("%s exists, skipping...", dst)
             return
 
@@ -498,35 +501,41 @@ class NetCDF(Adjustments):
         # Get geographic information
         na = -9999 # Infer from datatype
 
+        # Delete the old file if it exists, it can cause problems
+        if dst.exists():
+            os.remove(dst)
+
         # Resample
-        if xres and yres:
-            template = rio.open(TEMPLATE)
-            warped = gdal.Warp(
-                srcDSOrSrcDSTab=str(src),
-                destNameOrDestDS=str(dst),
-                dstNodata=float(na),
-                outputBounds=list(template.bounds),
-                dstSRS=dst_srs,
-                format="GTiff",
-                targetAlignedPixels=True,  # test this
-                xRes=xres,
-                yRes=yres,
-                resampleAlg="bilinear"
-            )
-            del warped
-
-        # Reproject
-        else:
-            warped = gdal.Warp(
-                destNameOrDestDS=str(dst),
-                srcDSOrSrcDSTab=str(src),
-                dstSRS=dst_srs,
-                dstNodata=float(na),
-                format="GTiff",
-                resampleAlg="bilinear"
-            )
-            del warped
-
+        try:
+            if xres and yres:
+                template = rio.open(TEMPLATE)
+                warped = gdal.Warp(
+                    srcDSOrSrcDSTab=str(src),
+                    destNameOrDestDS=str(dst),
+                    dstNodata=float(na),
+                    outputBounds=list(template.bounds),
+                    dstSRS=dst_srs,
+                    format="GTiff",
+                    targetAlignedPixels=True,  # test this
+                    xRes=xres,
+                    yRes=yres,
+                    resampleAlg="bilinear"
+                )
+                del warped
+    
+            # Reproject
+            else:
+                warped = gdal.Warp(
+                    destNameOrDestDS=str(dst),
+                    srcDSOrSrcDSTab=str(src),
+                    dstSRS=dst_srs,
+                    dstNodata=float(na),
+                    format="GTiff",
+                    resampleAlg="bilinear"
+                )
+                del warped
+        except (RuntimeError, TypeError):
+            logger.error("GDAL Warp faled on %s to %s", src, dst)
 
 class EDDI(NetCDF):
     """Methods for retrieving EDDI files."""
@@ -563,6 +572,11 @@ class EDDI(NetCDF):
     def format_eddi(self, time_tag="NETCDF_DIM_day"):
         """Reformat EDDI asc files to geotiff for use in DataBuilder."""
         logger.info("Adjusting %s downloads to DrIP format", self.index)
+
+        # Remove existing tifs
+        old_tifs = list(self.target_dir.glob("*tif"))
+        if old_tifs:
+            [os.remove(tif) for tif in old_tifs]
 
         # Collect all paths
         paths = list(self.target_dir.glob("*asc"))
@@ -627,7 +641,6 @@ class EDDI(NetCDF):
         # Collect all needed arguments
         resample_list = []
         reproject_list = []
-        resolution = resolution
         monthlies = list(self.home.joinpath("originals").glob("*tif"))
         monthlies.sort()
         for src in monthlies:
@@ -860,7 +873,7 @@ class Data_Builder(NetCDF):
         msg = f"{name}\n  {attr_str}"
         return msg
 
-    def build(self, overwrite=False):
+    def build(self, overwrite=True):
         """Download and combine multiple NetCDF files from WWDT into one."""
         dsts = [
             self.final_path(percentile=False, projected=False),
@@ -885,7 +898,7 @@ class Data_Builder(NetCDF):
                 prism._unzip_prism()
                 prism.format_prism()
             else:
-                self.download_all(self.download_paths)
+                self.download_all(self.download_paths, overwrite=overwrite)
                 self._adjust_wwdt()
 
             # Combine into single files for each index

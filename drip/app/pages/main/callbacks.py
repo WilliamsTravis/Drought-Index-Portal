@@ -28,6 +28,7 @@ from drip.app.old.functions import (
     TYPE_PATHS,
     UNIT_MAP
 )
+from drip.app.options.options import Options
 from drip.app.options.indices import INDEX_NAMES
 from drip.app.options.options import Options
 from drip.app.options.styles import ON_COLOR, OFF_COLOR, STYLES
@@ -177,7 +178,6 @@ def adjustMonthPrint1(sync):
     filters = filters + number
 
     return start, end, filters
-
 
 @app.callback(
     Output("function_choice", "options"),
@@ -368,53 +368,6 @@ def toggleLocationSyncButton(click, old_style):
         children = "Location Syncing: On"
     return style, children
 
-
-@app.callback(
-    Output("month_check_1", "value"),
-    Input("all_months_1", "n_clicks"),
-    Input("no_months_1", "n_clicks")
-)
-@calls.log
-def toggleMonthFilter1(all_months, no_months):
-    """This fills or empties the month filter boxes with/of checks"""
-    # If no clicks yet, prevent update
-    if not any([all_months, no_months]):
-        raise PreventUpdate
-
-    # Find which input triggered this callback
-    context = dash.callback_context
-    trigger_value = context.triggered[0]["value"]
-    trigger = context.triggered[0]["prop_id"]
-    if trigger_value:
-        if "all" in trigger:
-            return list(range(1, 13))
-        else:
-            return [None]
-
-
-@app.callback(
-    Output("month_check_2", "value"),
-    Input("all_months_2", "n_clicks"),
-    Input("no_months_2", "n_clicks")
-)
-@calls.log
-def toggleMonthFilter2(all_months, no_months):
-    """This fills or empties the month filter boxes with/of checks"""
-    # If no clicks yet, prevent update
-    if not any([all_months, no_months]):
-        raise PreventUpdate
-
-    # Find which input triggered this callback
-    context = dash.callback_context
-    trigger_value = context.triggered[0]["value"]
-    trigger = context.triggered[0]["prop_id"]
-    if trigger_value:
-        if "all" in trigger:
-            return list(range(1, 13))
-        else:
-            return [None]
-
-
 @app.callback(
     Output("tutorial_div", "style"),
     Output("tutorial_button", "style"),
@@ -502,7 +455,67 @@ def toggleDateSyncButton(click, old_style):
 
 # For multiple instances
 for i in range(1, 3):
-    
+
+    @app.callback(
+        Output(f"month_slider_{i}b", "max"),
+        Input(f"choice_{i}" ,"value"),
+        Input(f"year_slider_{i}", "value")
+    )
+    def adjust_end_month(index, year):
+        """Adjust end month if only the last year in dataset is selected."""
+        # Find the files of the last year
+        file = Paths.paths["indices"].joinpath(f"{index}/{index}.nc")
+        with xr.open_dataset(file) as ds:
+            time = ds["time"].data[-1]
+
+        # Convert to datetime
+        month = pd.to_datetime(time).month
+
+        return month
+
+    @app.callback(
+        Output(f"month_check_{i}", "value"),
+        Output(f"month_check_{i}", "options"),
+        Input(f"choice_{i}", "value"),
+        Input(f"all_months_{i}", "n_clicks"),
+        Input(f"no_months_{i}", "n_clicks"),
+        Input(f"year_slider_{i}", "value"),
+        State(f"month_check_{i}", "value"),
+    )
+    @calls.log
+    def toggleMonthFilter(index, all_months, no_months, years, last_months):
+        """This fills or empties the month filter boxes with/of checks"""
+        # Adjust options if only one year
+        options = Options(index)
+        if years[0] == years[-1]:
+            # If this is the last year on file, adjust the ending month
+            file = Paths.paths["indices"].joinpath(f"{index}/{index}.nc")
+            with xr.open_dataset(file) as ds:
+                time = ds["time"].data[:]
+            time = [pd.to_datetime(date) for date in time]
+            time = [date for date in time if date.year == years[0]]
+            time = time[-1]
+            last_month = time.month + 1
+        else:
+            last_month = 13
+        month_options = list(range(1, last_month))
+        options = options.date_marks["months"]
+
+        # Find which input triggered this callback
+        context = dash.callback_context
+        trigger_value = context.triggered[0]["value"]
+        trigger = context.triggered[0]["prop_id"]
+
+        # Set the values
+        month_values = last_months.copy()
+        if trigger_value:
+                if "all" in trigger:
+                    month_values = list(range(1, last_month))
+                elif "no" in trigger:
+                    month_values = [None]
+
+        return month_values, month_options
+
     @app.callback(
         Output(f"year_slider_{i}", "min"),
         Output(f"year_slider_{i}", "max"),

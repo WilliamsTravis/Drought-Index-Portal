@@ -14,7 +14,7 @@ set_handler(logger, Paths.log_directory.joinpath("installation.log"))
 def main():
     """Download and format all needed files for the prf app."""
     for index, desc in INDEX_NAMES.items():
-        if not index.startswith("ri"):
+        if not index.startswith(("ri", "pdsi", "scp", "pz")):
             logger.info("Building %s ...", index)
             print(f"Building {index}...")
             builder = Data_Builder(index)

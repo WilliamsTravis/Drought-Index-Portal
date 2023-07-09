@@ -138,8 +138,8 @@ NAVBAR = html.Nav(
             children=[
                 html.Button(
                     id="toggle_options",
-                    children="Options: Off",
-                    n_clicks=0,
+                    children="Options: On",
+                    n_clicks=1,
                     type="button",
                     title="Display/hide options that apply to each map below.",
                     style={
