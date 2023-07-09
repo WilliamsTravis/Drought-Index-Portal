@@ -480,34 +480,62 @@ LAYOUT = html.Div(
 
                  # Year Sliders
                  html.Div([
-                     html.H3(
-                        id="date_range_1",
-                        children="Date Range"
+                    html.Div(
+                        className="row",
+                        children=[
+                            html.H3(
+                               id="date_range_1",
+                               children="Date Range",
+                               style={"margin-bottom": "10px"}
+                            ),
+                            html.Button(
+                                id="date_latest_1",
+                                className="one column",
+                                children="Latest",
+                                title=("Click to toggle between a historical "
+                                       "range and the latest single month."),
+                                style={**STYLES["on_button_app"],
+                                       **{"margin-bottom": "25px"}}
+        
+                            ),
+                        ]
                     ),
                     html.Div(
                         id="year_slider_div_1",
-                        children=[
-                            dcc.RangeSlider(
-                                id="year_slider_1",
-                                value=[1980, OPTIONS.dates["max_year"]],
-                                min=OPTIONS.dates["min_year"],
-                                max=OPTIONS.dates["max_year"],
-                                updatemode="drag",
-                                step=1,
-                                marks=OPTIONS.date_marks["years"]
-                            )
-                        ],
-                        style={
-                            "margin-top": "0",
-                            "margin-bottom": "80px"
-                        }
+                        className="row",
+                        children=dcc.RangeSlider(
+                            id="year_slider_1",
+                            value=[1980, OPTIONS.dates["max_year"]],
+                            min=OPTIONS.dates["min_year"],
+                            max=OPTIONS.dates["max_year"],
+                            updatemode="drag",
+                            step=1,
+                            marks=OPTIONS.date_marks["years"]
+                        ),
+                        style={"margin-bottom": "50px"}
                     ),
                     html.Div(
                         id="year_div2",
                         children=[
-                            html.H3(
-                                id="date_range_2",
-                                children="Date Range #2"
+                            html.Div(
+                                className="row",
+                                children=[
+                                    html.H3(
+                                       id="date_range_2",
+                                       children="Date Range",
+                                       style={"margin-bottom": "10px"}
+                                    ),
+                                    html.Button(
+                                        id="date_latest_2",
+                                        className="one column",
+                                        children="Latest",
+                                        title=("Click to toggle between a historical "
+                                               "range and the latest single month."),
+                                        style={**STYLES["on_button_app"],
+                                               **{"margin-bottom": "25px"}}
+                
+                                    ),
+                                ]
                             ),
                             html.Div(
                                 id="year_slider_div_2",
@@ -593,13 +621,11 @@ LAYOUT = html.Div(
                                     "height": "25px",
                                     "font-size": "11",
                                     "border": "1px solid black",
-                                    "background-color": "#c9d3e9",
+                                    # "background-color": "#c9d3e9",
                                     "font-family": "Times New Roman",
-                                    "background-color": "#c9d3e9",
                                     "border-top-left-radius": "5px",
                                     "border-bottom-left-radius": "5px"
                                 }
-
                             ),
                              html.Button(
                                 id="no_months_1",
@@ -610,7 +636,7 @@ LAYOUT = html.Div(
                                     "height": "25px",
                                     "font-size": "11",
                                     "border": "1px solid black",
-                                    "background-color": "#c9d3e9",
+                                    # "background-color": "#c9d3e9",
                                     "font-family": "Times New Roman",
                                     "border-top-right-radius": "5px",
                                     "border-bottom-right-radius": "5px"
@@ -685,9 +711,8 @@ LAYOUT = html.Div(
                                 "height": "25px",
                                 "font-size": "11",
                                 "border": "1px solid black",
-                                "background-color": "#c9d3e9",
+                                # "background-color": "#c9d3e9",
                                 "font-family": "Times New Roman",
-                                "background-color": "#c9d3e9",
                                 "border-top-left-radius": "5px",
                                 "border-bottom-left-radius": "5px"
                             }
@@ -701,9 +726,8 @@ LAYOUT = html.Div(
                                 "height": "25px",
                                 "font-size": "11",
                                 "border": "1px solid black",
-                                "background-color": "#c9d3e9",
+                                # "background-color": "#c9d3e9",
                                 "font-family": "Times New Roman",
-                                "background-color": "#c9d3e9",
                                 "border-top-right-radius": "5px",
                                 "border-bottom-right-radius": "5px"
                             }
@@ -876,6 +900,14 @@ LAYOUT = html.Div(
         ),
         html.Div(
             id="download_path_store_2",
+            style={"display": "none"}
+        ),
+        html.Div(
+            id="date_store_1",
+            style={"display": "none"}
+        ),
+        html.Div(
+            id="date_store_2",
             style={"display": "none"}
         ),
         dcc.Download(

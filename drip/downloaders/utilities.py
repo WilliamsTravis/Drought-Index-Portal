@@ -31,6 +31,7 @@ import pandas as pd
 import pathos.multiprocessing as mp
 import pyproj
 import rasterio as rio
+import xarray as xr
 
 from osgeo import gdal, osr
 from scipy.stats import rankdata
@@ -265,6 +266,18 @@ class NetCDF(Adjustments):
         days = (date - base).days
 
         return days
+
+    def trim_dates(self, file):
+        """Trim file to include only dates up to now."""
+        # Open file and see where the data ends
+        ds = xr.open_dataset(file)
+        t1 = ds["time"][0]
+        ds = ds.sel(time=slice(t1, self.today))
+        if np.isnan(ds["value"][-1].data).all():
+            t2 = ds["time"][-2]
+            ds = ds.sel(time=slice(t1, t2))
+        os.remove(file)
+        ds.to_netcdf(file)
 
     def _add_crs_variable(self, nco, profile):
         """Build and return a spatial referencing variable."""
@@ -903,6 +916,11 @@ class Data_Builder(NetCDF):
 
             # Combine into single files for each index
             self._combine()
+
+            # Trim dates for WWDT
+            if "wrcc.dri.edu" in self.host:
+                for dst in dsts:
+                    self.trim_dates(dst)
 
             end = time.time()
             duration = round((end - start) / 60, 2)

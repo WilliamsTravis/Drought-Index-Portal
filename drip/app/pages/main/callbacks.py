@@ -342,7 +342,7 @@ def toggleOptions(click, old_style):
     else:
         div_style = {}
         button_style = {**old_style, **{"background-color": ON_COLOR}}
-        submit_style = STYLES["off_button_app"]
+        submit_style = STYLES["on_button_app"]
         submit_style["margin-bottom"] = "25px"
         submit_style["margin-top"] = "25px"
         children = "Options: On"
@@ -517,6 +517,45 @@ for i in range(1, 3):
         return month_values, month_options
 
     @app.callback(
+        Output(f"year_slider_{i}", "value"),
+        Output(f"month_slider_{i}a", "value"),
+        Output(f"month_slider_{i}b", "value"),
+        Output(f"date_latest_{i}", "children"),
+        Output(f"date_store_{i}", "children"),
+        Input(f"date_latest_{i}", "n_clicks"),
+        State(f"year_slider_{i}", "value"),
+        State(f"month_slider_{i}a", "value"),
+        State(f"month_slider_{i}b", "value"),
+        State(f"choice_{i}", "value"),
+        State(f"date_store_{i}", "children")
+    )
+    @calls.log
+    def toggleLatest(n_clicks, year, month1, month2, index, date_store):
+        """Toggle options on/off"""
+        if not n_clicks:
+            raise PreventUpdate
+
+        old = json.dumps({"year": year, "month1": month1, "month2": month2})
+
+        if n_clicks % 2 != 0:
+            label = "Historical"
+            file = Paths.paths["indices"].joinpath(f"{index}/{index}.nc")
+            with xr.open_dataset(file) as ds:
+                time = ds["time"].data[:]
+            time = [pd.to_datetime(date) for date in time]
+            time = time[-1]
+            month1 = month2 = time.month
+            year = [time.year, time.year]
+        else:
+            label = "Latest"
+            date_store = json.loads(date_store)
+            year = date_store["year"]
+            month1 = date_store["month1"]
+            month2 = date_store["month2"]
+
+        return year, month1, month2, label, old
+
+    @app.callback(
         Output(f"year_slider_{i}", "min"),
         Output(f"year_slider_{i}", "max"),
         Output(f"year_slider_{i}", "marks"),
@@ -557,7 +596,7 @@ for i in range(1, 3):
         Input(f"month_slider_{i}b", "value"),
         Input(f"month_check_{i}", "value"),
         Input("date_sync", "n_clicks"),
-        State("key_{}".format(i), "children")
+        State(f"key_{i}", "children")
     )
     @calls.log
     def adjustDatePrint(year_range, month_a,  month_b, month_check,  sync,
