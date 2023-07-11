@@ -51,7 +51,7 @@ setup(
     author="Travis Williams",
     author_email="twillico@proton.me",
     include_package_data=True,
-    install_requires=get_requirements(),
+#    install_requires=get_requirements(),
     python_requires=">=3.9",
     test_suite="tests",
     package_data={

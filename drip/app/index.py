@@ -1,6 +1,5 @@
 """Index for main Drip page."""
 import os, sys
-
 import drip.app.pages.main.callbacks
 
 from drip import calls

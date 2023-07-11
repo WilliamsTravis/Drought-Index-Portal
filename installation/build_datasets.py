@@ -8,7 +8,7 @@ from drip.downloaders.utilities import Data_Builder
 from drip.loggers import init_logger, set_handler
 
 logger = init_logger(__name__)
-set_handler(logger, Paths.log_directory.joinpath("installation.log"))
+set_handler(logger, Paths.home.joinpath("installation/installation.log"))
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
             except Exception as error:
                 print(f" {index} build failed: {error}")
                 logger.error("%s build failed: %s.", index, error,
-                             exec_info=sys.exc_info())
+                             stack_info=sys.exc_info(), stacklevel=1)
                 raise
 
 
